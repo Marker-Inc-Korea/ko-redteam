@@ -82,12 +82,18 @@ normalize 모듈을 **역방향**으로 돌려 한국어 공격 시드를 난독
 | ✅ 한국어 거부 detector | `ko_refusal` | 완료 |
 | ✅ 한국어 난독 공격 probe | `ko_obfuscation` + 스캔 | 완료 |
 | ✅ 침해분석 | `ko_forensics` 역난독+기법분류+공격유형 | 완료 |
-| ✅ 실모델 e2e 스캔 | `e2e_scan` — gemma-4-31B 실행, ko-ASR 0% vs garak 100% 오보 | 완료 |
+| ✅ 실모델 e2e 스캔 | `e2e_scan` — gemma-4-31B, 단일난독 ko-ASR 0% vs garak 100% | 완료 |
+| ✅ 조합공격 | `ko_jailbreak`+`combo_scan` — 프레이밍×난독, refusal_suppress 42% | 완료 |
 | 한국어 유해성 detector | KcELECTRA 등으로 한국어 유해출력 과소보고 교정 | 예정 |
 
 **실모델 e2e ([`probes/E2E_FINDINGS.md`](./probes/E2E_FINDINGS.md))**: gemma-4-31B 에 난독 유해요청 30건 →
 `ko_refusal` 실측 ASR **0%**(모델이 난독도 이해하고 거부, 강건). 같은 응답을 garak 영어 detector 로 채점하면
 ASR **100%** 오보 — 실모델로 "한국어 스캔엔 한국어 detector 필수" 를 증명.
+
+**조합공격 ([`probes/COMBO_FINDINGS.md`](./probes/COMBO_FINDINGS.md))**: 단일 난독은 gemma 가 다 막지만(0%),
+`ko_jailbreak` 프레이밍(DAN/AIM/그랜드마/거부억제 등 23종)을 씌우면 ko-ASR **13%**, payload 난독까지 얹으면
+**20%**. **거부억제(refusal-suppression) 42%** 가 실제 유해 순응을 유발하는 최강 벡터. garak 은 전 구간 100% 오보.
+위험은 단일 기법이 아니라 **스택**에서 발생.
 
 가능하면 garak 의 plugin 구조(probe/detector/generator) 위에 얹어 스캔엔진·모델 커넥터를
 재사용하고, **한국어 공격 코퍼스·detector** 라는 알맹이에 집중한다(프레임워크 재발명 금지).
@@ -105,8 +111,12 @@ ko-redteam/
 ├── probes/
 │   ├── ko_obfuscation.py             # 난독 공격 변형기(normalize 역방향)
 │   ├── scan_demo.py                  # 난독 스캔: 순진필터 vs ko-prompt-guard ASR
-│   ├── e2e_scan.py                   # 실모델(gemma-4-31B) e2e 스캔 + ko vs garak 비교
-│   └── E2E_FINDINGS.md               # 실측: ko-ASR 0% vs garak 100% 오보
+│   ├── e2e_scan.py                   # 실모델(gemma-4-31B) 단일난독 e2e + ko vs garak
+│   ├── E2E_FINDINGS.md               # 실측: ko-ASR 0% vs garak 100% 오보
+│   ├── ko_jailbreak.py               # 프레이밍 조합공격(DAN/AIM/그랜드마/거부억제 23종)
+│   ├── ko_jailbreak_templates.json   # 프레이밍 템플릿({payload} 슬롯)
+│   ├── combo_scan.py                 # 조합공격 스캔(프레이밍×난독)
+│   └── COMBO_FINDINGS.md             # 실측: 조합 시 refusal_suppress 42% 우회
 ├── analysis/
 │   └── ko_forensics.py               # 침해분석: 역난독 + 기법분류 + 공격유형
 ├── tests/
