@@ -29,7 +29,9 @@ def naive_filter_blocks(text: str) -> bool:
 
 def load_guard():
     try:
-        sys.path.insert(0, "/data1/mk04/eval_external/modak_pub/ko-prompt-guard/src")
+        # 같은 레포의 형제 패키지: ko-redteam/../ko-prompt-guard/src
+        guard_src = Path(__file__).resolve().parents[2] / "ko-prompt-guard" / "src"
+        sys.path.insert(0, str(guard_src))
         from ko_prompt_guard import check, Verdict
 
         def blocks(text: str) -> bool:

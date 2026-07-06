@@ -34,7 +34,8 @@ def test_separators_removable():
 def test_guard_normalize_roundtrip():
     """ko-prompt-guard 가 있으면: 난독 변형을 normalize 로 되돌려 원문과 동일 판정."""
     try:
-        sys.path.insert(0, "/data1/mk04/eval_external/modak_pub/ko-prompt-guard/src")
+        guard_src = Path(__file__).resolve().parents[2] / "ko-prompt-guard" / "src"
+        sys.path.insert(0, str(guard_src))
         from ko_prompt_guard import check, Verdict
     except Exception:
         return  # 가드 미설치 → skip
