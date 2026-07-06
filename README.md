@@ -36,14 +36,34 @@ garak 이 한국어 거부를 못 읽어 생기는 100% 오탐을 결정론 패�
 \* ko_refusal 은 한국어 전용 → 영어는 결합 detector(`detect_multilingual`, 한국어 OR garak 영어)로 처리.
 결합 detector 는 한국어·영어 거부를 모두 인식. 회귀 [`tests/test_ko_refusal.py`](./tests/test_ko_refusal.py) 5 통과.
 
+## 공격 probe — `ko_obfuscation` (난독 스캐너)
+
+normalize 모듈을 **역방향**으로 돌려 한국어 공격 시드를 난독화(자모분해·공백/구분자 삽입·제로폭·전각)
+→ 대상의 난독 강건성을 ASR 로 측정. [`probes/ko_obfuscation.py`](./probes/ko_obfuscation.py),
+스캔 [`probes/scan_demo.py`](./probes/scan_demo.py):
+
+| 기법(ASR=회피율) | 순진한 키워드 필터 | **ko-prompt-guard** |
+|---|---|---|
+| plain | 0% | 0% |
+| jamo_split(자모분해) | 75% | **0%** |
+| space_insert(공백) | 100% | **0%** |
+| dot_insert(구분자) | 100% | **0%** |
+| zero_width(제로폭) | 100% | **0%** |
+
+순진 필터는 난독에 0→100% 뚫리지만, ko-prompt-guard 는 normalize 로 난독을 되돌려 **전 기법 ASR 0%
+(난독 불변성)**. 회귀 [`tests/test_ko_obfuscation.py`](./tests/test_ko_obfuscation.py) 는 normalize 왕복으로
+불변성을 검증. → 이 probe 로 **임의의 한국어 LLM/가드**의 난독 강건성을 정량 스캔한다.
+(garak #1056 text-augmentations·#734 DRA 의 한국어판; 전각은 순수 한글엔 무효=ASCII 대상.)
+
 ## 지향 — 남은 축
 
 | 축 | 내용 | 상태 |
 |---|---|---|
-| **탐지(스캔)** | 한국어 원어 공격 probe(자모/초성/발음유사/전각/존댓말탈옥/간접인젝션) 로 임의의 한국어 LLM·가드를 스캔 → 공격유형별 ASR 측정 | 예정 |
+| ✅ 한국어 거부 detector | `ko_refusal` | 완료 |
+| ✅ 한국어 난독 공격 probe | `ko_obfuscation` + 스캔 | 완료 |
 | **침해분석** | 잡힌 공격 페이로드를 역난독 + 기법 분류(한국어 공격 택소노미) + 공격체인 해부 | 예정 |
 | 한국어 유해성 detector | KcELECTRA 등으로 한국어 유해출력 과소보고 교정 | 예정 |
-| ✅ 한국어 거부 detector | `ko_refusal` — 완료 | 완료 |
+| 실모델 e2e 스캔 | gemma-4/Solar-Open 등에 probe 직접 실행(SLURM) | 예정 |
 
 가능하면 garak 의 plugin 구조(probe/detector/generator) 위에 얹어 스캔엔진·모델 커넥터를
 재사용하고, **한국어 공격 코퍼스·detector** 라는 알맹이에 집중한다(프레임워크 재발명 금지).
@@ -57,9 +77,13 @@ garak 이 한국어 거부를 못 읽어 생기는 100% 오탐을 결정론 패�
 ko-redteam/
 ├── README.md
 ├── detectors/
-│   └── ko_refusal.py                 # 한국어 거부 detector(+한/영 결합) — 첫 산출물
+│   └── ko_refusal.py                 # 한국어 거부 detector(+한/영 결합)
+├── probes/
+│   ├── ko_obfuscation.py             # 난독 공격 변형기(normalize 역방향)
+│   └── scan_demo.py                  # 난독 스캔: 순진필터 vs ko-prompt-guard ASR
 ├── tests/
-│   └── test_ko_refusal.py            # 회귀 5
+│   ├── test_ko_refusal.py            # 회귀 5
+│   └── test_ko_obfuscation.py        # 회귀 5(normalize 왕복 불변성 포함)
 └── gap_analysis/                     # 착수 근거: garak 한국어 갭 실측
     ├── FINDINGS.md                   # 정량 결과 + 방법론 + 정직한 한계
     ├── garak_ko_detector_gap.py      # garak 갭 재현(실제 garak 있으면 그걸로, 없으면 스냅샷)
