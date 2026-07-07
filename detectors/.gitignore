@@ -1,2 +1,6 @@
-ko_refusal_clf/
+harmful_clf_train.json
+harmful_realstyle.json
+ko_harmful_clf/
 ko_indirect_pi_clf/
+ko_refusal_clf/
+real_harmful_gemma.json
