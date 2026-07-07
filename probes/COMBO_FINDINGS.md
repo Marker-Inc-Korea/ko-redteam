@@ -49,7 +49,7 @@ gemma 를 평문 거부(0%)에서 **실제 절차적 유해내용 생성**으로
 
 ```bash
 # gemma-4-31B 서빙(SLURM) 후:
-python combo_scan.py --endpoint http://127.0.0.1:8030/v1 --model gemma-4-31B-it
+python scan.py --mode combo --endpoint http://127.0.0.1:8030/v1 --model gemma-4-31B-it
 ```
 
 원시 응답 덤프(`combo_scan_report.json`, 유해 프레이밍·부분 순응 포함)는 저장소에 커밋하지 않는다(gitignore).

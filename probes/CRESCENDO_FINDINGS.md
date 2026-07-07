@@ -42,7 +42,7 @@ crescendo(Microsoft, arXiv 2404.01833): 무해한 질문에서 시작해 매 턴
 ## 재현
 
 ```bash
-python crescendo_scan.py --endpoint http://127.0.0.1:8030/v1 --model gemma-4-31B-it
+python scan.py --mode crescendo --endpoint http://127.0.0.1:8030/v1 --model gemma-4-31B-it
 ```
 원시 응답 덤프(`crescendo_scan_report.json`, 유해 순응 포함)는 저장소에 커밋하지 않는다(gitignore).
 

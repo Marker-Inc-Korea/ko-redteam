@@ -42,5 +42,5 @@
 ```bash
 # 1) gemma-4-31B 서빙(SLURM): medi/ganghwang_llm/scripts/serve_gemma4_31b_local.sbatch (port 8030)
 # 2) 스캔
-python e2e_scan.py --endpoint http://127.0.0.1:8030/v1 --model gemma-4-31B-it
+python scan.py --mode single --endpoint http://127.0.0.1:8030/v1 --model gemma-4-31B-it
 ```
