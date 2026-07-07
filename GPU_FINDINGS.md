@@ -27,6 +27,17 @@ ko-prompt-guard 의 **룰**은 위험어휘 포함 무해질문 100개에 과차
 원본 80개(룰이 54%만 잡던 것)를 held-out 으로 평가 → 분류기가 **97.5%** 탐지. refusal 분류기(룰 88→학습 99)
 와 동일 패턴: **결정론 룰로 precision-0-FP 기반 + 학습 분류기로 recall 천장 돌파**. 학습: `detectors/train_indirect_pi_clf.py`.
 
+**실제 가드 배선 검증** (ko-prompt-guard `scan_context` + opt-in Tier-2, env `KO_CTX_CLF_DIR`):
+
+| scan_context | recall | 과차단 FPR |
+|---|---|---|
+| 룰만(기본) | 53.8% | **0.0%** |
+| 룰 + Tier-2 분류기 | **98.8%** | 5.0% |
+
+배선 성공 — 분류기 연결 시 실배포에서 recall 54→**98.8%**. 단 FPR 0→5%(위험어휘 무해질문 100개 기준, advisory).
+opt-in 이라 배포가 선택: 룰만(precision-first, 0% FP) vs 룰+분류기(recall-first). threshold(`KO_CTX_CLF_THRESHOLD`)로
+조정 가능. 기본 off(ML-free) — 가중치 지정 시에만 활성. 배선 테스트 `ko-prompt-guard/tests/test_context_tier2.py`.
+
 ## 3. crescendo 회귀 — 재현 확인 ✅(취약)
 
 gemma-4-31B 재서빙 후 멀티턴 crescendo 재실행 → 이전 발견 그대로 재현:
