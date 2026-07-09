@@ -178,10 +178,13 @@ ko-redteam/
 python3 -m pip install -r requirements-dev.txt
 python3 probes/self_check.py
 python3 -m pytest tests -q
+docker build -t ko-redteam:local .
+docker run --rm ko-redteam:local
+docker run --rm ko-redteam:local python -m pytest tests -q
 ```
 
 `self_check.py`는 live endpoint 없이 import, Python 버전, benchmark audit, paperbench coverage, offline benchmark scan 경로를 확인합니다.
-GitHub Actions의 `ko-redteam` job도 같은 self-check와 전체 테스트를 실행하고 `self_check.json`을 artifact로 남깁니다.
+Docker image는 기본 커맨드로 같은 self-check를 실행합니다. GitHub Actions의 `ko-redteam` job도 self-check, 전체 테스트, 컨테이너 build/run을 실행하고 `self_check.json`을 artifact로 남깁니다.
 
 ## 라이선스·윤리
 

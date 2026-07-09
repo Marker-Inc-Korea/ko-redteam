@@ -1,0 +1,34 @@
+.git
+.pytest_cache
+__pycache__
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+.venv
+venv
+env
+*.egg-info
+
+# Generated local reports and suites can include sensitive prompt/response traces.
+probes/*_report.json
+probes/*_report.md
+probes/suite_*/
+probes/self_check.json
+benchmark_*.json
+benchmark_*.md
+scan_*.json
+scan_*.md
+comparison_report.*
+repeat_stability_report.*
+regression_report.*
+gate_report.*
+report_doctor.*
+
+# Local model/training artifacts are intentionally not shipped.
+detectors/harmful_clf_train.json
+detectors/harmful_realstyle.json
+detectors/real_harmful_gemma.json
+detectors/ko_harmful_clf/
+detectors/ko_indirect_pi_clf/
+detectors/ko_refusal_clf/
