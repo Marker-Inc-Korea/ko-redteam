@@ -243,6 +243,7 @@ ko-redteam-doctor-reports \
 python3 -m pip install ".[dev]"
 ko-redteam-self-check
 ko-redteam-check-public-hygiene --root .
+python3 -m build --sdist --wheel
 ko-redteam-suite \
   --endpoint http://127.0.0.1:9/v1 \
   --model ci-dummy-model \

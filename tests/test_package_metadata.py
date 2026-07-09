@@ -35,6 +35,17 @@ def test_console_script_targets_are_importable():
         assert callable(getattr(module, func_name))
 
 
+def test_distribution_metadata_has_release_basics():
+    data = tomllib.loads((ROOT / "pyproject.toml").read_text("utf-8"))
+    assert (ROOT / "LICENSE").read_text("utf-8").startswith("MIT License")
+    assert data["build-system"]["requires"][0].startswith("setuptools>=77")
+    assert data["project"]["license"] == "MIT"
+    assert data["project"]["license-files"] == ["LICENSE"]
+    assert "korean" in data["project"]["keywords"]
+    assert "Natural Language :: Korean" in data["project"]["classifiers"]
+    assert any(dep.startswith("build") for dep in data["project"]["optional-dependencies"]["dev"])
+
+
 def test_package_data_paths_exist():
     assert (ROOT / "benchmarks" / "ko_llm_paperbench_v1.json").exists()
     assert (ROOT / "benchmarks" / "ko_llm_mini_v1.json").exists()
@@ -81,6 +92,7 @@ def test_ci_runs_redteam_suite_multiturn_agent_smoke():
     assert "ko-redteam-suite" in workflow
     assert "--multiturn" in workflow
     assert "--agent-harness" in workflow
+    assert "python -m build --sdist --wheel" in workflow
     assert "suite_ci/suite_manifest.json" in workflow
 
 
