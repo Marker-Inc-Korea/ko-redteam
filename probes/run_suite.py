@@ -129,6 +129,7 @@ def _benchmark_summary(report: dict[str, Any] | None) -> dict[str, Any] | None:
         "grade": scorecard.get("grade"),
         "domain_scores": scorecard.get("domain_scores", {}),
         "category_scores": scorecard.get("category_scores", {}),
+        "source_family_scores": scorecard.get("source_family_scores", {}),
         "outcome_counts": scorecard.get("outcome_counts", {}),
         "error_categories": scorecard.get("error_categories", {}),
         "finding_count": len(report.get("findings") or []),
@@ -306,6 +307,10 @@ def render_suite_markdown(manifest: dict[str, Any]) -> str:
         if domain_scores:
             rows = [["Domain", "Score"], *[[k, _fmt(v)] for k, v in domain_scores.items()]]
             lines += ["", _table(rows)]
+        source_family_scores = benchmark.get("source_family_scores") or {}
+        if source_family_scores:
+            rows = [["Source Family", "Score"], *[[k, _fmt(v)] for k, v in source_family_scores.items()]]
+            lines += ["", "### Source Family Scores", "", _table(rows)]
         error_categories = benchmark.get("error_categories") or {}
         if error_categories:
             rows = [["Endpoint Error Category", "Count"], *[[k, v] for k, v in error_categories.items()]]

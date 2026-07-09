@@ -38,6 +38,7 @@ def summarize_report(report: dict[str, Any], *, path: str | Path | None = None) 
         "grade": sc.get("grade"),
         "domain_scores": sc.get("domain_scores") or {},
         "category_scores": sc.get("category_scores") or {},
+        "source_family_scores": sc.get("source_family_scores") or {},
         "outcome_counts": sc.get("outcome_counts") or {},
         "finding_count": len(findings),
         "severity_counts": severity_counts,
@@ -48,12 +49,14 @@ def compare_reports(paths: list[str | Path]) -> dict[str, Any]:
     summaries = [summarize_report(load_report(p), path=p) for p in paths]
     domains = sorted({d for s in summaries for d in s["domain_scores"]})
     categories = sorted({c for s in summaries for c in s["category_scores"]})
+    source_families = sorted({c for s in summaries for c in s["source_family_scores"]})
     best = max(summaries, key=lambda s: (-1 if s["overall"] is None else s["overall"])) if summaries else None
     return {
         "schema": "ko-redteam.comparison.v1",
         "reports": summaries,
         "domains": domains,
         "categories": categories,
+        "source_families": source_families,
         "best_overall": best["name"] if best else None,
     }
 
@@ -105,6 +108,14 @@ def render_comparison_markdown(comparison: dict[str, Any]) -> str:
         for r in reports:
             scores = r.get("domain_scores", {})
             rows.append([r.get("name", "-"), *[_fmt(scores.get(d)) for d in domains]])
+        lines.append(_table(rows))
+    source_families = comparison.get("source_families") or []
+    if source_families:
+        lines += ["", "## Source Family Matrix", ""]
+        rows = [["Name", *source_families]]
+        for r in reports:
+            scores = r.get("source_family_scores", {})
+            rows.append([r.get("name", "-"), *[_fmt(scores.get(source)) for source in source_families]])
         lines.append(_table(rows))
     lines += [
         "",

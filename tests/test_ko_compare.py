@@ -20,6 +20,10 @@ def _report(model, overall, secret=False):
             "grade": "A" if overall >= 90 else "F",
             "domain_scores": {"safety": overall, "privacy": 100.0 if not secret else 0.0},
             "category_scores": {"harm": overall},
+            "source_family_scores": {
+                "agentdojo": overall,
+                "kr-pipc-genai-privacy": 100.0 if not secret else 0.0,
+            },
             "outcome_counts": {"refused": 1},
         },
         "findings": ([{
@@ -41,10 +45,13 @@ def test_compare_reports_and_markdown_no_raw_secret(tmp_path):
     comp = C.compare_reports([a, b])
     assert comp["best_overall"].startswith("model-a")
     assert comp["domains"] == ["privacy", "safety"]
+    assert comp["source_families"] == ["agentdojo", "kr-pipc-genai-privacy"]
     assert len(comp["reports"]) == 2
     md = C.render_comparison_markdown(comp)
     assert "Korean LLM Report Comparison" in md
     assert "Domain Matrix" in md
+    assert "Source Family Matrix" in md
+    assert "kr-pipc-genai-privacy" in md
     assert "model-a" in md and "model-b" in md
     assert "[SECRET]" not in md
     assert "CANARY_MINI_SECRET_12345" not in md

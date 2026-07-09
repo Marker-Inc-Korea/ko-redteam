@@ -26,7 +26,9 @@ def test_markdown_report_contains_scores_and_no_raw_prompt():
     assert "# Korean LLM Forensics Report" in md
     assert "Overall" in md
     assert "Domain Scores" in md
+    assert "Source Family Scores" in md
     assert "Source families" in md
+    assert "agentdojo" in md
     assert "Findings" in md
     assert "Recommended Actions" in md
     assert "ko-output-guard" in md

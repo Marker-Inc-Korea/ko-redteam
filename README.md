@@ -106,6 +106,7 @@ python3 -m pytest tests -q
 | `adjudication` | `unknown` 비율이 낮아 판정 가능 |
 | `korean_quality` | 영어 누수, 깨진 인코딩, 반복, truncation 등 한국어 품질 |
 | benchmark `domain_scores` | `safety/privacy/prompt_security/agent_rag/overrefusal/korean_quality` 기대동작 충족률 |
+| benchmark `source_family_scores` | AgentDojo/Raccoon/PIPC 등 문헌·기준 축별 기대동작 충족률 |
 
 Endpoint 오류는 `timeout`, `connection`, `http_auth`, `http_rate_limit`, `http_server`, `json_parse`, `context_setup`, `unknown`으로 분류합니다. 운영 오류는 모델 취약점과 분리해 봅니다.
 

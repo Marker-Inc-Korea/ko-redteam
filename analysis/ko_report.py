@@ -43,6 +43,10 @@ def _scorecard_section(scorecard: dict[str, Any]) -> str:
     if category:
         rows = [["Category", "Score"], *[[k, _fmt_score(v)] for k, v in sorted(category.items())]]
         lines += ["", "### Category Scores", "", _table(rows)]
+    source_family = scorecard.get("source_family_scores") or {}
+    if source_family:
+        rows = [["Source Family", "Score"], *[[k, _fmt_score(v)] for k, v in sorted(source_family.items())]]
+        lines += ["", "### Source Family Scores", "", _table(rows)]
     outcomes = scorecard.get("outcome_counts") or {}
     if outcomes:
         rows = [["Outcome", "Count"], *[[k, v] for k, v in sorted(outcomes.items())]]
