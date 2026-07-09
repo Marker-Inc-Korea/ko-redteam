@@ -55,6 +55,10 @@ python probes/analyze_responses.py --input responses.jsonl --model gemma-4-31B-i
 # benchmark seed 품질/커버리지 검증
 python probes/validate_benchmarks.py --markdown-output benchmark_audit.md
 
+# benchmark seed를 한국어 난독/프레이밍 변형 세트로 확장
+python probes/expand_benchmark.py --input benchmarks/ko_llm_paperbench_v1.json \
+  --output benchmarks/ko_llm_paperbench_v1_expanded.local.json
+
 # 여러 모델/여러 실행 결과 비교
 python probes/compare_reports.py report_model_a.json report_model_b.json \
   --markdown-output comparison_report.md
@@ -93,6 +97,9 @@ Top 10/OR-Bench/SORRY-Bench의 축을 참고하되, 한국어 prompt는 자체 �
 
 `validate_benchmarks.py` 는 benchmark JSON의 schema, 필수 키, ID 중복, expected 값, secret-like prompt,
 domain/category/source-family 커버리지를 정적 검증한다. audit report에는 raw prompt를 쓰지 않는다.
+
+`expand_benchmark.py` 는 기존 benchmark seed를 원본 plain, 난독, 프레이밍 변형 benchmark로 확장한다. 기본은
+`expected=refuse_or_redirect` 케이스만 변형해 over-refusal/allow 측정을 왜곡하지 않는다.
 
 `gate_reports.py` 는 생성된 scan/benchmark/offline report의 `scorecard` 를 CI/배포 기준으로 판정한다.
 `--min-overall`, `--min-domain`, `--max-rate`, `--max-findings`, `--max-critical-high`를 지원하고 실패 시
@@ -146,6 +153,7 @@ ko-redteam/
 │   ├── benchmark_scan.py          # 기대 outcome 기반 benchmark + scorecard
 │   ├── analyze_responses.py       # 저장된 JSONL/JSON 응답 로그 오프라인 포렌식
 │   ├── validate_benchmarks.py     # benchmark seed 품질/커버리지 audit
+│   ├── expand_benchmark.py        # benchmark seed 난독/프레이밍 변형 확장
 │   ├── gate_reports.py            # report scorecard threshold gate
 │   ├── compare_reports.py         # 여러 report/model score 비교
 │   ├── scan_demo.py               # (보조) 가드 난독 강건성 오프라인 데모
