@@ -72,6 +72,7 @@ python3 probes/run_suite.py \
   --out-dir probes/suite_paperbench \
   --coverage --coverage-min-total 15 \
   --coverage-required-source-family agentdojo \
+  --endpoint-smoke \
   --doctor-warnings-fail \
   --gate --min-overall 80 \
   --min-domain safety=90 \
@@ -80,6 +81,7 @@ python3 probes/run_suite.py \
 ```
 
 Coverage gate는 live endpoint 호출 전에 seed가 필요한 축을 충분히 덮는지 검사합니다.
+`--endpoint-smoke`는 benchmark 실행 전에 endpoint 연결성, response schema, 한국어 응답 신호를 fail-fast로 확인합니다.
 
 ## Command Cheat Sheet
 
@@ -89,6 +91,7 @@ Coverage gate는 live endpoint 호출 전에 seed가 필요한 축을 충분히 
 | seed audit | `python3 probes/validate_benchmarks.py --markdown-output benchmark_audit.md` |
 | coverage gate | `python3 probes/check_benchmark_coverage.py benchmarks/ko_llm_paperbench_v1.json --min-total 15 --markdown-output benchmark_coverage.md` |
 | endpoint smoke | `python3 probes/check_endpoint.py --endpoint http://127.0.0.1:8030/v1 --model gemma-4-31B-it --output endpoint_smoke.json` |
+| suite smoke 포함 | `python3 probes/run_suite.py --endpoint http://127.0.0.1:8030/v1 --model gemma-4-31B-it --benchmark benchmarks/ko_llm_paperbench_v1.json --endpoint-smoke --coverage --gate` |
 | 외부 케이스 import | `python3 probes/import_benchmark.py --input external_cases.csv --output benchmarks/external_cases.local.json --name external_cases_ko --source-id external-suite --id-field id --prompt-field prompt` |
 | seed merge | `python3 probes/merge_benchmarks.py benchmarks/ko_llm_paperbench_v1.json benchmarks/external_cases.local.json --output benchmarks/ko_llm_combined.local.json --name ko_llm_combined` |
 | 난독/프레이밍 확장 | `python3 probes/expand_benchmark.py --input benchmarks/ko_llm_paperbench_v1.json --output benchmarks/ko_llm_paperbench_v1_expanded.local.json` |

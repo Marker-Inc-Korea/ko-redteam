@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -19,6 +20,11 @@ sys.path.insert(0, str(ROOT / "analysis"))
 sys.path.insert(0, str(HERE))
 
 from benchmark_scan import run_benchmark  # noqa: E402
+from check_endpoint import (  # noqa: E402
+    DEFAULT_PROMPT as DEFAULT_ENDPOINT_SMOKE_PROMPT,
+    DEFAULT_REQUIRED_PHRASE as DEFAULT_ENDPOINT_SMOKE_REQUIRED_PHRASE,
+    run_endpoint_smoke,
+)
 from expand_benchmark import expand_benchmark, load_benchmark as load_expand_benchmark  # noqa: E402
 from ko_benchmark_audit import audit_benchmark_paths, render_audit_markdown  # noqa: E402
 from ko_benchmark_coverage import (  # noqa: E402
@@ -136,6 +142,26 @@ def _benchmark_summary(report: dict[str, Any] | None) -> dict[str, Any] | None:
     }
 
 
+def _endpoint_smoke_summary(smoke: dict[str, Any] | None) -> dict[str, Any] | None:
+    if smoke is None:
+        return None
+    summary = smoke.get("summary") or {}
+    response = smoke.get("response") or {}
+    quality = response.get("korean_quality") or {}
+    error = smoke.get("error") or {}
+    return {
+        "status": smoke.get("status"),
+        "checks": summary.get("checks"),
+        "passed": summary.get("passed"),
+        "failed": summary.get("failed"),
+        "chars": response.get("chars"),
+        "hangul_ratio": quality.get("hangul_ratio"),
+        "quality_flags": quality.get("flags", []),
+        "error_category": error.get("category"),
+        "prompt_sha256_16": (smoke.get("config") or {}).get("prompt_sha256_16"),
+    }
+
+
 def _new_manifest(
     *,
     endpoint: str,
@@ -158,6 +184,11 @@ def _new_manifest(
     coverage_min_domains: dict[str, int],
     coverage_min_expected: dict[str, int],
     coverage_min_source_families: dict[str, int],
+    endpoint_smoke_enabled: bool,
+    endpoint_smoke_required_phrase: str | None,
+    endpoint_smoke_min_hangul_ratio: float,
+    endpoint_smoke_max_tokens: int,
+    endpoint_smoke_api_key_env: str | None,
     doctor_enabled: bool,
     doctor_warnings_fail: bool,
     doctor_allow_raw: bool,
@@ -194,6 +225,13 @@ def _new_manifest(
                 "min_domains": coverage_min_domains,
                 "min_expected": coverage_min_expected,
                 "min_source_families": coverage_min_source_families,
+            },
+            "endpoint_smoke": {
+                "enabled": endpoint_smoke_enabled,
+                "required_phrase": endpoint_smoke_required_phrase,
+                "min_hangul_ratio": endpoint_smoke_min_hangul_ratio,
+                "max_tokens": endpoint_smoke_max_tokens,
+                "api_key_env": endpoint_smoke_api_key_env,
             },
             "doctor": {
                 "enabled": doctor_enabled,
@@ -243,6 +281,7 @@ def render_suite_markdown(manifest: dict[str, Any]) -> str:
     summaries = manifest.get("summaries", {})
     benchmark = summaries.get("benchmark") or {}
     coverage = summaries.get("coverage") or {}
+    endpoint_smoke = summaries.get("endpoint_smoke") or {}
     doctor = summaries.get("doctor") or {}
     gate = summaries.get("gate") or {}
 
@@ -259,6 +298,7 @@ def render_suite_markdown(manifest: dict[str, Any]) -> str:
         f"- Benchmark: **{config.get('benchmark', '-')}**",
         f"- Expansion: **{config.get('expand', False)}**",
         f"- Coverage: **{(config.get('coverage') or {}).get('enabled', False)}**",
+        f"- Endpoint smoke: **{(config.get('endpoint_smoke') or {}).get('enabled', False)}**",
         f"- Doctor: **{(config.get('doctor') or {}).get('enabled', False)}**",
         f"- Gate: **{(config.get('gate') or {}).get('enabled', False)}**",
     ]
@@ -292,6 +332,21 @@ def render_suite_markdown(manifest: dict[str, Any]) -> str:
             f"- Cases: **{coverage.get('cases', 0)}**",
             f"- Checks: **{coverage.get('passed', 0)} passed / {coverage.get('failed', 0)} failed**",
         ]
+
+    if endpoint_smoke:
+        lines += [
+            "",
+            "## Endpoint Smoke",
+            "",
+            f"- Status: **{endpoint_smoke.get('status', '-')}**",
+            f"- Checks: **{endpoint_smoke.get('passed', 0)} passed / {endpoint_smoke.get('failed', 0)} failed**",
+            f"- Response chars: **{endpoint_smoke.get('chars', 0)}**",
+            f"- Prompt hash: **{endpoint_smoke.get('prompt_sha256_16', '-')}**",
+        ]
+        if endpoint_smoke.get("hangul_ratio") is not None:
+            lines.append(f"- Hangul ratio: **{_fmt(endpoint_smoke.get('hangul_ratio'))}**")
+        if endpoint_smoke.get("error_category"):
+            lines.append(f"- Error category: **{endpoint_smoke.get('error_category')}**")
 
     if benchmark:
         lines += [
@@ -372,6 +427,13 @@ def run_suite(
     coverage_min_domains: dict[str, int] | None = None,
     coverage_min_expected: dict[str, int] | None = None,
     coverage_min_source_families: dict[str, int] | None = None,
+    endpoint_smoke_enabled: bool = False,
+    endpoint_smoke_prompt: str = DEFAULT_ENDPOINT_SMOKE_PROMPT,
+    endpoint_smoke_required_phrase: str | None = DEFAULT_ENDPOINT_SMOKE_REQUIRED_PHRASE,
+    endpoint_smoke_min_hangul_ratio: float = 0.35,
+    endpoint_smoke_max_tokens: int = 96,
+    endpoint_smoke_api_key: str | None = None,
+    endpoint_smoke_api_key_env: str | None = None,
     doctor_enabled: bool = True,
     doctor_warnings_fail: bool = False,
     doctor_allow_raw: bool = False,
@@ -381,6 +443,7 @@ def run_suite(
     max_findings: int | None = None,
     max_critical_high: int | None = None,
     call_fn: Callable[[dict[str, Any]], dict[str, Any]] | None = None,
+    endpoint_smoke_call_fn: Callable[[str], dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """benchmark suite를 실행하고 manifest를 반환한다."""
     benchmark_path = Path(benchmark_path)
@@ -392,6 +455,8 @@ def run_suite(
     coverage_min_domains = coverage_min_domains or {}
     coverage_min_expected = coverage_min_expected or {}
     coverage_min_source_families = coverage_min_source_families or {}
+    if endpoint_smoke_api_key is None and endpoint_smoke_api_key_env:
+        endpoint_smoke_api_key = os.environ.get(endpoint_smoke_api_key_env)
 
     manifest_path = out_dir / "suite_manifest.json"
     suite_md_path = out_dir / "suite_report.md"
@@ -416,6 +481,11 @@ def run_suite(
         coverage_min_domains=coverage_min_domains,
         coverage_min_expected=coverage_min_expected,
         coverage_min_source_families=coverage_min_source_families,
+        endpoint_smoke_enabled=endpoint_smoke_enabled,
+        endpoint_smoke_required_phrase=endpoint_smoke_required_phrase,
+        endpoint_smoke_min_hangul_ratio=endpoint_smoke_min_hangul_ratio,
+        endpoint_smoke_max_tokens=endpoint_smoke_max_tokens,
+        endpoint_smoke_api_key_env=endpoint_smoke_api_key_env,
         doctor_enabled=doctor_enabled,
         doctor_warnings_fail=doctor_warnings_fail,
         doctor_allow_raw=doctor_allow_raw,
@@ -508,6 +578,28 @@ def run_suite(
             return _finalize(manifest, status="fail", manifest_path=manifest_path, suite_md_path=suite_md_path)
     else:
         _add_step(manifest, "benchmark_coverage", "skipped")
+
+    if endpoint_smoke_enabled:
+        endpoint_smoke_json = out_dir / "endpoint_smoke.json"
+        smoke = run_endpoint_smoke(
+            endpoint,
+            model,
+            prompt=endpoint_smoke_prompt,
+            timeout=timeout,
+            max_tokens=endpoint_smoke_max_tokens,
+            api_key=endpoint_smoke_api_key,
+            required_phrase=endpoint_smoke_required_phrase,
+            min_hangul_ratio=endpoint_smoke_min_hangul_ratio,
+            call_fn=endpoint_smoke_call_fn,
+        )
+        _write_json(endpoint_smoke_json, smoke)
+        manifest["artifacts"]["endpoint_smoke_json"] = str(endpoint_smoke_json)
+        manifest["summaries"]["endpoint_smoke"] = _endpoint_smoke_summary(smoke)
+        _add_step(manifest, "endpoint_smoke", smoke["status"], path=str(endpoint_smoke_json))
+        if smoke["status"] != "pass":
+            return _finalize(manifest, status="fail", manifest_path=manifest_path, suite_md_path=suite_md_path)
+    else:
+        _add_step(manifest, "endpoint_smoke", "skipped")
 
     report_json = out_dir / "benchmark_report.json"
     report_md = out_dir / "benchmark_report.md"
@@ -622,6 +714,15 @@ def main() -> None:
                     help="expected minimum, e.g. --coverage-min-expected refuse_or_redirect=5")
     ap.add_argument("--coverage-min-source-family", action="append", default=[],
                     help="source_family minimum, e.g. --coverage-min-source-family harmbench=3")
+    ap.add_argument("--endpoint-smoke", action="store_true",
+                    help="benchmark 실행 전 OpenAI-compatible endpoint readiness를 fail-fast로 확인")
+    ap.add_argument("--endpoint-smoke-prompt", default=DEFAULT_ENDPOINT_SMOKE_PROMPT)
+    ap.add_argument("--endpoint-smoke-required-phrase", default=DEFAULT_ENDPOINT_SMOKE_REQUIRED_PHRASE)
+    ap.add_argument("--endpoint-smoke-no-required-phrase", action="store_true")
+    ap.add_argument("--endpoint-smoke-min-hangul-ratio", type=float, default=0.35)
+    ap.add_argument("--endpoint-smoke-max-tokens", type=int, default=96)
+    ap.add_argument("--endpoint-smoke-api-key-env", default=None,
+                    help="endpoint smoke 호출에만 사용할 API key 환경변수 이름")
     ap.add_argument("--no-doctor", action="store_true", help="report 구조/privacy doctor step 생략")
     ap.add_argument("--doctor-warnings-fail", action="store_true", help="doctor warning도 suite 실패로 처리")
     ap.add_argument("--doctor-allow-raw", action="store_true",
@@ -657,6 +758,14 @@ def main() -> None:
         coverage_min_domains=parse_count_thresholds(args.coverage_min_domain),
         coverage_min_expected=parse_count_thresholds(args.coverage_min_expected),
         coverage_min_source_families=parse_count_thresholds(args.coverage_min_source_family),
+        endpoint_smoke_enabled=args.endpoint_smoke,
+        endpoint_smoke_prompt=args.endpoint_smoke_prompt,
+        endpoint_smoke_required_phrase=None
+        if args.endpoint_smoke_no_required_phrase
+        else args.endpoint_smoke_required_phrase,
+        endpoint_smoke_min_hangul_ratio=args.endpoint_smoke_min_hangul_ratio,
+        endpoint_smoke_max_tokens=args.endpoint_smoke_max_tokens,
+        endpoint_smoke_api_key_env=args.endpoint_smoke_api_key_env,
         doctor_enabled=not args.no_doctor,
         doctor_warnings_fail=args.doctor_warnings_fail,
         doctor_allow_raw=args.doctor_allow_raw,
