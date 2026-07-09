@@ -61,6 +61,11 @@ python probes/import_benchmark.py --input external_cases.csv --output benchmarks
   --domain-field domain --category-field category --expected-field expected \
   --audit-markdown-output external_cases_audit.md
 
+# 내부/외부 benchmark 여러 개를 합치고 duplicate prompt/ID를 정리
+python probes/merge_benchmarks.py benchmarks/ko_llm_paperbench_v1.json benchmarks/external_cases.local.json \
+  --output benchmarks/ko_llm_combined.local.json --name ko_llm_combined \
+  --audit-markdown-output combined_benchmark_audit.md
+
 # benchmark seed를 한국어 난독/프레이밍 변형 세트로 확장
 python probes/expand_benchmark.py --input benchmarks/ko_llm_paperbench_v1.json \
   --output benchmarks/ko_llm_paperbench_v1_expanded.local.json
@@ -132,6 +137,10 @@ domain/category/source-family 커버리지를 정적 검증한다. audit report�
 `--prompt-field`, `--domain-field`, `--category-field`, `--expected-field`, `--source-family-field`, `--tags-field`
 로 입력 컬럼을 매핑하고, 생성 직후 audit JSON/Markdown을 같이 만들 수 있다. 변환된 benchmark에는 실행용
 prompt가 포함되지만 audit/manifest에는 raw prompt를 반복 출력하지 않는다.
+
+`merge_benchmarks.py` 는 내부 seed와 importer로 만든 외부 benchmark를 하나로 합친다. source family/taxonomy를
+통합하고, 중복 case ID는 자동 재명명하며, exact duplicate prompt는 기본 제거한다(`--keep-duplicate-prompts`로
+유지 가능). 생성 직후 audit report를 만들 수 있어 suite 실행 전 조합 품질을 확인한다.
 
 `expand_benchmark.py` 는 기존 benchmark seed를 원본 plain, 난독, 프레이밍 변형 benchmark로 확장한다. 기본은
 `expected=refuse_or_redirect` 케이스만 변형해 over-refusal/allow 측정을 왜곡하지 않는다.
@@ -207,6 +216,7 @@ ko-redteam/
 │   ├── analyze_responses.py       # 저장된 JSONL/JSON 응답 로그 오프라인 포렌식
 │   ├── validate_benchmarks.py     # benchmark seed 품질/커버리지 audit
 │   ├── import_benchmark.py        # 외부 CSV/JSON/JSONL benchmark를 표준 schema로 변환
+│   ├── merge_benchmarks.py        # 내부/외부 benchmark 조합과 duplicate 정리
 │   ├── expand_benchmark.py        # benchmark seed 난독/프레이밍 변형 확장
 │   ├── run_suite.py               # audit/expand/benchmark/markdown/gate 통합 실행기
 │   ├── analyze_repeats.py         # 반복 실행 안정성/flaky case/endpoint error 분석
