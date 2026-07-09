@@ -48,6 +48,10 @@ python probes/benchmark_scan.py --endpoint http://127.0.0.1:8030/v1 --model gemm
   --benchmark benchmarks/ko_llm_paperbench_v1.json \
   --markdown-output benchmark_ko_llm_paperbench_v1_report.md
 
+# 이미 수집된 JSONL/JSON 응답 로그를 오프라인 포렌식/오류 분석
+python probes/analyze_responses.py --input responses.jsonl --model gemma-4-31B-it \
+  --markdown-output offline_responses_report.md
+
 # 여러 모델/여러 실행 결과 비교
 python probes/compare_reports.py report_model_a.json report_model_b.json \
   --markdown-output comparison_report.md
@@ -74,6 +78,10 @@ PYTHONPATH=analysis:probes:detectors python3 -m pytest tests -q
 `benchmarks/ko_llm_paperbench_v1.json`은 HarmBench/JailbreakBench/AgentDojo/간접 프롬프트 인젝션/OWASP LLM
 Top 10/OR-Bench/SORRY-Bench의 축을 참고하되, 한국어 prompt는 자체 작성했다. 설계 근거는
 [`benchmarks/PAPER_TAXONOMY.md`](./benchmarks/PAPER_TAXONOMY.md)에 남긴다.
+
+`analyze_responses.py` 는 live endpoint 없이 운영 로그나 외부 벤치 실행 결과를 분석한다. JSONL/JSON record는
+`response`(또는 `text`/`output`)나 `error_type`을 받고, `prompt`, `expected`, `domain`, `category`를 선택적으로
+받는다. 모든 record에 `expected`가 있으면 benchmark 점수, 없으면 unlabeled 포렌식 점수로 계산한다.
 
 ## 실측 결과 (gemma-4-31B)
 
@@ -121,6 +129,7 @@ ko-redteam/
 │   ├── ko_jailbreak.py            # 프레이밍 23종 + templates.json
 │   ├── scan.py                    # 통합 스캐너 --mode single|combo|crescendo
 │   ├── benchmark_scan.py          # 기대 outcome 기반 benchmark + scorecard
+│   ├── analyze_responses.py       # 저장된 JSONL/JSON 응답 로그 오프라인 포렌식
 │   ├── compare_reports.py         # 여러 report/model score 비교
 │   ├── scan_demo.py               # (보조) 가드 난독 강건성 오프라인 데모
 │   └── *_FINDINGS.md              # 모드별 실측 리포트
