@@ -9,7 +9,17 @@ from pathlib import Path
 from typing import Any
 
 EXPECTED_VALUES = {"refuse_or_redirect", "allow", "no_leak", "no_tool"}
-REQUIRED_CASE_KEYS = ("id", "domain", "category", "expected", "prompt")
+SUPPORTED_SCHEMAS = {
+    "ko-redteam.benchmark.v1",
+    "ko-redteam.multiturn-benchmark.v1",
+    "ko-redteam.agent-harness.v1",
+}
+COMMON_CASE_KEYS = ("id", "domain", "category", "expected")
+SCHEMA_CASE_KEYS = {
+    "ko-redteam.benchmark.v1": COMMON_CASE_KEYS + ("prompt",),
+    "ko-redteam.multiturn-benchmark.v1": COMMON_CASE_KEYS + ("turns",),
+    "ko-redteam.agent-harness.v1": COMMON_CASE_KEYS + ("user_prompt", "untrusted_context", "tools"),
+}
 MIN_HANGUL_CHARS = 1
 MIN_HANGUL_RATIO = 0.08
 HANGUL_RE = re.compile(r"[가-힣ㄱ-ㅎㅏ-ㅣ\u1100-\u11FF\u3130-\u318F\uA960-\uA97F\uD7B0-\uD7FF]")
@@ -50,6 +60,53 @@ def _source_families(case: dict[str, Any]) -> list[str]:
     if isinstance(value, list):
         return [str(v) for v in value]
     return []
+
+
+def _text_value(value: Any) -> str:
+    return value if isinstance(value, str) else ""
+
+
+def _case_texts(schema: str | None, case: dict[str, Any], case_id: str, issues: list[dict[str, Any]]) -> list[str]:
+    """schema별 raw prompt 필드를 audit용 텍스트 단위로 추출한다. 반환값은 저장하지 않고 hash/통계에만 쓴다."""
+    if schema == "ko-redteam.benchmark.v1":
+        prompt = _text_value(case.get("prompt"))
+        if not prompt.strip():
+            issues.append(_issue("error", "prompt", "prompt must be a non-empty string", case_id=case_id))
+        return [prompt]
+
+    if schema == "ko-redteam.multiturn-benchmark.v1":
+        turns = case.get("turns")
+        if not isinstance(turns, list) or not turns:
+            issues.append(_issue("error", "turns", "turns must be a non-empty list", case_id=case_id))
+            return [""]
+        texts = []
+        for idx, turn in enumerate(turns, 1):
+            user_text = turn.get("user") if isinstance(turn, dict) else None
+            if not isinstance(user_text, str) or not user_text.strip():
+                issues.append(_issue(
+                    "error",
+                    "turn_user",
+                    f"turn {idx} must contain non-empty user text",
+                    case_id=case_id,
+                ))
+                texts.append("")
+            else:
+                texts.append(user_text)
+        return texts
+
+    if schema == "ko-redteam.agent-harness.v1":
+        texts = []
+        for key in ("user_prompt", "untrusted_context"):
+            value = _text_value(case.get(key))
+            if not value.strip():
+                issues.append(_issue("error", key, f"{key} must be a non-empty string", case_id=case_id))
+            texts.append(value)
+        tools = case.get("tools")
+        if not isinstance(tools, list) or not tools:
+            issues.append(_issue("error", "tools", "tools must be a non-empty list", case_id=case_id))
+        return texts
+
+    return [_text_value(case.get("prompt"))]
 
 
 def _prompt_signal(prompt: str) -> dict[str, Any]:
@@ -103,7 +160,8 @@ def audit_benchmark_data(data: dict[str, Any], *, path: str | None = None) -> di
     ids: Counter[str] = Counter()
     korean_signals: list[dict[str, Any]] = []
 
-    if data.get("schema") != "ko-redteam.benchmark.v1":
+    schema = data.get("schema")
+    if schema not in SUPPORTED_SCHEMAS:
         issues.append(_issue("error", "schema", f"unsupported schema: {data.get('schema')}"))
     if not isinstance(data.get("name"), str) or not data.get("name", "").strip():
         issues.append(_issue("error", "name", "benchmark name must be a non-empty string"))
@@ -119,7 +177,7 @@ def audit_benchmark_data(data: dict[str, Any], *, path: str | None = None) -> di
             continue
         case_id = str(case.get("id") or f"#{idx}")
         ids[case_id] += 1
-        for key in REQUIRED_CASE_KEYS:
+        for key in SCHEMA_CASE_KEYS.get(str(schema), COMMON_CASE_KEYS):
             if key not in case:
                 issues.append(_issue("error", "missing_key", f"case missing required key: {key}", case_id=case_id))
         if not isinstance(case.get("id"), str) or not case.get("id", "").strip():
@@ -127,23 +185,26 @@ def audit_benchmark_data(data: dict[str, Any], *, path: str | None = None) -> di
         expected = case.get("expected")
         if expected not in EXPECTED_VALUES:
             issues.append(_issue("error", "expected", f"unsupported expected value: {expected}", case_id=case_id))
-        prompt = case.get("prompt")
-        if not isinstance(prompt, str) or not prompt.strip():
-            issues.append(_issue("error", "prompt", "prompt must be a non-empty string", case_id=case_id))
-            prompt = ""
-        if SECRET_LIKE_RE.search(prompt):
-            issues.append(_issue("warning", "secret_like_prompt",
-                                 "prompt contains vendor-token-shaped text; use CANARY_* instead", case_id=case_id))
-        signal = _prompt_signal(prompt)
-        korean_signals.append(signal)
-        if signal["hangul_chars"] < MIN_HANGUL_CHARS or signal["hangul_ratio"] < MIN_HANGUL_RATIO:
-            issues.append(_issue(
-                "error",
-                "low_korean_signal",
-                "Korean benchmark prompt must contain enough Hangul signal",
-                case_id=case_id,
-            ))
-        prompt_hashes[_sha(prompt)].append(case_id)
+        text_units = _case_texts(str(schema), case, case_id, issues)
+        fingerprint_text = "\n---\n".join(text_units)
+        for text in text_units:
+            if SECRET_LIKE_RE.search(text):
+                issues.append(_issue(
+                    "warning",
+                    "secret_like_prompt",
+                    "benchmark text contains vendor-token-shaped text; use CANARY_* instead",
+                    case_id=case_id,
+                ))
+            signal = _prompt_signal(text)
+            korean_signals.append(signal)
+            if signal["hangul_chars"] < MIN_HANGUL_CHARS or signal["hangul_ratio"] < MIN_HANGUL_RATIO:
+                issues.append(_issue(
+                    "error",
+                    "low_korean_signal",
+                    "Korean benchmark text must contain enough Hangul signal",
+                    case_id=case_id,
+                ))
+        prompt_hashes[_sha(fingerprint_text)].append(case_id)
         if isinstance(case.get("domain"), str):
             domain_counts[case["domain"]] += 1
         if isinstance(case.get("category"), str):

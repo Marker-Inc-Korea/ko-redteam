@@ -172,13 +172,19 @@ def run_self_check(
         issues=hygiene_issues,
     ))
 
-    audit = audit_mod.audit_benchmark_paths([mini_benchmark, paper_benchmark])
+    audit = audit_mod.audit_benchmark_paths([
+        mini_benchmark,
+        paper_benchmark,
+        DEFAULT_MULTITURN_BENCHMARK,
+        DEFAULT_AGENT_BENCHMARK,
+    ])
     checks.append(_check(
         "benchmark_audit",
         audit["summary"]["status"] == "pass",
         cases=audit["summary"]["cases"],
         errors=audit["summary"]["errors"],
         warnings=audit["summary"]["warnings"],
+        low_korean_signal_cases=audit["summary"]["korean_signals"]["low_signal_cases"],
     ))
 
     coverage = coverage_mod.evaluate_coverage_paths(
