@@ -63,6 +63,11 @@ python probes/expand_benchmark.py --input benchmarks/ko_llm_paperbench_v1.json \
 python probes/compare_reports.py report_model_a.json report_model_b.json \
   --markdown-output comparison_report.md
 
+# baseline 대비 candidate report 성능 회귀 판정
+python probes/check_regression.py --baseline baseline_report.json --candidate candidate_report.json \
+  --max-overall-drop 3 --max-domain-drop 5 --max-critical-high-increase 0 \
+  --markdown-output regression_report.md
+
 # report scorecard 를 CI/배포 threshold gate로 판정
 python probes/gate_reports.py benchmark_ko_llm_paperbench_v1_report.json \
   --min-overall 80 --min-domain safety=90 --min-domain privacy=90 \
@@ -100,6 +105,9 @@ domain/category/source-family 커버리지를 정적 검증한다. audit report�
 
 `expand_benchmark.py` 는 기존 benchmark seed를 원본 plain, 난독, 프레이밍 변형 benchmark로 확장한다. 기본은
 `expected=refuse_or_redirect` 케이스만 변형해 over-refusal/allow 측정을 왜곡하지 않는다.
+
+`check_regression.py` 는 baseline report와 candidate report의 `overall`, domain score, finding severity 변화를
+비교해 성능 후퇴를 판정한다. 실패 시 non-zero exit code를 반환하므로 CI regression gate로 사용할 수 있다.
 
 `gate_reports.py` 는 생성된 scan/benchmark/offline report의 `scorecard` 를 CI/배포 기준으로 판정한다.
 `--min-overall`, `--min-domain`, `--max-rate`, `--max-findings`, `--max-critical-high`를 지원하고 실패 시
@@ -154,6 +162,7 @@ ko-redteam/
 │   ├── analyze_responses.py       # 저장된 JSONL/JSON 응답 로그 오프라인 포렌식
 │   ├── validate_benchmarks.py     # benchmark seed 품질/커버리지 audit
 │   ├── expand_benchmark.py        # benchmark seed 난독/프레이밍 변형 확장
+│   ├── check_regression.py        # baseline 대비 score/finding 회귀 판정
 │   ├── gate_reports.py            # report scorecard threshold gate
 │   ├── compare_reports.py         # 여러 report/model score 비교
 │   ├── scan_demo.py               # (보조) 가드 난독 강건성 오프라인 데모
@@ -166,6 +175,7 @@ ko-redteam/
 │   ├── ko_diagnostics.py          # ⑦ 원인/owner/권장조치 진단
 │   ├── ko_benchmark_audit.py      # benchmark seed 정적 검증/커버리지
 │   ├── ko_gate.py                 # report scorecard gate 판정/Markdown
+│   ├── ko_regression.py           # baseline 대비 score/finding 회귀 판정
 │   ├── ko_compare.py              # 여러 report 비교/Markdown matrix
 │   └── ko_scorecard.py            # ⑥ scorecard(종합/분야별 점수)
 ├── tests/                         # 회귀 테스트(refusal/obfuscation/forensics/LLM-forensics/scorecard)
