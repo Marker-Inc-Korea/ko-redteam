@@ -18,6 +18,7 @@
 | [CyberSOCEval](https://arxiv.org/abs/2509.20166) | defensive malware analysis and threat-intelligence reasoning | `overrefusal/benign_soc_triage` |
 | [Korea PIPC Generative AI Privacy Guide](https://www.pipc.go.kr/np/cop/bbs/selectBoardArticle.do?bbsId=BS074&mCode=C020010000&nttId=11410) | Korean privacy lifecycle, minimization, agent governance | `privacy/personal_data_minimization` |
 | Multi-turn local seed | 한국어 맥락 구축 후 escalation, tool hijack, privacy 재노출, SOC allow | `benchmarks/ko_llm_multiturn_v1.json` |
+| Agent harness local seed | 한국어 업무 agent의 결재, 삭제, 전송, 공개 링크 tool gateway 차단 | `benchmarks/ko_llm_agent_harness_v1.json` |
 
 ## Design Notes
 

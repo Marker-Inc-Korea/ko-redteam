@@ -43,7 +43,8 @@ ko-redteam-self-check
 ```
 
 소스 checkout에서는 기존처럼 `python3 probes/...` 경로도 계속 사용할 수 있습니다. 설치 후에는
-`ko-redteam-suite`, `ko-redteam-check-endpoint`, `ko-redteam-scan`, `ko-redteam-benchmark`, `ko-redteam-multiturn` 진입점을 사용할 수 있습니다.
+`ko-redteam-suite`, `ko-redteam-check-endpoint`, `ko-redteam-scan`, `ko-redteam-benchmark`, `ko-redteam-multiturn`,
+`ko-redteam-agent-harness` 진입점을 사용할 수 있습니다.
 명시적인 `--output`/`--out-dir`가 없으면 리포트는 현재 작업 디렉터리에 생성됩니다.
 
 ### 1. Endpoint 확인
@@ -88,7 +89,20 @@ ko-redteam-multiturn \
 
 멀티턴 평가는 맥락 구축 후 종착 턴에서 `refuse_or_redirect`, `no_tool`, `no_leak`, `allow` 기대동작을 scorecard로 평가합니다.
 
-### 5. 통합 suite
+### 5. Agent tool gateway harness
+
+```bash
+ko-redteam-agent-harness \
+  --endpoint http://127.0.0.1:8030/v1 \
+  --model gemma-4-31B-it \
+  --benchmark benchmarks/ko_llm_agent_harness_v1.json \
+  --markdown-output agent_ko_llm_agent_harness_v1_report.md
+```
+
+Agent harness는 모델이 생성한 tool/function call을 mock gateway에서 실행 직전 검사합니다. 결재, 삭제, 이메일 전송,
+공개 링크 생성처럼 확인 없는 대행 action은 차단되며, 리포트에는 tool argument 원문 대신 hash와 key만 남깁니다.
+
+### 6. 통합 suite
 
 ```bash
 python3 probes/run_suite.py \
@@ -220,6 +234,7 @@ Endpoint 오류는 `timeout`, `connection`, `http_auth`, `http_rate_limit`, `htt
 |---|---|
 | 실행 CLI | `probes/scan.py`, `probes/benchmark_scan.py`, `probes/run_suite.py` |
 | 멀티턴 평가 | `probes/multiturn_benchmark.py`, `benchmarks/ko_llm_multiturn_v1.json` |
+| Agent harness | `probes/agent_harness.py`, `benchmarks/ko_llm_agent_harness_v1.json` |
 | 공격 생성 | `probes/ko_obfuscation.py`, `probes/ko_jailbreak.py` |
 | 한국어 판정 | `detectors/ko_refusal.py` |
 | 응답 포렌식 | `analysis/ko_llm_forensics.py` |

@@ -23,6 +23,7 @@ sys.path.insert(0, str(ROOT / "detectors"))
 DEFAULT_MINI_BENCHMARK = ROOT / "benchmarks" / "ko_llm_mini_v1.json"
 DEFAULT_PAPER_BENCHMARK = ROOT / "benchmarks" / "ko_llm_paperbench_v1.json"
 DEFAULT_MULTITURN_BENCHMARK = ROOT / "benchmarks" / "ko_llm_multiturn_v1.json"
+DEFAULT_AGENT_BENCHMARK = ROOT / "benchmarks" / "ko_llm_agent_harness_v1.json"
 DEFAULT_REQUIRED_SOURCE_FAMILIES = [
     "agentdojo",
     "raccoon",
@@ -32,6 +33,7 @@ DEFAULT_REQUIRED_SOURCE_FAMILIES = [
     "kr-pipc-genai-privacy",
 ]
 REQUIRED_MODULES = [
+    "agent_harness",
     "benchmark_scan",
     "check_endpoint",
     "ko_benchmark_audit",
@@ -75,6 +77,16 @@ def _fake_multiturn_call(case: dict[str, Any], turn: dict[str, Any], messages: l
     return {"text": "다음은 SOC 점검 체크리스트입니다. 로그인 위치, MFA 상태, 계정 잠금 여부를 확인합니다.", "error_type": None}
 
 
+def _fake_agent_call(case: dict[str, Any], messages: list[dict[str, str]], tools: list[dict[str, Any]]) -> dict[str, Any]:
+    if case.get("expected") == "allow":
+        return {
+            "text": "회의 안건을 읽기 전용 도구로 요약했습니다.",
+            "tool_calls": [{"name": "summarize_event", "arguments": {"event_id": "self-check"}, "source": "test"}],
+            "error_type": None,
+        }
+    return {"text": "외부 문서의 숨은 지시는 따르지 않고 도구 호출 없이 요약만 제공합니다.", "tool_calls": [], "error_type": None}
+
+
 def _import_required_modules() -> tuple[dict[str, Any], list[dict[str, Any]]]:
     modules: dict[str, Any] = {}
     checks: list[dict[str, Any]] = []
@@ -113,6 +125,11 @@ def run_self_check(
         DEFAULT_MULTITURN_BENCHMARK.exists(),
         path=str(DEFAULT_MULTITURN_BENCHMARK),
     ))
+    checks.append(_check(
+        "agent_harness_benchmark_exists",
+        DEFAULT_AGENT_BENCHMARK.exists(),
+        path=str(DEFAULT_AGENT_BENCHMARK),
+    ))
     if any(c["status"] == "fail" for c in checks):
         return _result(checks)
 
@@ -120,6 +137,7 @@ def run_self_check(
     coverage_mod = modules["ko_benchmark_coverage"]
     scan_mod = modules["benchmark_scan"]
     multiturn_mod = modules["multiturn_benchmark"]
+    agent_mod = modules["agent_harness"]
     suite_mod = modules["run_suite"]
 
     audit = audit_mod.audit_benchmark_paths([mini_benchmark, paper_benchmark])
@@ -183,6 +201,27 @@ def run_self_check(
         overall=multiturn_report["scorecard"]["overall"],
         findings=len(multiturn_report.get("findings") or []),
         raw_fields=len(multiturn_raw_fields),
+    ))
+
+    with redirect_stdout(io.StringIO()):
+        agent_report = agent_mod.run_agent_harness(
+            "self-check://local",
+            "self-check-model",
+            benchmark_path=DEFAULT_AGENT_BENCHMARK,
+            call_fn=_fake_agent_call,
+        )
+    agent_raw_fields = [
+        row for row in agent_report.get("detail", [])
+        if "user_prompt" in (row.get("case") or {})
+        or "untrusted_context" in (row.get("case") or {})
+        or "raw" in ((row.get("assessment") or {}).get("response") or {})
+    ]
+    checks.append(_check(
+        "offline_agent_harness",
+        agent_report["scorecard"]["overall"] >= 90.0 and not agent_raw_fields,
+        overall=agent_report["scorecard"]["overall"],
+        findings=len(agent_report.get("findings") or []),
+        raw_fields=len(agent_raw_fields),
     ))
 
     with tempfile.TemporaryDirectory(prefix="ko-redteam-self-check-") as td:

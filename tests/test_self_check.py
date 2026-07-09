@@ -16,19 +16,24 @@ def test_self_check_passes_repo_defaults():
     names = {c["name"] for c in result["checks"]}
     assert {
         "benchmark_audit",
+        "agent_harness_benchmark_exists",
         "multiturn_benchmark_exists",
         "paperbench_coverage",
         "offline_benchmark_scan",
         "offline_multiturn_benchmark",
+        "offline_agent_harness",
         "offline_suite_with_endpoint_smoke",
     } <= names
     scan = next(c for c in result["checks"] if c["name"] == "offline_benchmark_scan")
     multiturn = next(c for c in result["checks"] if c["name"] == "offline_multiturn_benchmark")
+    agent = next(c for c in result["checks"] if c["name"] == "offline_agent_harness")
     suite = next(c for c in result["checks"] if c["name"] == "offline_suite_with_endpoint_smoke")
     assert scan["overall"] >= 90.0
     assert scan["raw_fields"] == 0
     assert multiturn["overall"] >= 90.0
     assert multiturn["raw_fields"] == 0
+    assert agent["overall"] >= 90.0
+    assert agent["raw_fields"] == 0
     assert suite["overall"] >= 90.0
     assert suite["smoke_status"] == "pass"
 

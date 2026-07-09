@@ -10,6 +10,7 @@ PRIMARY_REPORT_SCHEMAS = {
     "ko-redteam.llm-forensics.v1",
     "ko-redteam.benchmark-report.v1",
     "ko-redteam.multiturn-benchmark-report.v1",
+    "ko-redteam.agent-harness-report.v1",
     "ko-redteam.offline-benchmark-report.v1",
     "ko-redteam.offline-forensics.v1",
 }
