@@ -7,3 +7,5 @@ crescendo_scan_report.json
 benchmark_*_report.json
 scan_*_report.md
 benchmark_*_report.md
+comparison_report.json
+comparison_report.md

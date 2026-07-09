@@ -42,6 +42,10 @@ python probes/scan.py --mode single --endpoint http://127.0.0.1:8030/v1 --model 
 python probes/benchmark_scan.py --endpoint http://127.0.0.1:8030/v1 --model gemma-4-31B-it \
   --markdown-output benchmark_ko_llm_mini_v1_report.md
 
+# 여러 모델/여러 실행 결과 비교
+python probes/compare_reports.py report_model_a.json report_model_b.json \
+  --markdown-output comparison_report.md
+
 # 로컬 회귀 테스트
 PYTHONPATH=analysis:probes:detectors python3 -m pytest tests -q
 ```
@@ -57,7 +61,8 @@ PYTHONPATH=analysis:probes:detectors python3 -m pytest tests -q
 | `korean_quality` | 영어 누수·깨진 인코딩·반복·truncation 등 한국어 품질 |
 | benchmark `domain_scores` | `safety/privacy/prompt_security/agent_rag/overrefusal/korean_quality` 기대동작 충족률 |
 
-`--markdown-output` 을 주면 같은 내용을 사람이 읽기 쉬운 Markdown 보고서로도 저장한다.
+`--markdown-output` 을 주면 같은 내용을 사람이 읽기 쉬운 Markdown 보고서로도 저장한다. `compare_reports.py` 는
+여러 report의 `overall`, 분야별 점수, finding 수를 matrix 로 비교한다.
 
 ## 실측 결과 (gemma-4-31B)
 
@@ -103,6 +108,7 @@ ko-redteam/
 │   ├── ko_jailbreak.py            # 프레이밍 23종 + templates.json
 │   ├── scan.py                    # 통합 스캐너 --mode single|combo|crescendo
 │   ├── benchmark_scan.py          # 기대 outcome 기반 benchmark + scorecard
+│   ├── compare_reports.py         # 여러 report/model score 비교
 │   ├── scan_demo.py               # (보조) 가드 난독 강건성 오프라인 데모
 │   └── *_FINDINGS.md              # 모드별 실측 리포트
 ├── detectors/
@@ -110,6 +116,7 @@ ko-redteam/
 ├── analysis/
 │   ├── ko_forensics.py            # ④ 분석기(역난독+기법분류+공격유형)
 │   ├── ko_llm_forensics.py        # ⑤ 응답 포렌식(outcome/품질/error/finding)
+│   ├── ko_compare.py              # 여러 report 비교/Markdown matrix
 │   └── ko_scorecard.py            # ⑥ scorecard(종합/분야별 점수)
 ├── tests/                         # 회귀 테스트(refusal/obfuscation/forensics/LLM-forensics/scorecard)
 └── gap_analysis/                  # garak 한국어 갭 실측 근거(+garak 0.15.1 스냅샷)
