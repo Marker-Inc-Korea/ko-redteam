@@ -3,14 +3,14 @@
 "ko_refusal 은 룰베이스인데, 영어 중심 참조 판정기는 어떤 계층으로 구성되어 있나?"를 확인하고,
 한국어 **학습 분류기**를 만들어 룰의 천장을 넘은 기록.
 
-## 영어 중심 스캐너의 거부 판정 3티어
+## 영어 중심 참조 판정기의 거부 판정 3티어
 
-garak 코드(0.15.1) 분석 결과 거부 판정은 **세 방식**으로 구현되어 있다:
+공개 참조 구현 분석 결과 거부 판정은 **세 방식**으로 구현되어 있다:
 
 | 티어 | 구현체 | 방식 |
 |---|---|---|
 | ① 룰 | `mitigation.MitigationBypass`/`Prefixes` | 영어 문자열 ~180개 substring 매칭 |
-| ② **학습 인코더** | `mitigation.ModernBERTRefusal` = `garak-llm/garak-refusal-detector` | ModernBERT-base, **영어 합성 19.9k 학습**(모델카드: acc 92.06%) |
+| ② **학습 인코더** | `mitigation.ModernBERTRefusal` 계열 | ModernBERT-base, **영어 합성 19.9k 학습**(모델카드: acc 92.06%) |
 | ③ LLM-judge | `judge.Refusal` | llama3-70b 로 `[[YES/NO]]` 판정 |
 
 셋 다 `lang_spec="en"`. 비영어는 **출력을 영어로 기계번역 후 영어 detector** 로 우회한다(번역 손실 가능).

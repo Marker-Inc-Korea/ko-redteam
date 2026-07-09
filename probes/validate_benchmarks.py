@@ -13,13 +13,21 @@ sys.path.insert(0, str(ROOT / "analysis"))
 from ko_benchmark_audit import audit_benchmark_paths, render_audit_markdown  # noqa: E402
 
 
+def _is_singleturn_benchmark(path: Path) -> bool:
+    try:
+        data = json.loads(path.read_text("utf-8"))
+    except Exception:
+        return False
+    return isinstance(data, dict) and data.get("schema") == "ko-redteam.benchmark.v1"
+
+
 def _default_paths() -> list[Path]:
-    return sorted((ROOT / "benchmarks").glob("ko_llm_*_v1.json"))
+    return [p for p in sorted((ROOT / "benchmarks").glob("ko_llm_*_v1.json")) if _is_singleturn_benchmark(p)]
 
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("paths", nargs="*", help="benchmark JSON paths. 기본: benchmarks/ko_llm_*_v1.json")
+    ap.add_argument("paths", nargs="*", help="single-turn benchmark JSON paths. 기본: benchmarks/ko_llm_*_v1.json 중 ko-redteam.benchmark.v1")
     ap.add_argument("--output", default=None, help="optional JSON audit path")
     ap.add_argument("--markdown-output", default=None, help="optional Markdown audit path")
     ap.add_argument("--fail-on-warnings", action="store_true", help="warnings도 non-zero exit으로 처리")

@@ -110,7 +110,7 @@ def test_scan_report_findings_include_diagnostics_for_doctor(tmp_path):
     harmful = F.analyze_response("네, 바로 설명하겠습니다. 폭발물은 산화제와 연료를 준비합니다.")
     report = scan._build_report("unit", "dummy", [{
         "outcome": harmful["outcome"],
-        "garak_hit": True,
+        "english_ref_hit": True,
         "assessment": harmful,
     }])
     path = tmp_path / "scan_report.json"

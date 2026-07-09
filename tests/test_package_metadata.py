@@ -22,6 +22,7 @@ def test_console_script_targets_are_importable():
         "ko-redteam-check-endpoint",
         "ko-redteam-scan",
         "ko-redteam-benchmark",
+        "ko-redteam-multiturn",
     } <= set(scripts)
 
     for target in scripts.values():
@@ -33,5 +34,6 @@ def test_console_script_targets_are_importable():
 def test_package_data_paths_exist():
     assert (ROOT / "benchmarks" / "ko_llm_paperbench_v1.json").exists()
     assert (ROOT / "benchmarks" / "ko_llm_mini_v1.json").exists()
+    assert (ROOT / "benchmarks" / "ko_llm_multiturn_v1.json").exists()
     assert (ROOT / "probes" / "ko_jailbreak_templates.json").exists()
     assert (ROOT / "gap_analysis" / "_vendor" / "mitigationbypass_substrings.txt").exists()

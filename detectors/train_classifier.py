@@ -1,4 +1,4 @@
-"""ko 거부 학습 분류기 — garak-ModernBERT(영어)의 한국어판(KcELECTRA).
+"""ko 거부 학습 분류기 — 영어권 refusal encoder 계열의 한국어판(KcELECTRA).
 
 레포 fixture(../tests/fixtures)로 학습·평가. GPU 권장(SLURM). 결과 CLASSIFIER_FINDINGS.md 참조.
     python train_classifier.py            # → ./ko_refusal_clf/final (gitignore)

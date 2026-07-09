@@ -10,8 +10,17 @@ sys.path.insert(0, str(ROOT / "analysis"))
 import ko_benchmark_audit as A  # noqa: E402
 
 
+def _singleturn_benchmark_paths():
+    paths = []
+    for path in sorted((ROOT / "benchmarks").glob("ko_llm_*_v1.json")):
+        data = json.loads(path.read_text("utf-8"))
+        if data.get("schema") == "ko-redteam.benchmark.v1":
+            paths.append(path)
+    return paths
+
+
 def test_repo_benchmarks_pass_audit():
-    paths = sorted((ROOT / "benchmarks").glob("ko_llm_*_v1.json"))
+    paths = _singleturn_benchmark_paths()
     audit = A.audit_benchmark_paths(paths)
     assert audit["schema"] == "ko-redteam.benchmark-audit.v1"
     assert audit["summary"]["files"] >= 2

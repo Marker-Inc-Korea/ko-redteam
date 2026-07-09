@@ -4,18 +4,24 @@
 `safety`, `privacy`, `prompt_security`, `agent_rag`, `overrefusal`, `korean_quality` 관점으로 분류한 뒤
 scorecard, finding, 권장 조치로 정리합니다.
 
-이 README는 운영자가 바로 실행하고 리포트를 해석하는 데 필요한 정보만 앞에 둡니다. 외부 도구와의 대조는
-벤치마크 경쟁 결과가 아니라, 한국어 평가 기준을 설계하기 위한 참고 자료로 `gap_analysis/`에 분리했습니다.
+이 README는 운영자가 바로 실행하고 리포트를 해석하는 데 필요한 정보만 앞에 둡니다. 외부 참조 구현 분석은
+제품 우열 비교가 아니라, 한국어 평가 기준을 설계하기 위한 참고 자료로 `gap_analysis/`에 분리했습니다.
 
-## What It Does
+## At A Glance
+
+- **대상**: OpenAI-compatible endpoint, 저장된 응답 JSON/JSONL, 자체 한국어 평가 seed
+- **관점**: 안전거부, 개인정보, prompt security, agent/RAG, 과잉거부, 한국어 품질
+- **기본 원칙**: raw prompt/response는 저장하지 않고, hash와 `sanitized_excerpt`만 남김
+
+## Capabilities
 
 | 기능 | 입력 | 산출물 |
 |---|---|---|
 | Endpoint smoke | live OpenAI-compatible endpoint | 연결성, schema, 한국어 응답 신호, 오류 taxonomy |
 | Redteam scan | 유해 요청, 난독, 프레이밍, 멀티턴 흐름 | LLM-forensics JSON/Markdown |
-| Expected-outcome 평가 | 자체 한국어 benchmark seed | pass-rate, domain score, source-family score |
+| Expected-outcome 평가 | 자체 한국어 평가 seed | pass-rate, domain score, source-family score |
 | Offline 분석 | 저장된 JSON/JSONL 응답 | 원문 재호출 없는 포렌식 리포트 |
-| Gate/doctor | report, benchmark seed | CI용 품질 게이트와 개인정보 누출 점검 |
+| Gate/doctor | report, 평가 seed | CI용 품질 게이트와 개인정보 누출 점검 |
 
 ## Run Path
 
@@ -27,9 +33,6 @@ endpoint smoke
   -> gate
 ```
 
-기본 리포트는 원문 prompt/response를 저장하지 않습니다. hash와 `sanitized_excerpt`만 남기며, 원문 저장은
-로컬 디버깅용 `--include-raw`에서만 opt-in입니다.
-
 ## Quick Start
 
 ### 0. 설치
@@ -40,7 +43,7 @@ ko-redteam-self-check
 ```
 
 소스 checkout에서는 기존처럼 `python3 probes/...` 경로도 계속 사용할 수 있습니다. 설치 후에는
-`ko-redteam-suite`, `ko-redteam-check-endpoint`, `ko-redteam-scan`, `ko-redteam-benchmark` 진입점을 사용할 수 있습니다.
+`ko-redteam-suite`, `ko-redteam-check-endpoint`, `ko-redteam-scan`, `ko-redteam-benchmark`, `ko-redteam-multiturn` 진입점을 사용할 수 있습니다.
 명시적인 `--output`/`--out-dir`가 없으면 리포트는 현재 작업 디렉터리에 생성됩니다.
 
 ### 1. Endpoint 확인
@@ -73,7 +76,19 @@ python3 probes/benchmark_scan.py \
   --markdown-output benchmark_ko_llm_paperbench_v1_report.md
 ```
 
-### 4. 통합 suite
+### 4. 멀티턴 평가
+
+```bash
+ko-redteam-multiturn \
+  --endpoint http://127.0.0.1:8030/v1 \
+  --model gemma-4-31B-it \
+  --benchmark benchmarks/ko_llm_multiturn_v1.json \
+  --markdown-output multiturn_ko_llm_multiturn_v1_report.md
+```
+
+멀티턴 평가는 맥락 구축 후 종착 턴에서 `refuse_or_redirect`, `no_tool`, `no_leak`, `allow` 기대동작을 scorecard로 평가합니다.
+
+### 5. 통합 suite
 
 ```bash
 python3 probes/run_suite.py \
@@ -94,21 +109,77 @@ python3 probes/run_suite.py \
 Coverage gate는 live endpoint 호출 전에 seed가 필요한 축을 충분히 덮는지 검사합니다.
 `--endpoint-smoke`는 benchmark 실행 전에 endpoint 연결성, response schema, 한국어 응답 신호를 fail-fast로 확인합니다.
 
-## Command Cheat Sheet
+## Useful Commands
 
-| 작업 | 명령 |
-|---|---|
-| 자체 sanity check | `python3 probes/self_check.py --output self_check.json` |
-| seed audit | `python3 probes/validate_benchmarks.py --markdown-output benchmark_audit.md` |
-| coverage gate | `python3 probes/check_benchmark_coverage.py benchmarks/ko_llm_paperbench_v1.json --min-total 15 --markdown-output benchmark_coverage.md` |
-| endpoint smoke | `python3 probes/check_endpoint.py --endpoint http://127.0.0.1:8030/v1 --model gemma-4-31B-it --output endpoint_smoke.json` |
-| suite smoke 포함 | `python3 probes/run_suite.py --endpoint http://127.0.0.1:8030/v1 --model gemma-4-31B-it --benchmark benchmarks/ko_llm_paperbench_v1.json --endpoint-smoke --coverage --gate` |
-| 외부 케이스 import | `python3 probes/import_benchmark.py --input external_cases.csv --output benchmarks/external_cases.local.json --name external_cases_ko --source-id external-suite --id-field id --prompt-field prompt` |
-| seed merge | `python3 probes/merge_benchmarks.py benchmarks/ko_llm_paperbench_v1.json benchmarks/external_cases.local.json --output benchmarks/ko_llm_combined.local.json --name ko_llm_combined` |
-| 난독/프레이밍 확장 | `python3 probes/expand_benchmark.py --input benchmarks/ko_llm_paperbench_v1.json --output benchmarks/ko_llm_paperbench_v1_expanded.local.json` |
-| 반복 안정성 | `python3 probes/analyze_repeats.py probes/suite_run1/benchmark_report.json probes/suite_run2/benchmark_report.json --max-overall-span 5 --markdown-output repeat_stability_report.md` |
-| report gate | `python3 probes/gate_reports.py benchmark_ko_llm_paperbench_v1_report.json --min-overall 80 --max-critical-high 0 --markdown-output gate_report.md` |
-| report doctor | `python3 probes/doctor_reports.py benchmark_ko_llm_paperbench_v1_report.json benchmark_ko_llm_paperbench_v1_report.md --warnings-fail --markdown-output report_doctor.md` |
+### Local sanity
+
+```bash
+python3 probes/self_check.py --output self_check.json
+python3 probes/validate_benchmarks.py --markdown-output benchmark_audit.md
+python3 probes/check_benchmark_coverage.py \
+  benchmarks/ko_llm_paperbench_v1.json \
+  --min-total 15 \
+  --markdown-output benchmark_coverage.md
+```
+
+### Endpoint and suite
+
+```bash
+python3 probes/check_endpoint.py \
+  --endpoint http://127.0.0.1:8030/v1 \
+  --model gemma-4-31B-it \
+  --output endpoint_smoke.json
+
+python3 probes/run_suite.py \
+  --endpoint http://127.0.0.1:8030/v1 \
+  --model gemma-4-31B-it \
+  --benchmark benchmarks/ko_llm_paperbench_v1.json \
+  --endpoint-smoke --coverage --gate
+```
+
+### Seed operations
+
+```bash
+python3 probes/import_benchmark.py \
+  --input external_cases.csv \
+  --output benchmarks/external_cases.local.json \
+  --name external_cases_ko \
+  --source-id external-suite \
+  --id-field id \
+  --prompt-field prompt
+
+python3 probes/merge_benchmarks.py \
+  benchmarks/ko_llm_paperbench_v1.json \
+  benchmarks/external_cases.local.json \
+  --output benchmarks/ko_llm_combined.local.json \
+  --name ko_llm_combined
+
+python3 probes/expand_benchmark.py \
+  --input benchmarks/ko_llm_paperbench_v1.json \
+  --output benchmarks/ko_llm_paperbench_v1_expanded.local.json
+```
+
+### Report QA
+
+```bash
+python3 probes/analyze_repeats.py \
+  probes/suite_run1/benchmark_report.json \
+  probes/suite_run2/benchmark_report.json \
+  --max-overall-span 5 \
+  --markdown-output repeat_stability_report.md
+
+python3 probes/gate_reports.py \
+  benchmark_ko_llm_paperbench_v1_report.json \
+  --min-overall 80 \
+  --max-critical-high 0 \
+  --markdown-output gate_report.md
+
+python3 probes/doctor_reports.py \
+  benchmark_ko_llm_paperbench_v1_report.json \
+  benchmark_ko_llm_paperbench_v1_report.md \
+  --warnings-fail \
+  --markdown-output report_doctor.md
+```
 
 ## Reading The Report
 
@@ -128,7 +199,7 @@ Endpoint 오류는 `timeout`, `connection`, `http_auth`, `http_rate_limit`, `htt
 ## Evaluation Seed
 
 `benchmarks/ko_llm_paperbench_v1.json`은 공개 논문과 가이드의 평가 축을 참고하되, prompt는 한국어 배포
-환경에 맞게 새로 작성한 자체 seed입니다. 외부 benchmark prompt를 복사해 재배포하지 않습니다.
+환경에 맞게 새로 작성한 자체 seed입니다. 외부 평가 프롬프트를 복사해 재배포하지 않습니다.
 
 | 축 | 반영 범위 |
 |---|---|
@@ -147,6 +218,7 @@ Endpoint 오류는 `timeout`, `connection`, `http_auth`, `http_rate_limit`, `htt
 | 영역 | 파일 |
 |---|---|
 | 실행 CLI | `probes/scan.py`, `probes/benchmark_scan.py`, `probes/run_suite.py` |
+| 멀티턴 평가 | `probes/multiturn_benchmark.py`, `benchmarks/ko_llm_multiturn_v1.json` |
 | 공격 생성 | `probes/ko_obfuscation.py`, `probes/ko_jailbreak.py` |
 | 한국어 판정 | `detectors/ko_refusal.py` |
 | 응답 포렌식 | `analysis/ko_llm_forensics.py` |
@@ -166,7 +238,7 @@ Endpoint 오류는 `timeout`, `connection`, `http_auth`, `http_rate_limit`, `htt
 | [`probes/CRESCENDO_FINDINGS.md`](./probes/CRESCENDO_FINDINGS.md) | 멀티턴 crescendo 스캔 |
 | [`gap_analysis/FINDINGS.md`](./gap_analysis/FINDINGS.md) | 영어 중심 참조 판정의 한국어 해석 갭 |
 
-과거 일부 실측 문서는 `ko-ASR = 비거부율` 프록시를 사용했습니다. 현재 통합 리포트에서는
+초기 실측 문서는 `ko-ASR = 비거부율` 프록시를 일부 사용했습니다. 현재 통합 리포트에서는
 `harmful_compliance`, `safe_redirect`, `unknown`, `error`를 분리해 보수적으로 해석합니다.
 
 ## Pre-release Check

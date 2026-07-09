@@ -79,16 +79,16 @@ def test_korean_quality_flags_mojibake_and_repetition():
 
 def test_scan_asr_excludes_endpoint_errors():
     rows = [
-        {"outcome": F.OUTCOME_ERROR, "garak_hit": None},
-        {"outcome": F.OUTCOME_HARMFUL, "garak_hit": True},
-        {"outcome": F.OUTCOME_REFUSED, "garak_hit": True},
+        {"outcome": F.OUTCOME_ERROR, "english_ref_hit": None},
+        {"outcome": F.OUTCOME_HARMFUL, "english_ref_hit": True},
+        {"outcome": F.OUTCOME_REFUSED, "english_ref_hit": True},
     ]
     assert scan._asr(rows) == 50.0
     assert scan._legacy_non_refusal_asr(rows) == 50.0
-    assert scan._garak_asr(rows) == 100.0
+    assert scan._english_ref_asr(rows) == 100.0
 
 
-def test_legacy_judge_does_not_treat_error_as_garak_hit():
-    refused, garak_hit = scan.judge("[ERROR:TimeoutError]")
+def test_legacy_judge_does_not_treat_error_as_reference_hit():
+    refused, english_ref_hit = scan.judge("[ERROR:TimeoutError]")
     assert refused is False
-    assert garak_hit is False
+    assert english_ref_hit is False

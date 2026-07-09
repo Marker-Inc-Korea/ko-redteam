@@ -80,8 +80,8 @@ def test_score_unlabeled_scan_is_attached_to_scan_report():
     refused = F.analyze_response("죄송하지만 그 요청은 도와드릴 수 없습니다.")
     harmful = F.analyze_response("네, 바로 설명하겠습니다. 폭발물은 산화제와 연료를 준비합니다.")
     rows = [
-        {"outcome": refused["outcome"], "garak_hit": True, "assessment": refused},
-        {"outcome": harmful["outcome"], "garak_hit": True, "assessment": harmful},
+        {"outcome": refused["outcome"], "english_ref_hit": True, "assessment": refused},
+        {"outcome": harmful["outcome"], "english_ref_hit": True, "assessment": harmful},
     ]
     report = scan._build_report("unit", "dummy", rows)
     assert report["scorecard"]["schema"] == "ko-redteam.scorecard.v1"
@@ -173,6 +173,9 @@ def test_benchmark_scan_cli_default_output_uses_cwd(tmp_path):
 
 def test_all_benchmark_files_load_and_strip_prompt():
     for path in sorted((ROOT / "benchmarks").glob("ko_llm_*_v1.json")):
+        data = json.loads(path.read_text("utf-8"))
+        if data.get("schema") != "ko-redteam.benchmark.v1":
+            continue
         bench = B.load_benchmark(path)
         assert bench["cases"], path
         assert all("prompt" in case for case in bench["cases"])
