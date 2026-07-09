@@ -53,7 +53,7 @@ ko-redteam-self-check
 
 | CLI | 용도 |
 |---|---|
-| `ko-redteam-suite` | audit, coverage, endpoint smoke, benchmark, agent harness, doctor, gate 통합 실행 |
+| `ko-redteam-suite` | audit, coverage, endpoint smoke, benchmark, multiturn, agent harness, doctor, gate 통합 실행 |
 | `ko-redteam-check-endpoint` | OpenAI-compatible endpoint 연결성과 한국어 응답 신호 확인 |
 | `ko-redteam-scan` | 단일/조합/crescendo 공격 스캔 |
 | `ko-redteam-benchmark` | expected-outcome 단일턴 평가 |
@@ -88,6 +88,7 @@ ko-redteam-suite \
   --endpoint-smoke \
   --coverage --coverage-min-total 15 \
   --coverage-required-source-family agentdojo \
+  --multiturn \
   --agent-harness \
   --doctor-warnings-fail \
   --gate --min-overall 80 \
@@ -103,6 +104,7 @@ ko-redteam-suite \
 | `suite_manifest.json` | 실행 설정, 단계 상태, 산출물 경로 |
 | `suite_report.md` | 사람이 읽는 통합 요약 |
 | `benchmark_report.json/md` | 단일턴 expected-outcome 평가 |
+| `multiturn_report.json/md` | 멀티턴 escalation/tool hijack/privacy 평가 |
 | `agent_harness_report.json/md` | tool gateway 평가 |
 | `report_doctor.json/md` | schema/privacy/report 품질 점검 |
 | `gate_report.json/md` | CI threshold 판정 |
@@ -234,8 +236,8 @@ docker run --rm ko-redteam:local python -m pytest tests -q
 ```
 
 `self_check.py`는 live endpoint 없이 import, Python 버전, seed audit, paperbench coverage, offline benchmark,
-multiturn, agent harness, suite endpoint-smoke 통합 경로를 확인합니다. GitHub Actions의 `ko-redteam` job도
-self-check, 전체 테스트, 컨테이너 build/run을 실행하고 `self_check.json`을 artifact로 남깁니다.
+multiturn, agent harness, suite endpoint-smoke/multiturn/agent 통합 경로를 확인합니다. GitHub Actions의
+`ko-redteam` job도 self-check, 전체 테스트, 컨테이너 build/run을 실행하고 `self_check.json`을 artifact로 남깁니다.
 
 ---
 

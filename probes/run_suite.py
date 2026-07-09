@@ -37,6 +37,8 @@ from ko_benchmark_coverage import (  # noqa: E402
 from ko_gate import evaluate_reports, parse_thresholds as parse_score_thresholds, render_gate_markdown  # noqa: E402
 from ko_report import render_markdown  # noqa: E402
 from ko_report_doctor import doctor_reports, render_doctor_markdown  # noqa: E402
+from multiturn_benchmark import DEFAULT_BENCHMARK as DEFAULT_MULTITURN_BENCHMARK  # noqa: E402
+from multiturn_benchmark import run_multiturn_benchmark  # noqa: E402
 
 DEFAULT_BENCHMARK = ROOT / "benchmarks" / "ko_llm_paperbench_v1.json"
 DEFAULT_MODEL = "gemma-4-31B-it"
@@ -203,6 +205,8 @@ def _new_manifest(
     doctor_warnings_fail: bool,
     doctor_allow_raw: bool,
     gate_enabled: bool,
+    multiturn_enabled: bool,
+    multiturn_benchmark_path: Path,
     agent_harness_enabled: bool,
     agent_benchmark_path: Path,
     min_overall: float,
@@ -258,6 +262,10 @@ def _new_manifest(
                 "max_findings": max_findings,
                 "max_critical_high": max_critical_high,
             },
+            "multiturn": {
+                "enabled": multiturn_enabled,
+                "benchmark": str(multiturn_benchmark_path),
+            },
             "agent_harness": {
                 "enabled": agent_harness_enabled,
                 "benchmark": str(agent_benchmark_path),
@@ -300,6 +308,7 @@ def render_suite_markdown(manifest: dict[str, Any]) -> str:
     endpoint_smoke = summaries.get("endpoint_smoke") or {}
     doctor = summaries.get("doctor") or {}
     gate = summaries.get("gate") or {}
+    multiturn = summaries.get("multiturn") or {}
     agent = summaries.get("agent_harness") or {}
 
     lines = [
@@ -318,6 +327,7 @@ def render_suite_markdown(manifest: dict[str, Any]) -> str:
         f"- Endpoint smoke: **{(config.get('endpoint_smoke') or {}).get('enabled', False)}**",
         f"- Doctor: **{(config.get('doctor') or {}).get('enabled', False)}**",
         f"- Gate: **{(config.get('gate') or {}).get('enabled', False)}**",
+        f"- Multiturn: **{(config.get('multiturn') or {}).get('enabled', False)}**",
         f"- Agent harness: **{(config.get('agent_harness') or {}).get('enabled', False)}**",
     ]
 
@@ -389,6 +399,25 @@ def render_suite_markdown(manifest: dict[str, Any]) -> str:
             rows = [["Endpoint Error Category", "Count"], *[[k, v] for k, v in error_categories.items()]]
             lines += ["", "### Endpoint Errors", "", _table(rows)]
 
+    if multiturn:
+        lines += [
+            "",
+            "## Multiturn Benchmark",
+            "",
+            f"- Report: **{multiturn.get('benchmark', '-')}**",
+            f"- Overall: **{_fmt(multiturn.get('overall'))}**",
+            f"- Grade: **{multiturn.get('grade', '-')}**",
+            f"- Findings: **{multiturn.get('finding_count', 0)}**",
+        ]
+        domain_scores = multiturn.get("domain_scores") or {}
+        if domain_scores:
+            rows = [["Domain", "Score"], *[[k, _fmt(v)] for k, v in domain_scores.items()]]
+            lines += ["", _table(rows)]
+        error_categories = multiturn.get("error_categories") or {}
+        if error_categories:
+            rows = [["Endpoint Error Category", "Count"], *[[k, v] for k, v in error_categories.items()]]
+            lines += ["", "### Multiturn Endpoint Errors", "", _table(rows)]
+
     if agent:
         lines += [
             "",
@@ -459,6 +488,8 @@ def run_suite(
     framing_per_family: bool = True,
     target_expected: set[str] | None = None,
     gate_enabled: bool = False,
+    multiturn_enabled: bool = False,
+    multiturn_benchmark_path: str | Path = DEFAULT_MULTITURN_BENCHMARK,
     agent_harness_enabled: bool = False,
     agent_benchmark_path: str | Path = DEFAULT_AGENT_BENCHMARK,
     coverage_enabled: bool = False,
@@ -485,11 +516,13 @@ def run_suite(
     max_findings: int | None = None,
     max_critical_high: int | None = None,
     call_fn: Callable[[dict[str, Any]], dict[str, Any]] | None = None,
+    multiturn_call_fn: Callable[[dict[str, Any], dict[str, Any], list[dict[str, str]]], dict[str, Any]] | None = None,
     agent_call_fn: Callable[[dict[str, Any], list[dict[str, str]], list[dict[str, Any]]], dict[str, Any]] | None = None,
     endpoint_smoke_call_fn: Callable[[str], dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """benchmark suite를 실행하고 manifest를 반환한다."""
     benchmark_path = Path(benchmark_path)
+    multiturn_benchmark_path = Path(multiturn_benchmark_path)
     agent_benchmark_path = Path(agent_benchmark_path)
     out_dir = Path(out_dir) if out_dir is not None else Path.cwd() / f"suite_{benchmark_path.stem}"
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -534,6 +567,8 @@ def run_suite(
         doctor_warnings_fail=doctor_warnings_fail,
         doctor_allow_raw=doctor_allow_raw,
         gate_enabled=gate_enabled,
+        multiturn_enabled=multiturn_enabled,
+        multiturn_benchmark_path=multiturn_benchmark_path,
         agent_harness_enabled=agent_harness_enabled,
         agent_benchmark_path=agent_benchmark_path,
         min_overall=min_overall,
@@ -671,6 +706,34 @@ def run_suite(
     manifest["summaries"]["benchmark"] = _benchmark_summary(report)
     _add_step(manifest, "benchmark_scan", "pass", path=str(report_json))
 
+    multiturn_report_json: Path | None = None
+    multiturn_report_md: Path | None = None
+    if multiturn_enabled:
+        multiturn_report_json = out_dir / "multiturn_report.json"
+        multiturn_report_md = out_dir / "multiturn_report.md"
+        try:
+            multiturn_report = run_multiturn_benchmark(
+                endpoint,
+                model,
+                benchmark_path=multiturn_benchmark_path,
+                include_raw=include_raw,
+                timeout=timeout,
+                max_tokens=max_tokens,
+                call_fn=multiturn_call_fn,
+            )
+        except Exception as e:  # noqa: BLE001
+            _add_step(manifest, "multiturn_benchmark", "fail", error=f"{type(e).__name__}: {e}")
+            return _finalize(manifest, status="fail", manifest_path=manifest_path, suite_md_path=suite_md_path)
+        _write_json(multiturn_report_json, multiturn_report)
+        _write_text(multiturn_report_md, render_markdown(multiturn_report))
+        manifest["artifacts"]["multiturn_benchmark"] = str(multiturn_benchmark_path)
+        manifest["artifacts"]["multiturn_report_json"] = str(multiturn_report_json)
+        manifest["artifacts"]["multiturn_report_md"] = str(multiturn_report_md)
+        manifest["summaries"]["multiturn"] = _benchmark_summary(multiturn_report)
+        _add_step(manifest, "multiturn_benchmark", "pass", path=str(multiturn_report_json))
+    else:
+        _add_step(manifest, "multiturn_benchmark", "skipped")
+
     agent_report_json: Path | None = None
     agent_report_md: Path | None = None
     if agent_harness_enabled:
@@ -704,6 +767,8 @@ def run_suite(
         doctor_json = out_dir / "report_doctor.json"
         doctor_md = out_dir / "report_doctor.md"
         doctor_paths: list[Path] = [report_json, report_md]
+        if multiturn_report_json is not None and multiturn_report_md is not None:
+            doctor_paths.extend([multiturn_report_json, multiturn_report_md])
         if agent_report_json is not None and agent_report_md is not None:
             doctor_paths.extend([agent_report_json, agent_report_md])
         doctor = doctor_reports(
@@ -733,6 +798,8 @@ def run_suite(
         gate_json = out_dir / "gate_report.json"
         gate_md = out_dir / "gate_report.md"
         gate_paths: list[Path] = [report_json]
+        if multiturn_report_json is not None:
+            gate_paths.append(multiturn_report_json)
         if agent_report_json is not None:
             gate_paths.append(agent_report_json)
         gate = evaluate_reports(
@@ -808,6 +875,9 @@ def main() -> None:
     ap.add_argument("--doctor-allow-raw", action="store_true",
                     help="doctor에서 raw prompt/response 필드를 허용. 로컬 디버깅 report 전용.")
     ap.add_argument("--gate", action="store_true", help="생성 report를 score gate로 판정")
+    ap.add_argument("--multiturn", action="store_true", help="benchmark scan 이후 multiturn benchmark 실행")
+    ap.add_argument("--multiturn-benchmark", default=str(DEFAULT_MULTITURN_BENCHMARK),
+                    help="multiturn benchmark path")
     ap.add_argument("--agent-harness", action="store_true", help="benchmark scan 이후 agent tool gateway harness 실행")
     ap.add_argument("--agent-benchmark", default=str(DEFAULT_AGENT_BENCHMARK),
                     help="agent harness benchmark path")
@@ -853,6 +923,8 @@ def main() -> None:
         doctor_warnings_fail=args.doctor_warnings_fail,
         doctor_allow_raw=args.doctor_allow_raw,
         gate_enabled=args.gate,
+        multiturn_enabled=args.multiturn,
+        multiturn_benchmark_path=args.multiturn_benchmark,
         agent_harness_enabled=args.agent_harness,
         agent_benchmark_path=args.agent_benchmark,
         min_overall=args.min_overall,
