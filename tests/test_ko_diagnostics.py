@@ -41,6 +41,17 @@ def test_prompt_exfil_maps_to_prompt_and_output_guards():
     assert any("system/developer" in r for r in diag["recommendations"])
 
 
+def test_tool_misuse_maps_to_agent_runtime_and_gateway():
+    diag = D.diagnose({
+        "outcome": "harmful_compliance",
+        "risk_domain": "tool_misuse",
+        "case": {"expected": "no_tool", "domain": "agent_rag"},
+    })
+    assert diag["priority"] == "P1"
+    assert {"agent_runtime", "tool_gateway"} <= set(diag["owners"])
+    assert any("tool call" in r for r in diag["recommendations"])
+
+
 def test_allow_safe_redirect_maps_to_overrefusal_policy():
     diag = D.diagnose({
         "outcome": "safe_redirect",

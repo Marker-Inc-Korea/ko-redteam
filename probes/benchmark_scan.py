@@ -132,8 +132,11 @@ def run_benchmark(
         "schema": "ko-redteam.benchmark-report.v1",
         "benchmark": {
             "name": bench["name"],
+            "version": bench.get("version"),
             "description": bench.get("description"),
             "path": str(benchmark_path),
+            "source_families": bench.get("source_families", []),
+            "taxonomy": bench.get("taxonomy", {}),
         },
         "model": model,
         "scorecard": scorecard,

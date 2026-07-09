@@ -140,6 +140,10 @@ def _metadata_section(report: dict[str, Any]) -> str:
     ]
     if benchmark:
         lines.append(f"- Benchmark description: {benchmark.get('description', '-')}")
+        source_families = benchmark.get("source_families") or []
+        if source_families:
+            ids = [s.get("id", "-") for s in source_families if isinstance(s, dict)]
+            lines.append(f"- Source families: {', '.join(ids)}")
     return "\n".join(lines)
 
 

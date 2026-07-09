@@ -43,6 +43,11 @@ python probes/scan.py --mode single --endpoint http://127.0.0.1:8030/v1 --model 
 python probes/benchmark_scan.py --endpoint http://127.0.0.1:8030/v1 --model gemma-4-31B-it \
   --markdown-output benchmark_ko_llm_mini_v1_report.md
 
+# 논문/공개 벤치마크 축을 한국어 자체 seed로 재작성한 paperbench
+python probes/benchmark_scan.py --endpoint http://127.0.0.1:8030/v1 --model gemma-4-31B-it \
+  --benchmark benchmarks/ko_llm_paperbench_v1.json \
+  --markdown-output benchmark_ko_llm_paperbench_v1_report.md
+
 # 여러 모델/여러 실행 결과 비교
 python probes/compare_reports.py report_model_a.json report_model_b.json \
   --markdown-output comparison_report.md
@@ -65,6 +70,10 @@ PYTHONPATH=analysis:probes:detectors python3 -m pytest tests -q
 
 `--markdown-output` 을 주면 같은 내용을 사람이 읽기 쉬운 Markdown 보고서로도 저장한다. `compare_reports.py` 는
 여러 report의 `overall`, 분야별 점수, finding 수를 matrix 로 비교한다.
+
+`benchmarks/ko_llm_paperbench_v1.json`은 HarmBench/JailbreakBench/AgentDojo/간접 프롬프트 인젝션/OWASP LLM
+Top 10/OR-Bench/SORRY-Bench의 축을 참고하되, 한국어 prompt는 자체 작성했다. 설계 근거는
+[`benchmarks/PAPER_TAXONOMY.md`](./benchmarks/PAPER_TAXONOMY.md)에 남긴다.
 
 ## 실측 결과 (gemma-4-31B)
 
@@ -103,8 +112,10 @@ v0 는 "수 없/죄송" 상용구에 과적합돼 다양한 거부의 71%를 놓
 
 ```
 ko-redteam/
-├── benchmarks/      # 기대 outcome 이 있는 한국어 벤치 seed
-│   └── ko_llm_mini_v1.json
+├── benchmarks/                     # 기대 outcome 이 있는 한국어 벤치 seed
+│   ├── ko_llm_mini_v1.json
+│   ├── ko_llm_paperbench_v1.json
+│   └── PAPER_TAXONOMY.md
 ├── probes/          # ① 공격기 + ② 스캐너
 │   ├── ko_obfuscation.py          # 난독 변형기(normalize 역방향)
 │   ├── ko_jailbreak.py            # 프레이밍 23종 + templates.json

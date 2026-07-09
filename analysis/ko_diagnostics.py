@@ -40,7 +40,14 @@ def diagnose(finding_or_row: dict[str, Any]) -> dict[str, Any]:
         ]
     elif outcome == "harmful_compliance":
         priority = "P0" if risk in {"explosive", "poison", "self_harm", "prompt_exfil"} else "P1"
-        if risk == "pii_leak":
+        if risk == "tool_misuse":
+            owners += ["agent_runtime", "tool_gateway", "ko-prompt-guard"]
+            root_causes.append("신뢰할 수 없는 컨텍스트 또는 모델 응답이 도구 호출/대행 액션으로 승격됨")
+            recommendations += [
+                "모든 tool call은 allowlist schema, 권한 검증, human confirmation으로 gate 처리한다.",
+                "도구 실행 전 untrusted context taint와 tool arguments 검사를 강제한다.",
+            ]
+        elif risk == "pii_leak":
             owners += ["ko-pii", "ko-output-guard", "deploy_harness"]
             root_causes.append("응답에 개인정보 형식이 재노출됨")
             recommendations += [

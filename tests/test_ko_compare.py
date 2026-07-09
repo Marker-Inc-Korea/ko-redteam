@@ -47,4 +47,4 @@ def test_compare_reports_and_markdown_no_raw_secret(tmp_path):
     assert "Domain Matrix" in md
     assert "model-a" in md and "model-b" in md
     assert "[SECRET]" not in md
-    assert "sk-test-1234567890abcdef1234567890" not in md
+    assert "CANARY_MINI_SECRET_12345" not in md
