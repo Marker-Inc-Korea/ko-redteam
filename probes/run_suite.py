@@ -339,7 +339,7 @@ def render_suite_markdown(manifest: dict[str, Any]) -> str:
     lines += ["", "## Steps", "", _table(step_rows)]
 
     audit_rows = [["Audit", "Status", "Cases", "Errors", "Warnings", "Low Korean Signal", "Min Hangul Ratio"]]
-    for name in ("source_audit", "benchmark_audit"):
+    for name in ("source_audit", "benchmark_audit", "multiturn_audit", "agent_audit"):
         item = summaries.get(name)
         if item:
             korean_signals = item.get("korean_signals") or {}
@@ -633,6 +633,38 @@ def run_suite(
         manifest["artifacts"]["benchmark_audit_json"] = str(source_audit_json)
         manifest["artifacts"]["benchmark_audit_md"] = str(source_audit_md)
         manifest["summaries"]["benchmark_audit"] = _audit_summary(source_audit)
+
+    if multiturn_enabled:
+        multiturn_audit_json = out_dir / "multiturn_benchmark_audit.json"
+        multiturn_audit_md = out_dir / "multiturn_benchmark_audit.md"
+        multiturn_audit = _audit_one(
+            multiturn_benchmark_path,
+            output_json=multiturn_audit_json,
+            output_md=multiturn_audit_md,
+        )
+        manifest["artifacts"]["multiturn_benchmark"] = str(multiturn_benchmark_path)
+        manifest["artifacts"]["multiturn_audit_json"] = str(multiturn_audit_json)
+        manifest["artifacts"]["multiturn_audit_md"] = str(multiturn_audit_md)
+        manifest["summaries"]["multiturn_audit"] = _audit_summary(multiturn_audit)
+        _add_step(manifest, "multiturn_audit", multiturn_audit["summary"]["status"], path=str(multiturn_audit_json))
+        if multiturn_audit["summary"]["errors"]:
+            return _finalize(manifest, status="fail", manifest_path=manifest_path, suite_md_path=suite_md_path)
+
+    if agent_harness_enabled:
+        agent_audit_json = out_dir / "agent_benchmark_audit.json"
+        agent_audit_md = out_dir / "agent_benchmark_audit.md"
+        agent_audit = _audit_one(
+            agent_benchmark_path,
+            output_json=agent_audit_json,
+            output_md=agent_audit_md,
+        )
+        manifest["artifacts"]["agent_benchmark"] = str(agent_benchmark_path)
+        manifest["artifacts"]["agent_audit_json"] = str(agent_audit_json)
+        manifest["artifacts"]["agent_audit_md"] = str(agent_audit_md)
+        manifest["summaries"]["agent_audit"] = _audit_summary(agent_audit)
+        _add_step(manifest, "agent_audit", agent_audit["summary"]["status"], path=str(agent_audit_json))
+        if agent_audit["summary"]["errors"]:
+            return _finalize(manifest, status="fail", manifest_path=manifest_path, suite_md_path=suite_md_path)
 
     if coverage_enabled:
         coverage_json = out_dir / "benchmark_coverage.json"

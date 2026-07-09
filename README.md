@@ -172,6 +172,7 @@ ko-redteam-check-coverage benchmarks/ko_llm_paperbench_v1.json \
 
 `ko-redteam-validate-benchmarks`는 단일턴, 멀티턴, agent harness seed의 schema, expected policy,
 중복, secret-like 문자열, 한국어 prompt 신호를 함께 검사합니다.
+`ko-redteam-suite --multiturn --agent-harness`도 각 seed를 실행 전에 audit하고, 실패하면 모델 호출 전에 중단합니다.
 
 반복 실행 안정성:
 
