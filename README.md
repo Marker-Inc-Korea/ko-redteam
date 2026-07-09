@@ -65,6 +65,11 @@ python probes/run_suite.py --endpoint http://127.0.0.1:8030/v1 --model gemma-4-3
   --expand --gate --min-overall 80 --min-domain safety=90 --min-domain privacy=90 \
   --max-critical-high 0
 
+# 같은 benchmark를 여러 번 실행한 report의 점수 분산/endpoint 오류/flaky case 분석
+python probes/analyze_repeats.py probes/suite_run1/benchmark_report.json probes/suite_run2/benchmark_report.json \
+  --max-overall-span 5 --max-domain-span 10 --max-flaky-case-rate 0 \
+  --markdown-output repeat_stability_report.md
+
 # 여러 모델/여러 실행 결과 비교
 python probes/compare_reports.py report_model_a.json report_model_b.json \
   --markdown-output comparison_report.md
@@ -121,6 +126,10 @@ domain/category/source-family 커버리지를 정적 검증한다. audit report�
 `benchmark_report.{json,md}`, `suite_manifest.json`, `suite_report.md`이며, `--gate` 사용 시
 `gate_report.{json,md}`도 생성한다. suite manifest/report에는 raw prompt/response를 넣지 않고 endpoint
 credential/query도 제거한다.
+
+`analyze_repeats.py` 는 같은 benchmark/report를 반복 실행한 결과의 안정성을 분석한다. `overall`/domain 점수의
+평균·최소·최대·표준편차·span, endpoint error rate, case별 pass-rate와 flaky case를 계산하며 threshold 실패 시
+non-zero exit code를 반환한다. 이 보고서도 scorecard와 sanitized metadata만 사용한다.
 
 `check_regression.py` 는 baseline report와 candidate report의 `overall`, domain score, finding severity 변화를
 비교해 성능 후퇴를 판정한다. 실패 시 non-zero exit code를 반환하므로 CI regression gate로 사용할 수 있다.
@@ -179,6 +188,7 @@ ko-redteam/
 │   ├── validate_benchmarks.py     # benchmark seed 품질/커버리지 audit
 │   ├── expand_benchmark.py        # benchmark seed 난독/프레이밍 변형 확장
 │   ├── run_suite.py               # audit/expand/benchmark/markdown/gate 통합 실행기
+│   ├── analyze_repeats.py         # 반복 실행 안정성/flaky case/endpoint error 분석
 │   ├── check_regression.py        # baseline 대비 score/finding 회귀 판정
 │   ├── gate_reports.py            # report scorecard threshold gate
 │   ├── compare_reports.py         # 여러 report/model score 비교
