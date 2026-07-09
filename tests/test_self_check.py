@@ -1,0 +1,40 @@
+"""self_check 배포 sanity check 회귀."""
+import json
+import subprocess
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT / "probes"))
+
+import self_check as S  # noqa: E402
+
+
+def test_self_check_passes_repo_defaults():
+    result = S.run_self_check()
+    assert result["status"] == "pass"
+    names = {c["name"] for c in result["checks"]}
+    assert {"benchmark_audit", "paperbench_coverage", "offline_benchmark_scan"} <= names
+    scan = next(c for c in result["checks"] if c["name"] == "offline_benchmark_scan")
+    assert scan["overall"] >= 90.0
+    assert scan["raw_fields"] == 0
+
+
+def test_self_check_cli_writes_json(tmp_path):
+    out = tmp_path / "self_check.json"
+    cp = subprocess.run(
+        [
+            sys.executable,
+            str(ROOT / "probes" / "self_check.py"),
+            "--output",
+            str(out),
+        ],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+
+    result = json.loads(out.read_text("utf-8"))
+    assert "self-check status=pass" in cp.stdout
+    assert result["status"] == "pass"

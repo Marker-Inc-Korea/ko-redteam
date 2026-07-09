@@ -38,7 +38,7 @@
 ### 1. 공격 스캔
 
 ```bash
-python probes/scan.py --mode single \
+python3 probes/scan.py --mode single \
   --endpoint http://127.0.0.1:8030/v1 \
   --model gemma-4-31B-it \
   --markdown-output scan_single_report.md
@@ -49,7 +49,7 @@ python probes/scan.py --mode single \
 ### 2. Benchmark 평가
 
 ```bash
-python probes/benchmark_scan.py \
+python3 probes/benchmark_scan.py \
   --endpoint http://127.0.0.1:8030/v1 \
   --model gemma-4-31B-it \
   --benchmark benchmarks/ko_llm_paperbench_v1.json \
@@ -59,7 +59,7 @@ python probes/benchmark_scan.py \
 ### 3. Suite 실행
 
 ```bash
-python probes/run_suite.py \
+python3 probes/run_suite.py \
   --endpoint http://127.0.0.1:8030/v1 \
   --model gemma-4-31B-it \
   --benchmark benchmarks/ko_llm_paperbench_v1.json \
@@ -78,21 +78,23 @@ Coverage gate는 endpoint 호출 전에 benchmark가 필요한 축을 충분히 
 ### 4. 테스트
 
 ```bash
-PYTHONPATH=analysis:probes:detectors python3 -m pytest tests -q
+python3 probes/self_check.py
+python3 -m pytest tests -q
 ```
 
 ## 자주 쓰는 명령
 
 | 작업 | 명령 |
 |---|---|
-| benchmark audit | `python probes/validate_benchmarks.py --markdown-output benchmark_audit.md` |
-| coverage gate | `python probes/check_benchmark_coverage.py benchmarks/ko_llm_paperbench_v1.json --min-total 15 --markdown-output benchmark_coverage.md` |
-| 외부 케이스 import | `python probes/import_benchmark.py --input external_cases.csv --output benchmarks/external_cases.local.json --name external_cases_ko --source-id external-suite --id-field id --prompt-field prompt` |
-| benchmark merge | `python probes/merge_benchmarks.py benchmarks/ko_llm_paperbench_v1.json benchmarks/external_cases.local.json --output benchmarks/ko_llm_combined.local.json --name ko_llm_combined` |
-| 난독/프레이밍 확장 | `python probes/expand_benchmark.py --input benchmarks/ko_llm_paperbench_v1.json --output benchmarks/ko_llm_paperbench_v1_expanded.local.json` |
-| 반복 안정성 | `python probes/analyze_repeats.py probes/suite_run1/benchmark_report.json probes/suite_run2/benchmark_report.json --max-overall-span 5 --markdown-output repeat_stability_report.md` |
-| report gate | `python probes/gate_reports.py benchmark_ko_llm_paperbench_v1_report.json --min-overall 80 --max-critical-high 0 --markdown-output gate_report.md` |
-| report doctor | `python probes/doctor_reports.py benchmark_ko_llm_paperbench_v1_report.json benchmark_ko_llm_paperbench_v1_report.md --warnings-fail --markdown-output report_doctor.md` |
+| benchmark audit | `python3 probes/validate_benchmarks.py --markdown-output benchmark_audit.md` |
+| coverage gate | `python3 probes/check_benchmark_coverage.py benchmarks/ko_llm_paperbench_v1.json --min-total 15 --markdown-output benchmark_coverage.md` |
+| 배포 sanity check | `python3 probes/self_check.py --output self_check.json` |
+| 외부 케이스 import | `python3 probes/import_benchmark.py --input external_cases.csv --output benchmarks/external_cases.local.json --name external_cases_ko --source-id external-suite --id-field id --prompt-field prompt` |
+| benchmark merge | `python3 probes/merge_benchmarks.py benchmarks/ko_llm_paperbench_v1.json benchmarks/external_cases.local.json --output benchmarks/ko_llm_combined.local.json --name ko_llm_combined` |
+| 난독/프레이밍 확장 | `python3 probes/expand_benchmark.py --input benchmarks/ko_llm_paperbench_v1.json --output benchmarks/ko_llm_paperbench_v1_expanded.local.json` |
+| 반복 안정성 | `python3 probes/analyze_repeats.py probes/suite_run1/benchmark_report.json probes/suite_run2/benchmark_report.json --max-overall-span 5 --markdown-output repeat_stability_report.md` |
+| report gate | `python3 probes/gate_reports.py benchmark_ko_llm_paperbench_v1_report.json --min-overall 80 --max-critical-high 0 --markdown-output gate_report.md` |
+| report doctor | `python3 probes/doctor_reports.py benchmark_ko_llm_paperbench_v1_report.json benchmark_ko_llm_paperbench_v1_report.md --warnings-fail --markdown-output report_doctor.md` |
 
 ## Scorecard
 
@@ -166,6 +168,18 @@ ko-redteam/
 ├── tests/                      # 회귀 테스트
 └── gap_analysis/               # 영어 중심 판정 갭 재현 자료와 외부 스냅샷
 ```
+
+## 배포 전 체크
+
+새 환경에서 최소 검증은 아래 순서로 충분합니다.
+
+```bash
+python3 -m pip install -r requirements-dev.txt
+python3 probes/self_check.py
+python3 -m pytest tests -q
+```
+
+`self_check.py`는 live endpoint 없이 import, Python 버전, benchmark audit, paperbench coverage, offline benchmark scan 경로를 확인합니다.
 
 ## 라이선스·윤리
 
