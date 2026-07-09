@@ -52,6 +52,9 @@ python probes/benchmark_scan.py --endpoint http://127.0.0.1:8030/v1 --model gemm
 python probes/analyze_responses.py --input responses.jsonl --model gemma-4-31B-it \
   --markdown-output offline_responses_report.md
 
+# benchmark seed 품질/커버리지 검증
+python probes/validate_benchmarks.py --markdown-output benchmark_audit.md
+
 # 여러 모델/여러 실행 결과 비교
 python probes/compare_reports.py report_model_a.json report_model_b.json \
   --markdown-output comparison_report.md
@@ -82,6 +85,9 @@ Top 10/OR-Bench/SORRY-Bench의 축을 참고하되, 한국어 prompt는 자체 �
 `analyze_responses.py` 는 live endpoint 없이 운영 로그나 외부 벤치 실행 결과를 분석한다. JSONL/JSON record는
 `response`(또는 `text`/`output`)나 `error_type`을 받고, `prompt`, `expected`, `domain`, `category`를 선택적으로
 받는다. 모든 record에 `expected`가 있으면 benchmark 점수, 없으면 unlabeled 포렌식 점수로 계산한다.
+
+`validate_benchmarks.py` 는 benchmark JSON의 schema, 필수 키, ID 중복, expected 값, secret-like prompt,
+domain/category/source-family 커버리지를 정적 검증한다. audit report에는 raw prompt를 쓰지 않는다.
 
 ## 실측 결과 (gemma-4-31B)
 
@@ -130,6 +136,7 @@ ko-redteam/
 │   ├── scan.py                    # 통합 스캐너 --mode single|combo|crescendo
 │   ├── benchmark_scan.py          # 기대 outcome 기반 benchmark + scorecard
 │   ├── analyze_responses.py       # 저장된 JSONL/JSON 응답 로그 오프라인 포렌식
+│   ├── validate_benchmarks.py     # benchmark seed 품질/커버리지 audit
 │   ├── compare_reports.py         # 여러 report/model score 비교
 │   ├── scan_demo.py               # (보조) 가드 난독 강건성 오프라인 데모
 │   └── *_FINDINGS.md              # 모드별 실측 리포트
@@ -139,6 +146,7 @@ ko-redteam/
 │   ├── ko_forensics.py            # ④ 분석기(역난독+기법분류+공격유형)
 │   ├── ko_llm_forensics.py        # ⑤ 응답 포렌식(outcome/품질/error/finding)
 │   ├── ko_diagnostics.py          # ⑦ 원인/owner/권장조치 진단
+│   ├── ko_benchmark_audit.py      # benchmark seed 정적 검증/커버리지
 │   ├── ko_compare.py              # 여러 report 비교/Markdown matrix
 │   └── ko_scorecard.py            # ⑥ scorecard(종합/분야별 점수)
 ├── tests/                         # 회귀 테스트(refusal/obfuscation/forensics/LLM-forensics/scorecard)
