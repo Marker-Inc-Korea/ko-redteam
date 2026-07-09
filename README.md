@@ -11,18 +11,24 @@
 문자열 매칭, 유해성 판정은 영어 toxicity 모델. 결과: **한국어로 완벽히 방어한 모델도 garak은 ASR 100%로
 오보**(정상 거부를 '탈옥 성공'으로 오집계). → 한국어 LLM 을 스캔하려면 **한국어 판정기**가 필수다.
 
-## 구성 — 부품 4개
+## 구성 — 부품 5개
 
-동작은 한 줄: **공격을 만들고 → 대상에 쏘고 → 거부/순응을 판정하고 → 잡힌 공격을 분석한다.**
+동작은 한 줄: **공격을 만들고 → 대상에 쏘고 → 응답을 포렌식 분류하고 → 취약/오류 finding 으로 리포트한다.**
 
 | 부품 | 파일 | 역할 |
 |---|---|---|
 | **① 공격기** | `probes/ko_obfuscation.py`, `probes/ko_jailbreak.py` | 한국어 공격 생성 — 난독(자모/제로폭/구분자/전각) + 프레이밍(DAN/AIM/그랜드마/거부억제 23종) |
-| **② 스캐너** | `probes/scan.py` | 공격을 대상 LLM 에 실행 → ASR 측정. `--mode single\|combo\|crescendo` (난이도 3단계) |
+| **② 스캐너** | `probes/scan.py` | 공격을 대상 LLM 에 실행 → sanitized LLM-forensics report 생성. `--mode single\|combo\|crescendo` |
 | **③ 판정기** | `detectors/ko_refusal.py` | 한국어 거부 인식 — garak 영어 detector 의 갭을 메움 |
 | **④ 분석기** | `analysis/ko_forensics.py` | 잡힌 난독 페이로드 해부 — 역난독 + 기법분류 + 공격유형 |
+| **⑤ LLM 포렌식** | `analysis/ko_llm_forensics.py` | 응답 outcome(`refused/safe_redirect/harmful_compliance/unknown/error`), 한국어 품질, endpoint 오류, sanitized finding |
 
 보조: `probes/scan_demo.py`(가드 난독 강건성 오프라인 데모), `gap_analysis/`(garak 갭 실측 근거).
+
+`scan.py` 의 기본 ASR 은 이제 단순 "비거부율" 이 아니라 **유해 순응률(`harmful_compliance`)** 이다.
+endpoint timeout/장애는 `outcome=error` 로 분리되어 취약점으로 오집계되지 않는다. 구 방식과 비교가 필요하면
+리포트의 `asr.legacy_non_refusal` 을 참고한다. 리포트는 기본적으로 원문 prompt/response 를 저장하지 않고
+hash + `sanitized_excerpt` 만 남긴다(`--include-raw` 는 로컬 분석용 opt-in).
 
 ## 실측 결과 (gemma-4-31B)
 
@@ -70,8 +76,9 @@ ko-redteam/
 ├── detectors/
 │   └── ko_refusal.py              # ③ 판정기(한국어 거부, +한/영 결합)
 ├── analysis/
-│   └── ko_forensics.py            # ④ 분석기(역난독+기법분류+공격유형)
-├── tests/                         # 회귀 16 (refusal 5 / obfuscation 5 / forensics 6)
+│   ├── ko_forensics.py            # ④ 분석기(역난독+기법분류+공격유형)
+│   └── ko_llm_forensics.py        # ⑤ 응답 포렌식(outcome/품질/error/finding)
+├── tests/                         # 회귀 24 (refusal/obfuscation/forensics/LLM-forensics)
 └── gap_analysis/                  # garak 한국어 갭 실측 근거(+garak 0.15.1 스냅샷)
 ```
 
