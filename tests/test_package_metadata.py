@@ -70,3 +70,31 @@ def test_analysis_package_imports_without_flat_pythonpath():
         check=True,
     )
     assert "package-import-ok" in cp.stdout
+
+
+def test_ci_runs_redteam_suite_multiturn_agent_smoke():
+    workflow_path = ROOT.parent / ".github" / "workflows" / "tests.yml"
+    if not workflow_path.exists():
+        return
+    workflow = workflow_path.read_text("utf-8")
+    assert "ko-redteam-suite" in workflow
+    assert "--multiturn" in workflow
+    assert "--agent-harness" in workflow
+    assert "suite_ci/suite_manifest.json" in workflow
+
+
+def test_user_facing_docs_keep_external_scanner_references_neutral():
+    docs = [
+        ROOT / "README.md",
+        ROOT / "benchmarks" / "PAPER_TAXONOMY.md",
+        ROOT / "benchmarks" / "LLM_VULNERABILITY_REVIEW.md",
+        ROOT / "gap_analysis" / "FINDINGS.md",
+    ]
+    root_readme = ROOT.parent / "README.md"
+    if root_readme.exists():
+        docs.insert(0, root_readme)
+    banned_terms = ["garak", "눈뜬장님"]
+    for path in docs:
+        text = path.read_text("utf-8").lower()
+        for term in banned_terms:
+            assert term not in text, f"{term!r} should not appear in {path.relative_to(ROOT.parent)}"
