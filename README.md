@@ -180,6 +180,7 @@ python3 -m pytest tests -q
 ```
 
 `self_check.py`는 live endpoint 없이 import, Python 버전, benchmark audit, paperbench coverage, offline benchmark scan 경로를 확인합니다.
+GitHub Actions의 `ko-redteam` job도 같은 self-check와 전체 테스트를 실행하고 `self_check.json`을 artifact로 남깁니다.
 
 ## 라이선스·윤리
 
