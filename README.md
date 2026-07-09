@@ -77,6 +77,7 @@ ko-redteam-suite \
 | `ko-redteam-analyze-responses` | 저장된 응답 JSON/JSONL의 오프라인 포렌식 분석 |
 | `ko-redteam-gate-reports` | CI threshold 판정 |
 | `ko-redteam-doctor-reports` | 리포트 schema, privacy, Markdown 품질 점검 |
+| `ko-redteam-check-public-hygiene` | 공개 배포 전 내부 경로, 내부 IP, 토큰형 문자열, 민감 산출물 경로 점검 |
 
 ---
 
@@ -241,6 +242,7 @@ ko-redteam-doctor-reports \
 ```bash
 python3 -m pip install ".[dev]"
 ko-redteam-self-check
+ko-redteam-check-public-hygiene --root .
 ko-redteam-suite \
   --endpoint http://127.0.0.1:9/v1 \
   --model ci-dummy-model \

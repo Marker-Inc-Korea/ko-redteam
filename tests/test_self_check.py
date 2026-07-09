@@ -23,11 +23,13 @@ def test_self_check_passes_repo_defaults():
         "offline_multiturn_benchmark",
         "offline_agent_harness",
         "offline_suite_with_endpoint_smoke",
+        "public_hygiene",
     } <= names
     scan = next(c for c in result["checks"] if c["name"] == "offline_benchmark_scan")
     multiturn = next(c for c in result["checks"] if c["name"] == "offline_multiturn_benchmark")
     agent = next(c for c in result["checks"] if c["name"] == "offline_agent_harness")
     suite = next(c for c in result["checks"] if c["name"] == "offline_suite_with_endpoint_smoke")
+    hygiene = next(c for c in result["checks"] if c["name"] == "public_hygiene")
     assert scan["overall"] >= 90.0
     assert scan["raw_fields"] == 0
     assert multiturn["overall"] >= 90.0
@@ -38,6 +40,7 @@ def test_self_check_passes_repo_defaults():
     assert suite["multiturn_overall"] >= 90.0
     assert suite["agent_overall"] >= 90.0
     assert suite["smoke_status"] == "pass"
+    assert hygiene["issues"] == 0
 
 
 def test_self_check_cli_writes_json(tmp_path):

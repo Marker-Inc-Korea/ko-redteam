@@ -15,6 +15,7 @@ probes/*_report.json
 probes/*_report.md
 probes/suite_*/
 probes/self_check.json
+public_hygiene.json
 endpoint_smoke.json
 benchmark_*.json
 benchmark_*.md

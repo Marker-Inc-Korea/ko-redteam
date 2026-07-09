@@ -22,6 +22,7 @@ def test_console_script_targets_are_importable():
         "ko-redteam-self-check",
         "ko-redteam-suite",
         "ko-redteam-check-endpoint",
+        "ko-redteam-check-public-hygiene",
         "ko-redteam-scan",
         "ko-redteam-benchmark",
         "ko-redteam-multiturn",

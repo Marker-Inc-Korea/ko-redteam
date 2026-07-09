@@ -1,0 +1,70 @@
+"""ko_public_hygiene 공개 배포 hygiene gate 회귀."""
+from __future__ import annotations
+
+import subprocess
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT / "analysis"))
+
+import ko_public_hygiene as H  # noqa: E402
+
+
+def test_repo_public_hygiene_passes():
+    report = H.scan_public_hygiene(ROOT)
+    assert report["schema"] == "ko-redteam.public-hygiene.v1"
+    assert report["status"] == "pass"
+    assert report["summary"]["files_scanned"] > 0
+    assert report["issues"] == []
+
+
+def test_public_hygiene_detects_internal_and_secret_shapes_without_echo(tmp_path):
+    bad = tmp_path / "bad.md"
+    private_path = "/" + "data1" + "/" + "mk04" + "/eval_external"
+    private_ip = "192" + ".168.0.10"
+    fake_secret = "sk-" + "exampleSECRET0000"
+    bad.write_text(
+        "\n".join([
+            f"private path {private_path}",
+            f"private ip {private_ip}",
+            f"token {fake_secret}",
+        ]),
+        "utf-8",
+    )
+    artifact = tmp_path / "detectors" / ("real_" + "harmful_gemma.json")
+    artifact.parent.mkdir()
+    artifact.write_text("{}", "utf-8")
+
+    report = H.scan_public_hygiene(tmp_path)
+    codes = {issue["code"] for issue in report["issues"]}
+    rendered = H.render_text(report)
+    assert report["status"] == "fail"
+    assert {
+        "internal_abs_path",
+        "internal_rfc1918_ip",
+        "vendor_token_shape",
+        "sensitive_artifact_path",
+    } <= codes
+    assert fake_secret not in rendered
+    assert private_path not in rendered
+
+
+def test_check_public_hygiene_cli_smoke(tmp_path):
+    out = tmp_path / "public_hygiene.json"
+    cp = subprocess.run(
+        [
+            sys.executable,
+            str(ROOT / "probes" / "check_public_hygiene.py"),
+            "--root",
+            str(ROOT),
+            "--output",
+            str(out),
+        ],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+    assert "public-hygiene status=pass" in cp.stdout
+    assert out.exists()

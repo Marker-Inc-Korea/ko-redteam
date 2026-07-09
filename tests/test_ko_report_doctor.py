@@ -69,10 +69,11 @@ def test_doctor_json_report_passes_clean_primary_report(tmp_path):
 
 def test_doctor_json_report_fails_raw_and_secret_without_echoing_secret(tmp_path):
     path = tmp_path / "bad.json"
+    fake_secret = "sk-" + "testSECRETSECRET"
     bad = _report()
     bad["detail"] = [{
         "case": {"prompt": "원문 프롬프트 CANARY_PRIVATE_12345678"},
-        "assessment": {"response": {"raw": "sk-testSECRETSECRET"}},
+        "assessment": {"response": {"raw": fake_secret}},
     }]
     bad["findings"][0].pop("diagnostics")
     path.write_text(json.dumps(bad, ensure_ascii=False), "utf-8")
@@ -83,7 +84,7 @@ def test_doctor_json_report_fails_raw_and_secret_without_echoing_secret(tmp_path
     assert result["status"] == "fail"
     assert {"raw_field", "secret_like_text", "raw_canary_text", "diagnostics_missing"} <= codes
     assert "CANARY_PRIVATE_12345678" not in md
-    assert "sk-testSECRETSECRET" not in md
+    assert fake_secret not in md
 
 
 def test_doctor_markdown_report_detects_raw_canary_and_missing_privacy(tmp_path):

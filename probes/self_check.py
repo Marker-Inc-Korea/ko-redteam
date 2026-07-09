@@ -39,6 +39,7 @@ REQUIRED_MODULES = [
     "ko_benchmark_audit",
     "ko_benchmark_coverage",
     "ko_llm_forensics",
+    "ko_public_hygiene",
     "ko_report",
     "ko_report_doctor",
     "ko_scorecard",
@@ -46,6 +47,21 @@ REQUIRED_MODULES = [
     "multiturn_benchmark",
     "run_suite",
 ]
+
+
+def _public_hygiene_roots() -> list[Path]:
+    if (ROOT / "pyproject.toml").exists():
+        return [ROOT]
+    return [
+        path for path in (
+            ROOT / "analysis",
+            ROOT / "benchmarks",
+            ROOT / "detectors",
+            ROOT / "gap_analysis",
+            ROOT / "probes",
+        )
+        if path.exists()
+    ]
 
 
 def _check(name: str, passed: bool, **extra: Any) -> dict[str, Any]:
@@ -139,6 +155,17 @@ def run_self_check(
     multiturn_mod = modules["multiturn_benchmark"]
     agent_mod = modules["agent_harness"]
     suite_mod = modules["run_suite"]
+    hygiene_mod = modules["ko_public_hygiene"]
+
+    hygiene_reports = [hygiene_mod.scan_public_hygiene(path) for path in _public_hygiene_roots()]
+    hygiene_issues = sum(report["summary"]["issues"] for report in hygiene_reports)
+    hygiene_files = sum(report["summary"]["files_scanned"] for report in hygiene_reports)
+    checks.append(_check(
+        "public_hygiene",
+        hygiene_issues == 0,
+        files_scanned=hygiene_files,
+        issues=hygiene_issues,
+    ))
 
     audit = audit_mod.audit_benchmark_paths([mini_benchmark, paper_benchmark])
     checks.append(_check(
@@ -292,7 +319,7 @@ def render_text(result: dict[str, Any]) -> str:
         detail = []
         for key in (
             "actual", "expected", "cases", "overall", "multiturn_overall", "agent_overall",
-            "failed", "smoke_status", "error", "path",
+            "failed", "smoke_status", "files_scanned", "issues", "error", "path",
         ):
             if key in check:
                 detail.append(f"{key}={check[key]}")
