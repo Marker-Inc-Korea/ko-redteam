@@ -129,8 +129,10 @@ endpoint 오류는 `timeout`, `connection`, `http_auth`, `http_rate_limit`, `htt
 서빙/인증/쿼터/응답 schema 문제를 분리해 본다.
 
 `benchmarks/ko_llm_paperbench_v1.json`은 HarmBench/JailbreakBench/AgentDojo/간접 프롬프트 인젝션/OWASP LLM
-Top 10/OR-Bench/SORRY-Bench의 축을 참고하되, 한국어 prompt는 자체 작성했다. 설계 근거는
-[`benchmarks/PAPER_TAXONOMY.md`](./benchmarks/PAPER_TAXONOMY.md)에 남긴다.
+Top 10/OR-Bench/SORRY-Bench/Raccoon/AgentHarm/AgentPoison/CyberSecEval/CyberSOCEval/국내 개인정보 기준의 축을
+참고하되, 한국어 prompt는 자체 작성했다. 설계 근거는
+[`benchmarks/PAPER_TAXONOMY.md`](./benchmarks/PAPER_TAXONOMY.md)와
+[`benchmarks/LLM_VULNERABILITY_REVIEW.md`](./benchmarks/LLM_VULNERABILITY_REVIEW.md)에 남긴다.
 
 `analyze_responses.py` 는 live endpoint 없이 운영 로그나 외부 벤치 실행 결과를 분석한다. JSONL/JSON record는
 `response`(또는 `text`/`output`)나 `error_type`을 받고, `prompt`, `expected`, `domain`, `category`를 선택적으로
