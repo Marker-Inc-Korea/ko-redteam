@@ -59,6 +59,12 @@ python probes/validate_benchmarks.py --markdown-output benchmark_audit.md
 python probes/expand_benchmark.py --input benchmarks/ko_llm_paperbench_v1.json \
   --output benchmarks/ko_llm_paperbench_v1_expanded.local.json
 
+# audit → 선택적 확장 → benchmark scan → Markdown → 선택적 gate를 한 번에 실행
+python probes/run_suite.py --endpoint http://127.0.0.1:8030/v1 --model gemma-4-31B-it \
+  --benchmark benchmarks/ko_llm_paperbench_v1.json --out-dir probes/suite_paperbench \
+  --expand --gate --min-overall 80 --min-domain safety=90 --min-domain privacy=90 \
+  --max-critical-high 0
+
 # 여러 모델/여러 실행 결과 비교
 python probes/compare_reports.py report_model_a.json report_model_b.json \
   --markdown-output comparison_report.md
@@ -109,6 +115,12 @@ domain/category/source-family 커버리지를 정적 검증한다. audit report�
 
 `expand_benchmark.py` 는 기존 benchmark seed를 원본 plain, 난독, 프레이밍 변형 benchmark로 확장한다. 기본은
 `expected=refuse_or_redirect` 케이스만 변형해 over-refusal/allow 측정을 왜곡하지 않는다.
+
+`run_suite.py` 는 benchmark audit, 선택적 확장, endpoint benchmark 실행, Markdown report, 선택적 gate를 묶는
+상위 실행기다. 기본 산출물은 `probes/suite_<benchmark>/` 아래 `benchmark_audit.{json,md}`,
+`benchmark_report.{json,md}`, `suite_manifest.json`, `suite_report.md`이며, `--gate` 사용 시
+`gate_report.{json,md}`도 생성한다. suite manifest/report에는 raw prompt/response를 넣지 않고 endpoint
+credential/query도 제거한다.
 
 `check_regression.py` 는 baseline report와 candidate report의 `overall`, domain score, finding severity 변화를
 비교해 성능 후퇴를 판정한다. 실패 시 non-zero exit code를 반환하므로 CI regression gate로 사용할 수 있다.
@@ -166,6 +178,7 @@ ko-redteam/
 │   ├── analyze_responses.py       # 저장된 JSONL/JSON 응답 로그 오프라인 포렌식
 │   ├── validate_benchmarks.py     # benchmark seed 품질/커버리지 audit
 │   ├── expand_benchmark.py        # benchmark seed 난독/프레이밍 변형 확장
+│   ├── run_suite.py               # audit/expand/benchmark/markdown/gate 통합 실행기
 │   ├── check_regression.py        # baseline 대비 score/finding 회귀 판정
 │   ├── gate_reports.py            # report scorecard threshold gate
 │   ├── compare_reports.py         # 여러 report/model score 비교
