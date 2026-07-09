@@ -55,6 +55,11 @@ python probes/analyze_responses.py --input responses.jsonl --model gemma-4-31B-i
 # benchmark seed 품질/커버리지 검증
 python probes/validate_benchmarks.py --markdown-output benchmark_audit.md
 
+# benchmark domain/expected/source-family 충분성 gate
+python probes/check_benchmark_coverage.py benchmarks/ko_llm_paperbench_v1.json \
+  --min-total 9 --min-domain safety=2 --required-source-family agentdojo \
+  --markdown-output benchmark_coverage.md
+
 # 외부 CSV/JSON/JSONL benchmark를 ko-redteam benchmark schema로 변환 후 audit
 python probes/import_benchmark.py --input external_cases.csv --output benchmarks/external_cases.local.json \
   --name external_cases_ko --source-id external-suite --id-field id --prompt-field prompt \
@@ -132,6 +137,11 @@ Top 10/OR-Bench/SORRY-Bench의 축을 참고하되, 한국어 prompt는 자체 �
 
 `validate_benchmarks.py` 는 benchmark JSON의 schema, 필수 키, ID 중복, expected 값, secret-like prompt,
 domain/category/source-family 커버리지를 정적 검증한다. audit report에는 raw prompt를 쓰지 않는다.
+
+`check_benchmark_coverage.py` 는 구조가 맞는 benchmark가 실제로 필요한 평가 축을 충분히 덮는지 gate로 판정한다.
+기본 required domain은 `safety/privacy/prompt_security/agent_rag/overrefusal/korean_quality`, 기본 expected는
+`refuse_or_redirect/allow/no_leak/no_tool`이다. `--min-domain`, `--min-expected`, `--required-source-family`로
+프로젝트별 기준을 강화할 수 있고 실패 시 non-zero exit code를 반환한다.
 
 `import_benchmark.py` 는 외부 CSV/JSON/JSONL을 `ko-redteam.benchmark.v1`로 변환한다. `--id-field`,
 `--prompt-field`, `--domain-field`, `--category-field`, `--expected-field`, `--source-family-field`, `--tags-field`
@@ -215,6 +225,7 @@ ko-redteam/
 │   ├── benchmark_scan.py          # 기대 outcome 기반 benchmark + scorecard
 │   ├── analyze_responses.py       # 저장된 JSONL/JSON 응답 로그 오프라인 포렌식
 │   ├── validate_benchmarks.py     # benchmark seed 품질/커버리지 audit
+│   ├── check_benchmark_coverage.py # benchmark 충분성/균형 gate
 │   ├── import_benchmark.py        # 외부 CSV/JSON/JSONL benchmark를 표준 schema로 변환
 │   ├── merge_benchmarks.py        # 내부/외부 benchmark 조합과 duplicate 정리
 │   ├── expand_benchmark.py        # benchmark seed 난독/프레이밍 변형 확장
@@ -234,6 +245,7 @@ ko-redteam/
 │   ├── ko_error_taxonomy.py       # endpoint/운영 오류 taxonomy
 │   ├── ko_diagnostics.py          # ⑦ 원인/owner/권장조치 진단
 │   ├── ko_benchmark_audit.py      # benchmark seed 정적 검증/커버리지
+│   ├── ko_benchmark_coverage.py   # benchmark 충분성/균형 gate
 │   ├── ko_gate.py                 # report scorecard gate 판정/Markdown
 │   ├── ko_regression.py           # baseline 대비 score/finding 회귀 판정
 │   ├── ko_stability.py            # 반복 실행 안정성/flaky case 분석
