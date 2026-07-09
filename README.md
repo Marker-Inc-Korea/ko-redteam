@@ -75,10 +75,11 @@ python probes/merge_benchmarks.py benchmarks/ko_llm_paperbench_v1.json benchmark
 python probes/expand_benchmark.py --input benchmarks/ko_llm_paperbench_v1.json \
   --output benchmarks/ko_llm_paperbench_v1_expanded.local.json
 
-# audit → 선택적 확장 → benchmark scan → Markdown → 선택적 gate를 한 번에 실행
+# audit → 선택적 확장 → coverage gate → benchmark scan → Markdown → score gate를 한 번에 실행
 python probes/run_suite.py --endpoint http://127.0.0.1:8030/v1 --model gemma-4-31B-it \
   --benchmark benchmarks/ko_llm_paperbench_v1.json --out-dir probes/suite_paperbench \
-  --expand --doctor-warnings-fail --gate --min-overall 80 \
+  --expand --coverage --coverage-min-total 9 --coverage-required-source-family agentdojo \
+  --doctor-warnings-fail --gate --min-overall 80 \
   --min-domain safety=90 --min-domain privacy=90 --max-critical-high 0
 
 # 같은 benchmark를 여러 번 실행한 report의 점수 분산/endpoint 오류/flaky case 분석
@@ -155,10 +156,12 @@ prompt가 포함되지만 audit/manifest에는 raw prompt를 반복 출력하지
 `expand_benchmark.py` 는 기존 benchmark seed를 원본 plain, 난독, 프레이밍 변형 benchmark로 확장한다. 기본은
 `expected=refuse_or_redirect` 케이스만 변형해 over-refusal/allow 측정을 왜곡하지 않는다.
 
-`run_suite.py` 는 benchmark audit, 선택적 확장, endpoint benchmark 실행, Markdown report, 선택적 gate를 묶는
+`run_suite.py` 는 benchmark audit, 선택적 확장, 선택적 coverage gate, endpoint benchmark 실행, Markdown report,
+선택적 score gate를 묶는
 상위 실행기다. 기본 산출물은 `probes/suite_<benchmark>/` 아래 `benchmark_audit.{json,md}`,
-`benchmark_report.{json,md}`, `report_doctor.{json,md}`, `suite_manifest.json`, `suite_report.md`이며, `--gate`
-사용 시 `gate_report.{json,md}`도 생성한다. report doctor는 기본 활성화되어 report 구조와 privacy leakage를
+`benchmark_report.{json,md}`, `report_doctor.{json,md}`, `suite_manifest.json`, `suite_report.md`이며, `--coverage`
+사용 시 `benchmark_coverage.{json,md}`, `--gate` 사용 시 `gate_report.{json,md}`도 생성한다. coverage gate 실패는
+endpoint 호출 전에 suite를 실패 처리한다. report doctor는 기본 활성화되어 report 구조와 privacy leakage를
 검증한다(`--no-doctor`로 생략 가능). suite manifest/report에는 raw prompt/response를 넣지 않고 endpoint
 credential/query도 제거한다.
 

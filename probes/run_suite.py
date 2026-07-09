@@ -21,7 +21,12 @@ sys.path.insert(0, str(HERE))
 from benchmark_scan import run_benchmark  # noqa: E402
 from expand_benchmark import expand_benchmark, load_benchmark as load_expand_benchmark  # noqa: E402
 from ko_benchmark_audit import audit_benchmark_paths, render_audit_markdown  # noqa: E402
-from ko_gate import evaluate_reports, parse_thresholds, render_gate_markdown  # noqa: E402
+from ko_benchmark_coverage import (  # noqa: E402
+    evaluate_coverage_paths,
+    parse_thresholds as parse_count_thresholds,
+    render_coverage_markdown,
+)
+from ko_gate import evaluate_reports, parse_thresholds as parse_score_thresholds, render_gate_markdown  # noqa: E402
 from ko_report import render_markdown  # noqa: E402
 from ko_report_doctor import doctor_reports, render_doctor_markdown  # noqa: E402
 
@@ -58,6 +63,15 @@ def _fmt(value: Any) -> str:
     if value is None:
         return "-"
     return str(value)
+
+
+def _list_arg(items: list[str] | None) -> list[str] | None:
+    if items is None:
+        return None
+    out: list[str] = []
+    for item in items:
+        out.extend(part.strip() for part in item.split(",") if part.strip())
+    return out
 
 
 def _sanitize_endpoint(endpoint: str) -> str:
@@ -135,6 +149,14 @@ def _new_manifest(
     framings: list[str] | None,
     framing_per_family: bool,
     target_expected: set[str] | None,
+    coverage_enabled: bool,
+    coverage_min_total: int,
+    coverage_required_domains: list[str] | None,
+    coverage_required_expected: list[str] | None,
+    coverage_required_source_families: list[str],
+    coverage_min_domains: dict[str, int],
+    coverage_min_expected: dict[str, int],
+    coverage_min_source_families: dict[str, int],
     doctor_enabled: bool,
     doctor_warnings_fail: bool,
     doctor_allow_raw: bool,
@@ -162,6 +184,16 @@ def _new_manifest(
             "framings": framings,
             "framing_per_family": framing_per_family,
             "target_expected": sorted(target_expected or ["refuse_or_redirect"]),
+            "coverage": {
+                "enabled": coverage_enabled,
+                "min_total": coverage_min_total,
+                "required_domains": coverage_required_domains,
+                "required_expected": coverage_required_expected,
+                "required_source_families": coverage_required_source_families,
+                "min_domains": coverage_min_domains,
+                "min_expected": coverage_min_expected,
+                "min_source_families": coverage_min_source_families,
+            },
             "doctor": {
                 "enabled": doctor_enabled,
                 "warnings_fail": doctor_warnings_fail,
@@ -209,6 +241,7 @@ def render_suite_markdown(manifest: dict[str, Any]) -> str:
     config = manifest.get("config", {})
     summaries = manifest.get("summaries", {})
     benchmark = summaries.get("benchmark") or {}
+    coverage = summaries.get("coverage") or {}
     doctor = summaries.get("doctor") or {}
     gate = summaries.get("gate") or {}
 
@@ -224,6 +257,7 @@ def render_suite_markdown(manifest: dict[str, Any]) -> str:
         f"- Endpoint: **{config.get('endpoint', '-')}**",
         f"- Benchmark: **{config.get('benchmark', '-')}**",
         f"- Expansion: **{config.get('expand', False)}**",
+        f"- Coverage: **{(config.get('coverage') or {}).get('enabled', False)}**",
         f"- Doctor: **{(config.get('doctor') or {}).get('enabled', False)}**",
         f"- Gate: **{(config.get('gate') or {}).get('enabled', False)}**",
     ]
@@ -247,6 +281,16 @@ def render_suite_markdown(manifest: dict[str, Any]) -> str:
             ])
     if len(audit_rows) > 1:
         lines += ["", "## Benchmark Audit", "", _table(audit_rows)]
+
+    if coverage:
+        lines += [
+            "",
+            "## Benchmark Coverage",
+            "",
+            f"- Status: **{coverage.get('status', '-')}**",
+            f"- Cases: **{coverage.get('cases', 0)}**",
+            f"- Checks: **{coverage.get('passed', 0)} passed / {coverage.get('failed', 0)} failed**",
+        ]
 
     if benchmark:
         lines += [
@@ -315,6 +359,14 @@ def run_suite(
     framing_per_family: bool = True,
     target_expected: set[str] | None = None,
     gate_enabled: bool = False,
+    coverage_enabled: bool = False,
+    coverage_min_total: int = 1,
+    coverage_required_domains: list[str] | None = None,
+    coverage_required_expected: list[str] | None = None,
+    coverage_required_source_families: list[str] | None = None,
+    coverage_min_domains: dict[str, int] | None = None,
+    coverage_min_expected: dict[str, int] | None = None,
+    coverage_min_source_families: dict[str, int] | None = None,
     doctor_enabled: bool = True,
     doctor_warnings_fail: bool = False,
     doctor_allow_raw: bool = False,
@@ -331,6 +383,10 @@ def run_suite(
     out_dir.mkdir(parents=True, exist_ok=True)
     min_domains = min_domains or {}
     max_rates = max_rates or {}
+    coverage_required_source_families = coverage_required_source_families or []
+    coverage_min_domains = coverage_min_domains or {}
+    coverage_min_expected = coverage_min_expected or {}
+    coverage_min_source_families = coverage_min_source_families or {}
 
     manifest_path = out_dir / "suite_manifest.json"
     suite_md_path = out_dir / "suite_report.md"
@@ -347,6 +403,14 @@ def run_suite(
         framings=framings,
         framing_per_family=framing_per_family,
         target_expected=target_expected,
+        coverage_enabled=coverage_enabled,
+        coverage_min_total=coverage_min_total,
+        coverage_required_domains=coverage_required_domains,
+        coverage_required_expected=coverage_required_expected,
+        coverage_required_source_families=coverage_required_source_families,
+        coverage_min_domains=coverage_min_domains,
+        coverage_min_expected=coverage_min_expected,
+        coverage_min_source_families=coverage_min_source_families,
         doctor_enabled=doctor_enabled,
         doctor_warnings_fail=doctor_warnings_fail,
         doctor_allow_raw=doctor_allow_raw,
@@ -409,6 +473,36 @@ def run_suite(
         manifest["artifacts"]["benchmark_audit_json"] = str(source_audit_json)
         manifest["artifacts"]["benchmark_audit_md"] = str(source_audit_md)
         manifest["summaries"]["benchmark_audit"] = _audit_summary(source_audit)
+
+    if coverage_enabled:
+        coverage_json = out_dir / "benchmark_coverage.json"
+        coverage_md = out_dir / "benchmark_coverage.md"
+        coverage = evaluate_coverage_paths(
+            [executed_benchmark],
+            min_total=coverage_min_total,
+            required_domains=coverage_required_domains,
+            required_expected=coverage_required_expected,
+            required_source_families=coverage_required_source_families,
+            min_domain=coverage_min_domains,
+            min_expected=coverage_min_expected,
+            min_source_family=coverage_min_source_families,
+        )
+        _write_json(coverage_json, coverage)
+        _write_text(coverage_md, render_coverage_markdown(coverage))
+        manifest["artifacts"]["benchmark_coverage_json"] = str(coverage_json)
+        manifest["artifacts"]["benchmark_coverage_md"] = str(coverage_md)
+        manifest["summaries"]["coverage"] = {
+            "status": coverage["status"],
+            "cases": coverage["summary"]["cases"],
+            "checks": coverage["summary"]["checks"],
+            "passed": coverage["summary"]["passed"],
+            "failed": coverage["summary"]["failed"],
+        }
+        _add_step(manifest, "benchmark_coverage", coverage["status"], path=str(coverage_json))
+        if coverage["status"] != "pass":
+            return _finalize(manifest, status="fail", manifest_path=manifest_path, suite_md_path=suite_md_path)
+    else:
+        _add_step(manifest, "benchmark_coverage", "skipped")
 
     report_json = out_dir / "benchmark_report.json"
     report_md = out_dir / "benchmark_report.md"
@@ -509,6 +603,20 @@ def main() -> None:
     ap.add_argument("--no-framing", action="store_true", help="expansion framing variants 생성 안 함")
     ap.add_argument("--target-expected", action="append", default=None,
                     help="expected policy to expand. 기본: refuse_or_redirect")
+    ap.add_argument("--coverage", action="store_true", help="benchmark coverage gate 실행")
+    ap.add_argument("--coverage-min-total", type=int, default=1)
+    ap.add_argument("--coverage-required-domain", action="append", default=None,
+                    help="required benchmark domain. 반복 가능 또는 comma-separated")
+    ap.add_argument("--coverage-required-expected", action="append", default=None,
+                    help="required expected policy. 반복 가능 또는 comma-separated")
+    ap.add_argument("--coverage-required-source-family", action="append", default=[],
+                    help="required source_family. 반복 가능 또는 comma-separated")
+    ap.add_argument("--coverage-min-domain", action="append", default=[],
+                    help="domain minimum, e.g. --coverage-min-domain safety=5")
+    ap.add_argument("--coverage-min-expected", action="append", default=[],
+                    help="expected minimum, e.g. --coverage-min-expected refuse_or_redirect=5")
+    ap.add_argument("--coverage-min-source-family", action="append", default=[],
+                    help="source_family minimum, e.g. --coverage-min-source-family harmbench=3")
     ap.add_argument("--no-doctor", action="store_true", help="report 구조/privacy doctor step 생략")
     ap.add_argument("--doctor-warnings-fail", action="store_true", help="doctor warning도 suite 실패로 처리")
     ap.add_argument("--doctor-allow-raw", action="store_true",
@@ -536,13 +644,21 @@ def main() -> None:
         framings=args.framing,
         framing_per_family=not args.no_framing,
         target_expected=set(args.target_expected or ["refuse_or_redirect"]),
+        coverage_enabled=args.coverage,
+        coverage_min_total=args.coverage_min_total,
+        coverage_required_domains=_list_arg(args.coverage_required_domain),
+        coverage_required_expected=_list_arg(args.coverage_required_expected),
+        coverage_required_source_families=_list_arg(args.coverage_required_source_family) or [],
+        coverage_min_domains=parse_count_thresholds(args.coverage_min_domain),
+        coverage_min_expected=parse_count_thresholds(args.coverage_min_expected),
+        coverage_min_source_families=parse_count_thresholds(args.coverage_min_source_family),
         doctor_enabled=not args.no_doctor,
         doctor_warnings_fail=args.doctor_warnings_fail,
         doctor_allow_raw=args.doctor_allow_raw,
         gate_enabled=args.gate,
         min_overall=args.min_overall,
-        min_domains=parse_thresholds(args.min_domain),
-        max_rates=parse_thresholds(args.max_rate),
+        min_domains=parse_score_thresholds(args.min_domain),
+        max_rates=parse_score_thresholds(args.max_rate),
         max_findings=args.max_findings,
         max_critical_high=args.max_critical_high,
     )
