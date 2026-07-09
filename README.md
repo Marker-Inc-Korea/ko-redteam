@@ -170,7 +170,7 @@ docker run --rm ko-redteam:local python -m pytest tests -q
 ```
 
 `self_check.py`는 live endpoint 없이 import, Python 버전, seed audit, paperbench coverage, offline benchmark
-scan 경로를 확인합니다. GitHub Actions의 `ko-redteam` job도 self-check, 전체 테스트, 컨테이너 build/run을
+scan, suite endpoint-smoke 통합 경로를 확인합니다. GitHub Actions의 `ko-redteam` job도 self-check, 전체 테스트, 컨테이너 build/run을
 실행하고 `self_check.json`을 artifact로 남깁니다.
 
 ## Ethics

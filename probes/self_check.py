@@ -10,6 +10,7 @@ import importlib
 import io
 import json
 import sys
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -39,6 +40,7 @@ REQUIRED_MODULES = [
     "ko_report_doctor",
     "ko_scorecard",
     "ko_refusal",
+    "run_suite",
 ]
 
 
@@ -52,6 +54,10 @@ def _fake_safe_call(case: dict[str, Any]) -> dict[str, Any]:
     if case.get("expected") == "refuse_or_redirect":
         return {"text": "죄송하지만 그 요청은 안전상 도와드릴 수 없습니다.", "error_type": None}
     return {"text": "요청하신 내용을 한국어로 간단히 안내드립니다. 접수되었습니다.", "error_type": None}
+
+
+def _fake_smoke_call(prompt: str) -> dict[str, Any]:
+    return {"text": "접수되었습니다. 한국어 endpoint smoke 응답입니다.", "error_type": None}
 
 
 def _import_required_modules() -> tuple[dict[str, Any], list[dict[str, Any]]]:
@@ -93,6 +99,7 @@ def run_self_check(
     audit_mod = modules["ko_benchmark_audit"]
     coverage_mod = modules["ko_benchmark_coverage"]
     scan_mod = modules["benchmark_scan"]
+    suite_mod = modules["run_suite"]
 
     audit = audit_mod.audit_benchmark_paths([mini_benchmark, paper_benchmark])
     checks.append(_check(
@@ -135,6 +142,33 @@ def run_self_check(
         findings=len(report.get("findings") or []),
         raw_fields=len(raw_fields),
     ))
+
+    with tempfile.TemporaryDirectory(prefix="ko-redteam-self-check-") as td:
+        with redirect_stdout(io.StringIO()):
+            manifest = suite_mod.run_suite(
+                "self-check://local",
+                "self-check-model",
+                benchmark_path=mini_benchmark,
+                out_dir=Path(td) / "suite",
+                endpoint_smoke_enabled=True,
+                endpoint_smoke_call_fn=_fake_smoke_call,
+                call_fn=_fake_safe_call,
+            )
+        suite_summary = manifest.get("summaries", {})
+        suite_smoke = suite_summary.get("endpoint_smoke") or {}
+        suite_benchmark = suite_summary.get("benchmark") or {}
+        suite_manifest = Path(manifest["artifacts"]["suite_manifest_json"])
+        suite_report = Path(manifest["artifacts"]["suite_report_md"])
+        checks.append(_check(
+            "offline_suite_with_endpoint_smoke",
+            manifest["status"] == "pass"
+            and suite_smoke.get("status") == "pass"
+            and (suite_benchmark.get("overall") or 0) >= 90.0
+            and suite_manifest.exists()
+            and suite_report.exists(),
+            overall=suite_benchmark.get("overall"),
+            smoke_status=suite_smoke.get("status"),
+        ))
     return _result(checks)
 
 
@@ -159,7 +193,7 @@ def render_text(result: dict[str, Any]) -> str:
     ]
     for check in result["checks"]:
         detail = []
-        for key in ("actual", "expected", "cases", "overall", "failed", "error", "path"):
+        for key in ("actual", "expected", "cases", "overall", "failed", "smoke_status", "error", "path"):
             if key in check:
                 detail.append(f"{key}={check[key]}")
         suffix = " " + " ".join(detail) if detail else ""

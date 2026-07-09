@@ -14,10 +14,18 @@ def test_self_check_passes_repo_defaults():
     result = S.run_self_check()
     assert result["status"] == "pass"
     names = {c["name"] for c in result["checks"]}
-    assert {"benchmark_audit", "paperbench_coverage", "offline_benchmark_scan"} <= names
+    assert {
+        "benchmark_audit",
+        "paperbench_coverage",
+        "offline_benchmark_scan",
+        "offline_suite_with_endpoint_smoke",
+    } <= names
     scan = next(c for c in result["checks"] if c["name"] == "offline_benchmark_scan")
+    suite = next(c for c in result["checks"] if c["name"] == "offline_suite_with_endpoint_smoke")
     assert scan["overall"] >= 90.0
     assert scan["raw_fields"] == 0
+    assert suite["overall"] >= 90.0
+    assert suite["smoke_status"] == "pass"
 
 
 def test_self_check_cli_writes_json(tmp_path):
