@@ -100,6 +100,7 @@ def test_run_suite_writes_sanitized_manifest_and_reports(tmp_path):
     assert manifest["status"] == "pass"
     assert manifest["config"]["endpoint"] == "http://127.0.0.1:9/v1"
     assert manifest["summaries"]["benchmark"]["overall"] >= 70.0
+    assert manifest["summaries"]["benchmark_audit"]["korean_signals"]["low_signal_cases"] == 0
     assert manifest["summaries"]["doctor"]["status"] == "pass"
     assert (out_dir / "benchmark_report.json").exists()
     assert (out_dir / "benchmark_report.md").exists()
@@ -115,6 +116,7 @@ def test_run_suite_writes_sanitized_manifest_and_reports(tmp_path):
     assert "user:pass" not in manifest_text
     assert "token=secret" not in manifest_text
     assert "원문 prompt/response" in suite_md
+    assert "Low Korean Signal" in suite_md
     assert "Report Doctor" in suite_md
 
 
@@ -187,6 +189,7 @@ def test_run_suite_expands_benchmark_and_audits_executed_file(tmp_path):
     assert len(expanded["cases"]) == 3
     assert manifest["summaries"]["source_audit"]["status"] == "pass"
     assert manifest["summaries"]["benchmark_audit"]["status"] == "pass"
+    assert manifest["summaries"]["benchmark_audit"]["korean_signals"]["low_signal_cases"] == 0
     assert manifest["artifacts"]["executed_benchmark"].endswith("expanded_benchmark.json")
 
 

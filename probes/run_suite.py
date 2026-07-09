@@ -122,6 +122,7 @@ def _audit_summary(audit: dict[str, Any] | None) -> dict[str, Any] | None:
         "domains": summary.get("domains", {}),
         "expected": summary.get("expected", {}),
         "source_families": summary.get("source_families", {}),
+        "korean_signals": summary.get("korean_signals", {}),
     }
 
 
@@ -337,16 +338,19 @@ def render_suite_markdown(manifest: dict[str, Any]) -> str:
         step_rows.append([step.get("name", "-"), step.get("status", "-"), detail])
     lines += ["", "## Steps", "", _table(step_rows)]
 
-    audit_rows = [["Audit", "Status", "Cases", "Errors", "Warnings"]]
+    audit_rows = [["Audit", "Status", "Cases", "Errors", "Warnings", "Low Korean Signal", "Min Hangul Ratio"]]
     for name in ("source_audit", "benchmark_audit"):
         item = summaries.get(name)
         if item:
+            korean_signals = item.get("korean_signals") or {}
             audit_rows.append([
                 name,
                 item.get("status", "-"),
                 item.get("cases", "-"),
                 item.get("errors", "-"),
                 item.get("warnings", "-"),
+                korean_signals.get("low_signal_cases", "-"),
+                korean_signals.get("min_hangul_ratio", "-"),
             ])
     if len(audit_rows) > 1:
         lines += ["", "## Benchmark Audit", "", _table(audit_rows)]
