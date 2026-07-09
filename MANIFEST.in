@@ -1,0 +1,21 @@
+include LICENSE
+include README.md
+include pyproject.toml
+
+graft analysis
+graft benchmarks
+graft detectors
+graft gap_analysis
+graft probes
+
+prune tests
+prune *.egg-info
+
+exclude detectors/CLASSIFIER_FINDINGS.md
+exclude probes/COMBO_FINDINGS.md
+exclude probes/CRESCENDO_FINDINGS.md
+exclude probes/E2E_FINDINGS.md
+recursive-exclude probes *_report.json *_report.md
+
+global-exclude .gitignore
+global-exclude *.py[cod]

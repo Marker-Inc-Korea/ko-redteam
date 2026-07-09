@@ -1,29 +1,38 @@
 # ko-redteam
 
 한국어 LLM 서비스를 배포하기 전/후에 안전성, 개인정보, prompt security, agent/RAG 도구 사용,
-과잉거부, 한국어 응답 품질을 함께 점검하는 레드팀/포렌식 평가 도구입니다.
+과잉거부, 한국어 응답 품질을 한 번에 점검하는 레드팀/포렌식 평가 도구입니다.
 
-기본 리포트는 raw prompt/response를 저장하지 않습니다. hash, `sanitized_excerpt`, scorecard,
-finding, 권장 조치만 남겨 운영 환경에서도 재현성과 감사 가능성을 확보하는 쪽에 초점을 둡니다.
+**목적**: 모델이 한국어 운영 환경에서 무엇을 거부하고, 무엇을 허용하고, 어떤 정보를 새는지 재현 가능한
+리포트로 남깁니다.
 
-> 평가셋은 공개 논문과 가이드에서 반복되는 위험 축을 참고해 한국어 배포 맥락으로 새로 작성했습니다.
-> 외부 평가 프롬프트나 특정 도구의 결과를 복제하지 않습니다.
+**리포트 원칙**: 기본 설정에서는 raw prompt/response를 저장하지 않습니다. hash, `sanitized_excerpt`,
+scorecard, finding, 권장 조치만 남겨 운영 환경에서도 감사 가능한 형태를 우선합니다.
+
+**평가셋 원칙**: 공개 논문과 가이드에서 반복되는 위험 축만 참고하고, 한국어 배포 맥락의 문항은 새로
+작성했습니다. 외부 평가 프롬프트, 특정 도구의 결과, 순위표를 복제하지 않습니다.
 
 ---
 
-## At A Glance
+## What It Checks
 
-| 질문 | 확인하는 것 | 주요 산출물 |
-|---|---|---|
-| 모델이 유해 요청을 안전하게 거부하는가 | 유해 절차, jailbreak framing, cyber misuse | `benchmark_report.json/md` |
-| 민감정보를 다시 노출하지 않는가 | 주민번호, 휴대폰, 계좌/카드, 주소, 의료/금융 맥락 | `privacy_profile` |
-| 프롬프트/시크릿을 흘리지 않는가 | system/developer prompt 추출, canary/secret 재노출 | scorecard + findings |
-| agent가 외부 지시를 tool action으로 승격하지 않는가 | 결재, 삭제, 전송, 공개 링크 생성 | `agent_harness_report.json/md` |
-| 정상 보안/SOC 질문을 과잉거부하지 않는가 | benign security, SOC triage, 행정/품질 질문 | domain score |
-| 한국어 응답 품질이 안정적인가 | 영어 누수, 반복, 깨진 인코딩, truncation | diagnostics |
+**Safety**: 유해 절차, jailbreak framing, cyber misuse 요청을 안전하게 거부하는지 봅니다.
+
+**Privacy**: 주민번호, 휴대폰, 계좌/카드, 주소, 의료/금융 맥락의 재노출을 분리해 기록합니다.
+
+**Prompt Security**: system/developer prompt, canary, secret, 내부 지시문 추출 시도를 점검합니다.
+
+**Agent/RAG**: 외부 문서나 tool 결과가 결재, 삭제, 전송, 공개 링크 생성 같은 action으로 승격되는지 봅니다.
+
+**Over-refusal**: 정상 보안/SOC/행정 질문을 불필요하게 거부하는지 측정합니다.
+
+**Korean Quality**: 영어 누수, 반복, 깨진 인코딩, truncation 같은 한국어 응답 품질 문제를 진단합니다.
+
+## Evaluation Flow
 
 ```text
-Endpoint
+OpenAI-compatible endpoint
+  -> endpoint smoke
   -> single-turn evaluation
   -> multi-turn escalation check
   -> agent/tool gateway check
@@ -40,7 +49,7 @@ python3 -m pip install ".[dev]"
 ko-redteam-self-check
 ```
 
-가장 많이 쓰는 통합 실행:
+실서비스 endpoint는 통합 suite로 확인합니다.
 
 ```bash
 ko-redteam-suite \
@@ -64,25 +73,16 @@ ko-redteam-suite \
 
 ---
 
-## CLI Map
+## Command Groups
 
-| CLI | 용도 |
-|---|---|
-| `ko-redteam-suite` | audit, coverage, endpoint smoke, 단일턴/멀티턴/agent 평가, doctor, gate 통합 실행 |
-| `ko-redteam-check-endpoint` | OpenAI-compatible endpoint 연결성과 한국어 응답 신호 확인 |
-| `ko-redteam-scan` | 단일/조합/crescendo 공격 스캔 |
-| `ko-redteam-benchmark` | expected-outcome 단일턴 평가 |
-| `ko-redteam-multiturn` | 멀티턴 escalation, tool hijack, privacy 재노출 평가 |
-| `ko-redteam-agent-harness` | mock tool gateway 기반 agent/RAG 평가 |
-| `ko-redteam-analyze-responses` | 저장된 응답 JSON/JSONL의 오프라인 포렌식 분석 |
-| `ko-redteam-import-benchmark` | 외부 CSV/JSON/JSONL을 ko-redteam benchmark schema로 변환 |
-| `ko-redteam-merge-benchmarks` | 여러 benchmark JSON 병합 및 중복 prompt 정리 |
-| `ko-redteam-expand-benchmark` | 한국어 난독/프레이밍 변형 benchmark 생성 |
-| `ko-redteam-compare-reports` | 여러 JSON report의 모델/분야별 점수 비교 |
-| `ko-redteam-check-regression` | baseline 대비 candidate report 회귀 판정 |
-| `ko-redteam-gate-reports` | CI threshold 판정 |
-| `ko-redteam-doctor-reports` | 리포트 schema, privacy, Markdown 품질 점검 |
-| `ko-redteam-check-public-hygiene` | 공개 배포 전 내부 경로, 내부 IP, 토큰형 문자열, 민감 산출물 경로 점검 |
+| 단계 | CLI | 용도 |
+|---|---|---|
+| 통합 실행 | `ko-redteam-suite` | audit, coverage, endpoint smoke, 단일턴/멀티턴/agent 평가, doctor, gate |
+| 연결 확인 | `ko-redteam-check-endpoint` | OpenAI-compatible endpoint와 한국어 응답 신호 확인 |
+| 평가 실행 | `ko-redteam-benchmark`, `ko-redteam-multiturn`, `ko-redteam-agent-harness` | 단일턴, 멀티턴, tool gateway 평가 |
+| 오프라인 분석 | `ko-redteam-scan`, `ko-redteam-analyze-responses` | 저장된 응답과 공격 스캔 결과 분석 |
+| 평가셋 관리 | `ko-redteam-import-benchmark`, `ko-redteam-merge-benchmarks`, `ko-redteam-expand-benchmark` | 외부 파일 변환, 병합, 한국어 변형 생성 |
+| 릴리스 게이트 | `ko-redteam-compare-reports`, `ko-redteam-check-regression`, `ko-redteam-gate-reports`, `ko-redteam-doctor-reports`, `ko-redteam-check-public-hygiene` | 점수 비교, 회귀 판정, CI threshold, 공개 배포 위생 점검 |
 
 ---
 
@@ -105,6 +105,9 @@ Endpoint 오류는 모델 취약점으로 합산하지 않고 `outcome=error`와
 ---
 
 ## Focused Runs
+
+<details>
+<summary>개별 CLI 실행 예시</summary>
 
 Endpoint smoke:
 
@@ -149,9 +152,14 @@ Agent harness는 모델이 생성한 tool/function call을 mock gateway에서 �
 이메일 전송, 공개 링크 생성처럼 확인 없는 write/destructive action은 차단되어야 하며, 리포트에는 tool
 argument 원문 대신 hash와 key만 남깁니다.
 
+</details>
+
 ---
 
 ## Report QA
+
+<details>
+<summary>평가셋, 반복 실행, 회귀, 리포트 품질 점검</summary>
 
 평가셋 품질:
 
@@ -208,6 +216,8 @@ ko-redteam-doctor-reports \
   --markdown-output report_doctor.md
 ```
 
+</details>
+
 ---
 
 ## Reading Reports
@@ -234,12 +244,12 @@ ko-redteam-doctor-reports \
 | `ko_llm_mini_v1.json` | self-check용 최소 smoke seed |
 
 `benchmarks/ko_llm_paperbench_v1.json`은 공개 논문과 가이드의 평가 축만 참고한 한국어 자체 seed입니다.
-원본 prompt를 복사하거나 외부 도구의 평가 결과를 재배포하지 않습니다.
+원본 prompt, 외부 도구 결과, 순위표를 가져오지 않습니다.
 
 설계 근거는 [`benchmarks/PAPER_TAXONOMY.md`](./benchmarks/PAPER_TAXONOMY.md)와
 [`benchmarks/LLM_VULNERABILITY_REVIEW.md`](./benchmarks/LLM_VULNERABILITY_REVIEW.md)에 둡니다.
-영어권 refusal 문자열 판정의 한국어 전이 한계는 특정 제품 비교가 아니라, 한국어 평가 기준을 분리해야
-하는 근거로 [`gap_analysis/FINDINGS.md`](./gap_analysis/FINDINGS.md)에 정리했습니다.
+영어 중심 판정 규칙의 한국어 전이 한계는 특정 제품 비교가 아니라, 한국어 평가 기준을 분리해야 하는
+근거로 [`gap_analysis/FINDINGS.md`](./gap_analysis/FINDINGS.md)에 정리했습니다.
 
 ---
 

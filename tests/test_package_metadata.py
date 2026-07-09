@@ -43,12 +43,20 @@ def test_console_script_targets_are_importable():
 def test_distribution_metadata_has_release_basics():
     data = tomllib.loads((ROOT / "pyproject.toml").read_text("utf-8"))
     assert (ROOT / "LICENSE").read_text("utf-8").startswith("MIT License")
+    manifest = (ROOT / "MANIFEST.in").read_text("utf-8")
+    assert "prune tests" in manifest
+    assert "exclude probes/COMBO_FINDINGS.md" in manifest
+    assert "recursive-exclude probes *_report.json *_report.md" in manifest
+    assert "global-exclude .gitignore" in manifest
     assert data["build-system"]["requires"][0].startswith("setuptools>=77")
     assert data["project"]["license"] == "MIT"
     assert data["project"]["license-files"] == ["LICENSE"]
     assert "korean" in data["project"]["keywords"]
     assert "Natural Language :: Korean" in data["project"]["classifiers"]
     assert any(dep.startswith("build") for dep in data["project"]["optional-dependencies"]["dev"])
+    assert data["tool"]["setuptools"]["include-package-data"] is False
+    assert data["tool"]["setuptools"]["exclude-package-data"]["detectors"] == [".gitignore"]
+    assert data["tool"]["setuptools"]["exclude-package-data"]["probes"] == [".gitignore"]
 
 
 def test_package_data_paths_exist():
