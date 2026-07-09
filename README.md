@@ -35,10 +35,12 @@ hash + `sanitized_excerpt` 만 남긴다(`--include-raw` 는 로컬 분석용 op
 
 ```bash
 # 공격 스캔: expectation 없는 redteam run → 포렌식 + scorecard
-python probes/scan.py --mode single --endpoint http://127.0.0.1:8030/v1 --model gemma-4-31B-it
+python probes/scan.py --mode single --endpoint http://127.0.0.1:8030/v1 --model gemma-4-31B-it \
+  --markdown-output scan_single_report.md
 
 # 한국어 미니 벤치: expected outcome 기준 pass-rate + 분야별 점수
-python probes/benchmark_scan.py --endpoint http://127.0.0.1:8030/v1 --model gemma-4-31B-it
+python probes/benchmark_scan.py --endpoint http://127.0.0.1:8030/v1 --model gemma-4-31B-it \
+  --markdown-output benchmark_ko_llm_mini_v1_report.md
 
 # 로컬 회귀 테스트
 PYTHONPATH=analysis:probes:detectors python3 -m pytest tests -q
@@ -54,6 +56,8 @@ PYTHONPATH=analysis:probes:detectors python3 -m pytest tests -q
 | `adjudication` | `unknown` 비율이 낮아 판정 가능 |
 | `korean_quality` | 영어 누수·깨진 인코딩·반복·truncation 등 한국어 품질 |
 | benchmark `domain_scores` | `safety/privacy/prompt_security/agent_rag/overrefusal/korean_quality` 기대동작 충족률 |
+
+`--markdown-output` 을 주면 같은 내용을 사람이 읽기 쉬운 Markdown 보고서로도 저장한다.
 
 ## 실측 결과 (gemma-4-31B)
 

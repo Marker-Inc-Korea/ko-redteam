@@ -33,6 +33,7 @@ from ko_llm_forensics import (  # noqa: E402
     summarize_assessments,
 )
 from ko_scorecard import score_unlabeled_scan  # noqa: E402
+from ko_report import render_markdown  # noqa: E402
 from ko_obfuscation import TECHNIQUES, obfuscate  # noqa: E402
 import ko_jailbreak as JB  # noqa: E402
 
@@ -381,6 +382,8 @@ if __name__ == "__main__":
     ap.add_argument("--include-raw", action="store_true",
                     help="raw prompt/response 를 로컬 report 에 포함한다. 기본은 sanitized only.")
     ap.add_argument("--output", default=None, help="report path. 기본: probes/scan_<mode>_report.json")
+    ap.add_argument("--markdown-output", default=None,
+                    help="optional Markdown summary path. 예: scan_single_report.md")
     args = ap.parse_args()
     out = MODES[args.mode](args.endpoint, args.model, include_raw=args.include_raw,
                            timeout=args.timeout, max_tokens=args.max_tokens)
@@ -389,4 +392,8 @@ if __name__ == "__main__":
     sc = out.get("scorecard", {})
     if sc:
         print(f"score overall={sc.get('overall')} grade={sc.get('grade')} domains={sc.get('domain_scores')}")
+    if args.markdown_output:
+        md_path = Path(args.markdown_output)
+        md_path.write_text(render_markdown(out), "utf-8")
+        print(f"saved markdown {md_path}")
     print(f"\nsaved {out_path}")

@@ -17,6 +17,7 @@ ROOT = HERE.parent
 sys.path.insert(0, str(ROOT / "analysis"))
 
 from ko_llm_forensics import analyze_response  # noqa: E402
+from ko_report import render_markdown  # noqa: E402
 from ko_scorecard import evaluate_expected, score_benchmark_rows  # noqa: E402
 
 DEFAULT_BENCHMARK = ROOT / "benchmarks" / "ko_llm_mini_v1.json"
@@ -149,6 +150,8 @@ if __name__ == "__main__":
                     help="raw prompt/response 를 로컬 report 에 포함한다. 기본은 sanitized only.")
     ap.add_argument("--output", default=None,
                     help="report path. 기본: probes/benchmark_<benchmark-name>_report.json")
+    ap.add_argument("--markdown-output", default=None,
+                    help="optional Markdown summary path. 예: benchmark_ko_llm_mini_v1_report.md")
     args = ap.parse_args()
     report = run_benchmark(args.endpoint, args.model, benchmark_path=args.benchmark,
                            include_raw=args.include_raw, timeout=args.timeout,
@@ -157,4 +160,8 @@ if __name__ == "__main__":
     out.write_text(json.dumps(report, ensure_ascii=False, indent=1), "utf-8")
     sc = report["scorecard"]
     print(f"\nscore overall={sc['overall']} grade={sc['grade']} domains={sc['domain_scores']}")
+    if args.markdown_output:
+        md_path = Path(args.markdown_output)
+        md_path.write_text(render_markdown(report), "utf-8")
+        print(f"saved markdown {md_path}")
     print(f"saved {out}")

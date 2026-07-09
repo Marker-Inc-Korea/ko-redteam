@@ -1,0 +1,145 @@
+"""ko_report — ko-redteam JSON report 를 Markdown 보고서로 렌더링."""
+from __future__ import annotations
+
+from collections import Counter
+from typing import Any
+
+
+def _fmt_score(score: Any) -> str:
+    if isinstance(score, (int, float)):
+        return f"{score:.1f}"
+    return "-"
+
+
+def _table(rows: list[list[Any]]) -> str:
+    if not rows:
+        return ""
+    header = "| " + " | ".join(str(x) for x in rows[0]) + " |"
+    sep = "| " + " | ".join("---" for _ in rows[0]) + " |"
+    body = ["| " + " | ".join(str(x) for x in r) + " |" for r in rows[1:]]
+    return "\n".join([header, sep, *body])
+
+
+def _scorecard_section(scorecard: dict[str, Any]) -> str:
+    if not scorecard:
+        return "## Scorecard\n\n(scorecard 없음)"
+    lines = [
+        "## Scorecard",
+        "",
+        f"- Overall: **{_fmt_score(scorecard.get('overall'))}** / Grade: **{scorecard.get('grade', '-')}**",
+        f"- Mode: `{scorecard.get('mode', '-')}`",
+    ]
+    domain = scorecard.get("domain_scores") or {}
+    if domain:
+        rows = [["Domain", "Score"], *[[k, _fmt_score(v)] for k, v in sorted(domain.items())]]
+        lines += ["", "### Domain Scores", "", _table(rows)]
+    category = scorecard.get("category_scores") or {}
+    if category:
+        rows = [["Category", "Score"], *[[k, _fmt_score(v)] for k, v in sorted(category.items())]]
+        lines += ["", "### Category Scores", "", _table(rows)]
+    outcomes = scorecard.get("outcome_counts") or {}
+    if outcomes:
+        rows = [["Outcome", "Count"], *[[k, v] for k, v in sorted(outcomes.items())]]
+        lines += ["", "### Outcomes", "", _table(rows)]
+    rates = scorecard.get("rates") or {}
+    if rates:
+        rows = [["Rate", "%"], *[[k, _fmt_score(v)] for k, v in sorted(rates.items())]]
+        lines += ["", "### Rates", "", _table(rows)]
+    return "\n".join(lines)
+
+
+def _findings_section(findings: list[dict[str, Any]], *, limit: int = 12) -> str:
+    lines = ["## Findings", ""]
+    if not findings:
+        return "\n".join([*lines, "주요 finding 없음."])
+    sev_order = {"CRITICAL": 0, "HIGH": 1, "MEDIUM": 2, "LOW": 3, "INFO": 4}
+    ranked = sorted(findings, key=lambda f: (sev_order.get(f.get("severity", "LOW"), 9), f.get("id", "")))
+    rows = [["ID", "Severity", "Outcome", "Title", "Evidence"]]
+    for f in ranked[:limit]:
+        evidence = f.get("evidence") or {}
+        rows.append([
+            f.get("id", "-"),
+            f.get("severity", "-"),
+            f.get("outcome", "-"),
+            f.get("title", "-"),
+            evidence.get("sanitized_excerpt", "-"),
+        ])
+    lines.append(_table(rows))
+    if len(findings) > limit:
+        lines += ["", f"_상위 {limit}개만 표시. 전체 finding: {len(findings)}개._"]
+    return "\n".join(lines)
+
+
+def _case_score_section(scorecard: dict[str, Any], *, limit: int = 20) -> str:
+    cases = scorecard.get("case_scores") or []
+    if not cases:
+        return ""
+    failed = [c for c in cases if not c.get("pass")]
+    lines = ["## Benchmark Case Scores", ""]
+    rows = [["ID", "Domain", "Category", "Expected", "Outcome", "Score", "Reason"]]
+    for c in failed[:limit]:
+        rows.append([
+            c.get("id", "-"),
+            c.get("domain", "-"),
+            c.get("category", "-"),
+            c.get("expected", "-"),
+            c.get("outcome", "-"),
+            _fmt_score(c.get("score")),
+            c.get("reason", "-"),
+        ])
+    if len(rows) == 1:
+        lines.append("실패/부분통과 케이스 없음.")
+    else:
+        lines.append(_table(rows))
+    return "\n".join(lines)
+
+
+def _metadata_section(report: dict[str, Any]) -> str:
+    schema = report.get("schema", "-")
+    model = report.get("model", "-")
+    benchmark = report.get("benchmark") or {}
+    mode = report.get("mode") or benchmark.get("name") or "-"
+    lines = [
+        "# Korean LLM Forensics Report",
+        "",
+        "## Metadata",
+        "",
+        f"- Schema: `{schema}`",
+        f"- Model: `{model}`",
+        f"- Mode/Benchmark: `{mode}`",
+    ]
+    if benchmark:
+        lines.append(f"- Benchmark description: {benchmark.get('description', '-')}")
+    return "\n".join(lines)
+
+
+def _quality_section(report: dict[str, Any]) -> str:
+    details = report.get("detail") or []
+    flags = Counter()
+    for row in details:
+        assessment = row.get("assessment", row)
+        for flag in assessment.get("korean_quality", {}).get("flags", []):
+            flags[flag] += 1
+    lines = ["## Korean Quality", ""]
+    if not flags:
+        lines.append("한국어 품질 flag 없음.")
+    else:
+        rows = [["Flag", "Count"], *[[k, v] for k, v in sorted(flags.items())]]
+        lines.append(_table(rows))
+    return "\n".join(lines)
+
+
+def render_markdown(report: dict[str, Any], *, finding_limit: int = 12) -> str:
+    """JSON report를 사람이 읽기 쉬운 Markdown으로 변환한다. raw prompt/response는 출력하지 않는다."""
+    scorecard = report.get("scorecard") or {}
+    sections = [
+        _metadata_section(report),
+        _scorecard_section(scorecard),
+        _findings_section(report.get("findings") or [], limit=finding_limit),
+        _case_score_section(scorecard),
+        _quality_section(report),
+        "## Privacy",
+        "",
+        "이 보고서는 기본적으로 원문 prompt/response 를 포함하지 않고 hash와 sanitized evidence만 표시한다.",
+    ]
+    return "\n\n".join(s for s in sections if s).rstrip() + "\n"
