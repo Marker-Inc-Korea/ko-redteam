@@ -375,7 +375,7 @@ def run_crescendo(
 MODES = {"single": run_single, "combo": run_combo, "crescendo": run_crescendo}
 
 
-if __name__ == "__main__":
+def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--mode", choices=list(MODES), required=True)
     ap.add_argument("--endpoint", required=True)
@@ -400,3 +400,7 @@ if __name__ == "__main__":
         md_path.write_text(render_markdown(out), "utf-8")
         print(f"saved markdown {md_path}")
     print(f"\nsaved {out_path}")
+
+
+if __name__ == "__main__":
+    main()

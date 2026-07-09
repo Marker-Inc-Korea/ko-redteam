@@ -145,8 +145,7 @@ def run_benchmark(
         "detail": rows,
     }
 
-
-if __name__ == "__main__":
+def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--endpoint", required=True)
     ap.add_argument("--model", default="gemma-4-31B-it")
@@ -172,3 +171,7 @@ if __name__ == "__main__":
         md_path.write_text(render_markdown(report), "utf-8")
         print(f"saved markdown {md_path}")
     print(f"saved {out}")
+
+
+if __name__ == "__main__":
+    main()

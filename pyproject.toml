@@ -1,3 +1,42 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ko-redteam"
+version = "0.1.0"
+description = "Korean LLM redteam and forensics toolkit"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Marker Inc Korea" }]
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=8,<9"]
+
+[project.scripts]
+ko-redteam-self-check = "probes.self_check:main"
+ko-redteam-suite = "probes.run_suite:main"
+ko-redteam-check-endpoint = "probes.check_endpoint:main"
+ko-redteam-scan = "probes.scan:main"
+ko-redteam-benchmark = "probes.benchmark_scan:main"
+ko-redteam-validate-benchmarks = "probes.validate_benchmarks:main"
+ko-redteam-check-coverage = "probes.check_benchmark_coverage:main"
+ko-redteam-analyze-responses = "probes.analyze_responses:main"
+ko-redteam-analyze-repeats = "probes.analyze_repeats:main"
+ko-redteam-gate-reports = "probes.gate_reports:main"
+ko-redteam-doctor-reports = "probes.doctor_reports:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["analysis*", "benchmarks*", "detectors*", "gap_analysis*", "probes*"]
+
+[tool.setuptools.package-data]
+benchmarks = ["*.json", "*.md"]
+gap_analysis = ["*.md", "_vendor/*"]
+probes = ["ko_jailbreak_templates.json"]
+
 [tool.pytest.ini_options]
 pythonpath = ["analysis", "probes", "detectors"]
 testpaths = ["tests"]

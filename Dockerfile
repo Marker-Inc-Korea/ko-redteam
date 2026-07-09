@@ -5,16 +5,15 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-COPY requirements-dev.txt ./
-RUN python -m pip install --no-cache-dir --upgrade pip \
-    && python -m pip install --no-cache-dir -r requirements-dev.txt \
-    && useradd --create-home --shell /usr/sbin/nologin redteam \
-    && chown redteam:redteam /app
+COPY . .
 
-COPY --chown=redteam:redteam . .
+RUN python -m pip install --no-cache-dir --upgrade pip \
+    && python -m pip install --no-cache-dir ".[dev]" \
+    && useradd --create-home --shell /usr/sbin/nologin redteam \
+    && chown -R redteam:redteam /app
 
 USER redteam
 
-RUN python probes/self_check.py
+RUN ko-redteam-self-check
 
-CMD ["python", "probes/self_check.py"]
+CMD ["ko-redteam-self-check"]

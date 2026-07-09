@@ -32,6 +32,16 @@ endpoint smoke
 
 ## Quick Start
 
+### 0. 설치
+
+```bash
+python3 -m pip install ".[dev]"
+ko-redteam-self-check
+```
+
+소스 checkout에서는 기존처럼 `python3 probes/...` 경로도 계속 사용할 수 있습니다. 설치 후에는
+`ko-redteam-suite`, `ko-redteam-check-endpoint`, `ko-redteam-scan`, `ko-redteam-benchmark` 진입점을 사용할 수 있습니다.
+
 ### 1. Endpoint 확인
 
 ```bash
@@ -161,8 +171,8 @@ Endpoint 오류는 `timeout`, `connection`, `http_auth`, `http_rate_limit`, `htt
 ## Pre-release Check
 
 ```bash
-python3 -m pip install -r requirements-dev.txt
-python3 probes/self_check.py
+python3 -m pip install ".[dev]"
+ko-redteam-self-check
 python3 -m pytest tests -q
 docker build -t ko-redteam:local .
 docker run --rm ko-redteam:local
