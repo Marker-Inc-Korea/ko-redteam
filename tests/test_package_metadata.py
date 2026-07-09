@@ -27,6 +27,11 @@ def test_console_script_targets_are_importable():
         "ko-redteam-benchmark",
         "ko-redteam-multiturn",
         "ko-redteam-agent-harness",
+        "ko-redteam-import-benchmark",
+        "ko-redteam-merge-benchmarks",
+        "ko-redteam-expand-benchmark",
+        "ko-redteam-compare-reports",
+        "ko-redteam-check-regression",
     } <= set(scripts)
 
     for target in scripts.values():

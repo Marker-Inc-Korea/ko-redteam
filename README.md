@@ -75,6 +75,11 @@ ko-redteam-suite \
 | `ko-redteam-multiturn` | 멀티턴 escalation, tool hijack, privacy 재노출 평가 |
 | `ko-redteam-agent-harness` | mock tool gateway 기반 agent/RAG 평가 |
 | `ko-redteam-analyze-responses` | 저장된 응답 JSON/JSONL의 오프라인 포렌식 분석 |
+| `ko-redteam-import-benchmark` | 외부 CSV/JSON/JSONL을 ko-redteam benchmark schema로 변환 |
+| `ko-redteam-merge-benchmarks` | 여러 benchmark JSON 병합 및 중복 prompt 정리 |
+| `ko-redteam-expand-benchmark` | 한국어 난독/프레이밍 변형 benchmark 생성 |
+| `ko-redteam-compare-reports` | 여러 JSON report의 모델/분야별 점수 비교 |
+| `ko-redteam-check-regression` | baseline 대비 candidate report 회귀 판정 |
 | `ko-redteam-gate-reports` | CI threshold 판정 |
 | `ko-redteam-doctor-reports` | 리포트 schema, privacy, Markdown 품질 점검 |
 | `ko-redteam-check-public-hygiene` | 공개 배포 전 내부 경로, 내부 IP, 토큰형 문자열, 민감 산출물 경로 점검 |
@@ -165,6 +170,23 @@ ko-redteam-analyze-repeats \
   probes/suite_run2/benchmark_report.json \
   --max-overall-span 5 \
   --markdown-output repeat_stability_report.md
+```
+
+모델/버전 비교와 회귀 판정:
+
+```bash
+ko-redteam-compare-reports \
+  probes/suite_run1/benchmark_report.json \
+  probes/suite_run2/benchmark_report.json \
+  --markdown-output comparison_report.md
+```
+
+```bash
+ko-redteam-check-regression \
+  --baseline probes/suite_run1/benchmark_report.json \
+  --candidate probes/suite_run2/benchmark_report.json \
+  --max-overall-drop 3 \
+  --markdown-output regression_report.md
 ```
 
 CI gate:

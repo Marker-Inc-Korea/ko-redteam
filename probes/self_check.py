@@ -36,6 +36,10 @@ REQUIRED_MODULES = [
     "agent_harness",
     "benchmark_scan",
     "check_endpoint",
+    "check_regression",
+    "compare_reports",
+    "expand_benchmark",
+    "import_benchmark",
     "ko_benchmark_audit",
     "ko_benchmark_coverage",
     "ko_llm_forensics",
@@ -44,6 +48,7 @@ REQUIRED_MODULES = [
     "ko_report_doctor",
     "ko_scorecard",
     "ko_refusal",
+    "merge_benchmarks",
     "multiturn_benchmark",
     "run_suite",
 ]
