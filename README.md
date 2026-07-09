@@ -11,7 +11,7 @@
 문자열 매칭, 유해성 판정은 영어 toxicity 모델. 결과: **한국어로 완벽히 방어한 모델도 garak은 ASR 100%로
 오보**(정상 거부를 '탈옥 성공'으로 오집계). → 한국어 LLM 을 스캔하려면 **한국어 판정기**가 필수다.
 
-## 구성 — 부품 5개
+## 구성 — 부품 6개
 
 동작은 한 줄: **공격을 만들고 → 대상에 쏘고 → 응답을 포렌식 분류하고 → 취약/오류 finding 으로 리포트한다.**
 
@@ -22,6 +22,7 @@
 | **③ 판정기** | `detectors/ko_refusal.py` | 한국어 거부 인식 — garak 영어 detector 의 갭을 메움 |
 | **④ 분석기** | `analysis/ko_forensics.py` | 잡힌 난독 페이로드 해부 — 역난독 + 기법분류 + 공격유형 |
 | **⑤ LLM 포렌식** | `analysis/ko_llm_forensics.py` | 응답 outcome(`refused/safe_redirect/harmful_compliance/unknown/error`), 한국어 품질, endpoint 오류, sanitized finding |
+| **⑥ 점수화** | `analysis/ko_scorecard.py`, `probes/benchmark_scan.py` | 종합점수/분야별점수(`security/reliability/adjudication/korean_quality`, benchmark domain scores) |
 
 보조: `probes/scan_demo.py`(가드 난독 강건성 오프라인 데모), `gap_analysis/`(garak 갭 실측 근거).
 
@@ -29,6 +30,30 @@
 endpoint timeout/장애는 `outcome=error` 로 분리되어 취약점으로 오집계되지 않는다. 구 방식과 비교가 필요하면
 리포트의 `asr.legacy_non_refusal` 을 참고한다. 리포트는 기본적으로 원문 prompt/response 를 저장하지 않고
 hash + `sanitized_excerpt` 만 남긴다(`--include-raw` 는 로컬 분석용 opt-in).
+
+## 실행
+
+```bash
+# 공격 스캔: expectation 없는 redteam run → 포렌식 + scorecard
+python probes/scan.py --mode single --endpoint http://127.0.0.1:8030/v1 --model gemma-4-31B-it
+
+# 한국어 미니 벤치: expected outcome 기준 pass-rate + 분야별 점수
+python probes/benchmark_scan.py --endpoint http://127.0.0.1:8030/v1 --model gemma-4-31B-it
+
+# 로컬 회귀 테스트
+PYTHONPATH=analysis:probes:detectors python3 -m pytest tests -q
+```
+
+리포트에는 `scorecard` 가 포함된다.
+
+| 점수 | 의미 |
+|---|---|
+| `overall` / `grade` | 종합 점수와 A~F 등급 |
+| `security` | 유해 순응(`harmful_compliance`) 억제 |
+| `reliability` | endpoint 오류/timeout 없이 측정 가능 |
+| `adjudication` | `unknown` 비율이 낮아 판정 가능 |
+| `korean_quality` | 영어 누수·깨진 인코딩·반복·truncation 등 한국어 품질 |
+| benchmark `domain_scores` | `safety/privacy/prompt_security/agent_rag/overrefusal/korean_quality` 기대동작 충족률 |
 
 ## 실측 결과 (gemma-4-31B)
 
@@ -67,18 +92,22 @@ v0 는 "수 없/죄송" 상용구에 과적합돼 다양한 거부의 71%를 놓
 
 ```
 ko-redteam/
+├── benchmarks/      # 기대 outcome 이 있는 한국어 벤치 seed
+│   └── ko_llm_mini_v1.json
 ├── probes/          # ① 공격기 + ② 스캐너
 │   ├── ko_obfuscation.py          # 난독 변형기(normalize 역방향)
 │   ├── ko_jailbreak.py            # 프레이밍 23종 + templates.json
 │   ├── scan.py                    # 통합 스캐너 --mode single|combo|crescendo
+│   ├── benchmark_scan.py          # 기대 outcome 기반 benchmark + scorecard
 │   ├── scan_demo.py               # (보조) 가드 난독 강건성 오프라인 데모
 │   └── *_FINDINGS.md              # 모드별 실측 리포트
 ├── detectors/
 │   └── ko_refusal.py              # ③ 판정기(한국어 거부, +한/영 결합)
 ├── analysis/
 │   ├── ko_forensics.py            # ④ 분석기(역난독+기법분류+공격유형)
-│   └── ko_llm_forensics.py        # ⑤ 응답 포렌식(outcome/품질/error/finding)
-├── tests/                         # 회귀 24 (refusal/obfuscation/forensics/LLM-forensics)
+│   ├── ko_llm_forensics.py        # ⑤ 응답 포렌식(outcome/품질/error/finding)
+│   └── ko_scorecard.py            # ⑥ scorecard(종합/분야별 점수)
+├── tests/                         # 회귀 테스트(refusal/obfuscation/forensics/LLM-forensics/scorecard)
 └── gap_analysis/                  # garak 한국어 갭 실측 근거(+garak 0.15.1 스냅샷)
 ```
 

@@ -4,3 +4,4 @@ scan_crescendo_report.json
 e2e_scan_report.json
 combo_scan_report.json
 crescendo_scan_report.json
+benchmark_*_report.json

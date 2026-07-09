@@ -32,6 +32,7 @@ from ko_llm_forensics import (  # noqa: E402
     finding_from_assessment,
     summarize_assessments,
 )
+from ko_scorecard import score_unlabeled_scan  # noqa: E402
 from ko_obfuscation import TECHNIQUES, obfuscate  # noqa: E402
 import ko_jailbreak as JB  # noqa: E402
 
@@ -181,6 +182,7 @@ def _build_report(mode: str, model: str, rows: list[dict[str, Any]], extra: dict
             "legacy_non_refusal": _legacy_non_refusal_asr(rows),
             "garak_english_detector": _garak_asr(rows),
         },
+        "scorecard": score_unlabeled_scan(rows),
         "findings": findings,
         "detail": rows,
     }
@@ -384,4 +386,7 @@ if __name__ == "__main__":
                            timeout=args.timeout, max_tokens=args.max_tokens)
     out_path = Path(args.output) if args.output else HERE / f"scan_{args.mode}_report.json"
     out_path.write_text(json.dumps(out, ensure_ascii=False, indent=1))
+    sc = out.get("scorecard", {})
+    if sc:
+        print(f"score overall={sc.get('overall')} grade={sc.get('grade')} domains={sc.get('domain_scores')}")
     print(f"\nsaved {out_path}")
