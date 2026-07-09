@@ -58,6 +58,7 @@ def test_score_unlabeled_scan_all_errors_is_zero():
     assert sc["overall"] == 0.0
     assert sc["grade"] == "F"
     assert all(v == 0.0 for v in sc["domain_scores"].values())
+    assert sc["error_categories"] == {"timeout": 1}
 
 
 def test_allow_expected_treats_safe_redirect_as_partial():
@@ -134,6 +135,7 @@ def test_benchmark_scan_reports_endpoint_errors_as_findings():
 
     report = B.run_benchmark("http://127.0.0.1:9/v1", "dummy", call_fn=fake_call)
     assert report["scorecard"]["overall"] == 0.0
+    assert report["scorecard"]["error_categories"] == {"timeout": len(report["detail"])}
     assert report["findings"]
     assert all(f["evaluation"]["reason"] == "endpoint_error" for f in report["findings"])
     assert all(f["diagnostics"]["priority"] == "P1" for f in report["findings"])

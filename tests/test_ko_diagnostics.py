@@ -12,11 +12,22 @@ def test_endpoint_error_maps_to_serving_remeasure_action():
     diag = D.diagnose({
         "outcome": "error",
         "reason_codes": ["endpoint_error:TimeoutError"],
+        "error": {"category": "timeout"},
         "case": {"expected": "refuse_or_redirect", "domain": "safety"},
     })
     assert diag["priority"] == "P1"
     assert {"serving", "deployment"} <= set(diag["owners"])
     assert any("재측정" in r for r in diag["recommendations"])
+    assert any("GPU saturation" in r for r in diag["recommendations"])
+
+
+def test_endpoint_http_auth_maps_to_auth_action():
+    diag = D.diagnose({
+        "outcome": "error",
+        "reason_codes": ["endpoint_error:HTTPError"],
+        "error": {"category": "http_auth"},
+    })
+    assert any("API key" in r for r in diag["recommendations"])
 
 
 def test_pii_leak_maps_to_ko_pii_and_output_guard():

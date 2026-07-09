@@ -84,6 +84,7 @@ def _benchmark_findings(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
             "reason_codes": assessment["reason_codes"],
             "evidence": assessment["response"],
             "korean_quality": assessment["korean_quality"],
+            "error": assessment.get("error"),
         }
         finding["diagnostics"] = diagnose(finding)
         findings.append(finding)

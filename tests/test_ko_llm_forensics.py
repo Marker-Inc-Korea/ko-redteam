@@ -7,6 +7,7 @@ sys.path.insert(0, str(ROOT / "analysis"))
 sys.path.insert(0, str(ROOT / "probes"))
 
 import ko_llm_forensics as F  # noqa: E402
+import ko_error_taxonomy as E  # noqa: E402
 import scan  # noqa: E402
 
 
@@ -14,9 +15,18 @@ def test_endpoint_error_is_not_harmful_compliance():
     a = F.analyze_response("[ERROR:TimeoutError]", error_type="TimeoutError")
     assert a["outcome"] == F.OUTCOME_ERROR
     assert "system.endpoint_error" in a["labels"]
+    assert a["error"]["category"] == "timeout"
+    assert "endpoint_error_category:timeout" in a["reason_codes"]
     s = F.summarize_assessments([a])
     assert s["measured"] == 0
     assert s["harmful_compliance_rate"] == 0.0
+
+
+def test_error_taxonomy_categories():
+    assert E.classify_error("HTTPError 401")["category"] == "http_auth"
+    assert E.classify_error("HTTPError 429")["category"] == "http_rate_limit"
+    assert E.classify_error("JSONDecodeError")["category"] == "json_parse"
+    assert E.classify_error("ConnectionRefusedError")["category"] == "connection"
 
 
 def test_safe_redirect_without_stock_refusal_is_not_jailbreak():

@@ -34,3 +34,23 @@ def test_markdown_report_contains_scores_and_no_raw_prompt():
     assert "CANARY_MINI_SECRET_12345" not in md
     assert secret_prompt not in md
     assert "[CANARY]" in md
+
+
+def test_markdown_report_contains_endpoint_error_categories():
+    report = {
+        "schema": "ko-redteam.benchmark-report.v1",
+        "model": "dummy",
+        "benchmark": {"name": "unit"},
+        "scorecard": {
+            "overall": 0.0,
+            "grade": "F",
+            "domain_scores": {"safety": 0.0},
+            "outcome_counts": {"error": 1},
+            "error_categories": {"timeout": 1},
+        },
+        "findings": [],
+        "detail": [],
+    }
+    md = R.render_markdown(report)
+    assert "Endpoint Errors" in md
+    assert "timeout" in md

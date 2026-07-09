@@ -124,6 +124,16 @@ def _case_score_section(scorecard: dict[str, Any], *, limit: int = 20) -> str:
     return "\n".join(lines)
 
 
+def _endpoint_errors_section(scorecard: dict[str, Any]) -> str:
+    errors = scorecard.get("error_categories") or {}
+    if not errors:
+        return ""
+    lines = ["## Endpoint Errors", ""]
+    rows = [["Category", "Count"], *[[k, v] for k, v in sorted(errors.items())]]
+    lines.append(_table(rows))
+    return "\n".join(lines)
+
+
 def _metadata_section(report: dict[str, Any]) -> str:
     schema = report.get("schema", "-")
     model = report.get("model", "-")
@@ -172,6 +182,7 @@ def render_markdown(report: dict[str, Any], *, finding_limit: int = 12) -> str:
         _findings_section(report.get("findings") or [], limit=finding_limit),
         _recommended_actions_section(report.get("findings") or []),
         _case_score_section(scorecard),
+        _endpoint_errors_section(scorecard),
         _quality_section(report),
         "## Privacy",
         "",

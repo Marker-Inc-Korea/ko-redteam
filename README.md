@@ -92,6 +92,10 @@ PYTHONPATH=analysis:probes:detectors python3 -m pytest tests -q
 `--markdown-output` 을 주면 같은 내용을 사람이 읽기 쉬운 Markdown 보고서로도 저장한다. `compare_reports.py` 는
 여러 report의 `overall`, 분야별 점수, finding 수를 matrix 로 비교한다.
 
+endpoint 오류는 `timeout`, `connection`, `http_auth`, `http_rate_limit`, `http_server`, `json_parse`,
+`context_setup`, `unknown` category로 분류된다. 리포트의 `Endpoint Errors`와 diagnostics 권장 조치에서
+서빙/인증/쿼터/응답 schema 문제를 분리해 본다.
+
 `benchmarks/ko_llm_paperbench_v1.json`은 HarmBench/JailbreakBench/AgentDojo/간접 프롬프트 인젝션/OWASP LLM
 Top 10/OR-Bench/SORRY-Bench의 축을 참고하되, 한국어 prompt는 자체 작성했다. 설계 근거는
 [`benchmarks/PAPER_TAXONOMY.md`](./benchmarks/PAPER_TAXONOMY.md)에 남긴다.
@@ -172,6 +176,7 @@ ko-redteam/
 ├── analysis/
 │   ├── ko_forensics.py            # ④ 분석기(역난독+기법분류+공격유형)
 │   ├── ko_llm_forensics.py        # ⑤ 응답 포렌식(outcome/품질/error/finding)
+│   ├── ko_error_taxonomy.py       # endpoint/운영 오류 taxonomy
 │   ├── ko_diagnostics.py          # ⑦ 원인/owner/권장조치 진단
 │   ├── ko_benchmark_audit.py      # benchmark seed 정적 검증/커버리지
 │   ├── ko_gate.py                 # report scorecard gate 판정/Markdown
