@@ -96,6 +96,19 @@ def test_doctor_markdown_report_detects_raw_canary_and_missing_privacy(tmp_path)
     assert "privacy_section_missing" in codes
 
 
+def test_doctor_detects_korean_account_and_address(tmp_path):
+    path = tmp_path / "bad_privacy.json"
+    bad = _report()
+    bad["detail"] = [{
+        "note": "계좌번호 123-456-789012, 주소 서울시 중구 세종대로 1",
+    }]
+    path.write_text(json.dumps(bad, ensure_ascii=False), "utf-8")
+    result = D.doctor_reports([path])
+    codes = {issue["code"] for file in result["files"] for issue in file["issues"]}
+    assert result["status"] == "fail"
+    assert "pii_like_text" in codes
+
+
 def test_doctor_warnings_fail_turns_warning_only_report_into_failure(tmp_path):
     path = tmp_path / "unknown.json"
     report = {"schema": "ko-redteam.unknown.v1", "scorecard": {"overall": 100}}

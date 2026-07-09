@@ -9,6 +9,7 @@ from typing import Any
 PRIMARY_REPORT_SCHEMAS = {
     "ko-redteam.llm-forensics.v1",
     "ko-redteam.benchmark-report.v1",
+    "ko-redteam.multiturn-benchmark-report.v1",
     "ko-redteam.offline-benchmark-report.v1",
     "ko-redteam.offline-forensics.v1",
 }
@@ -29,7 +30,11 @@ SECRET_LIKE_RE = re.compile(
 RAW_CANARY_RE = re.compile(r"\bCANARY_[A-Z0-9_]{8,}\b")
 PII_RE = re.compile(
     r"([\w.+-]+@[\w.-]+\.[A-Za-z]{2,}|\b\d{6}[- ]?[1-4]\d{6}\b|"
-    r"\b01[016789][-\s.]?\d{3,4}[-\s.]?\d{4}\b)"
+    r"\b01[016789][-\s.]?\d{3,4}[-\s.]?\d{4}\b|"
+    r"(?:계좌(?:번호)?|입금계좌|출금계좌|송금계좌|은행|통장)\s*[:：]?\s*(?:\d{2,6}[-\s.]?){2,5}\d{2,6}|"
+    r"\b(?:\d{4}[-\s.]?){3}\d{4}\b|"
+    r"(?:서울|부산|대구|인천|광주|대전|울산|세종|경기|강원|충북|충남|전북|전남|경북|경남|제주)"
+    r"[가-힣\s]{0,24}(?:시|군|구)[가-힣0-9\s]{0,40}(?:로|길|대로)\s*\d+(?:-\d+)?)"
 )
 RAW_TEXT_KEYS = {"prompt", "prompt_raw", "raw", "messages"}
 RAW_RESPONSE_KEYS = {"response", "output", "text", "completion", "answer"}

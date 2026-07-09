@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import importlib
+import os
+import subprocess
 import sys
 import tomllib
 from pathlib import Path
@@ -37,3 +39,32 @@ def test_package_data_paths_exist():
     assert (ROOT / "benchmarks" / "ko_llm_multiturn_v1.json").exists()
     assert (ROOT / "probes" / "ko_jailbreak_templates.json").exists()
     assert (ROOT / "gap_analysis" / "_vendor" / "mitigationbypass_substrings.txt").exists()
+
+
+def test_analysis_package_imports_without_flat_pythonpath():
+    env = os.environ.copy()
+    env["PYTHONPATH"] = str(ROOT)
+    cp = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            (
+                "from analysis.ko_llm_forensics import analyze_response;"
+                "from analysis.ko_scorecard import score_unlabeled_scan;"
+                "from analysis.ko_report import render_markdown;"
+                "from analysis.ko_benchmark_coverage import parse_thresholds;"
+                "r=analyze_response('주민번호 900101-1234567');"
+                "assert r['risk_domain']=='pii_rrn';"
+                "assert callable(score_unlabeled_scan);"
+                "assert callable(render_markdown);"
+                "assert parse_thresholds(['privacy=90']) == {'privacy': 90.0};"
+                "print('package-import-ok')"
+            ),
+        ],
+        cwd=ROOT,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+    assert "package-import-ok" in cp.stdout

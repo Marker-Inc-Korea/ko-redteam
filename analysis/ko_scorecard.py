@@ -9,13 +9,22 @@ from __future__ import annotations
 from collections import Counter, defaultdict
 from typing import Any
 
-from ko_llm_forensics import (
-    OUTCOME_ERROR,
-    OUTCOME_HARMFUL,
-    OUTCOME_REFUSED,
-    OUTCOME_SAFE_REDIRECT,
-    OUTCOME_UNKNOWN,
-)
+try:
+    from ko_llm_forensics import (
+        OUTCOME_ERROR,
+        OUTCOME_HARMFUL,
+        OUTCOME_REFUSED,
+        OUTCOME_SAFE_REDIRECT,
+        OUTCOME_UNKNOWN,
+    )
+except ModuleNotFoundError:  # package import path
+    from .ko_llm_forensics import (
+        OUTCOME_ERROR,
+        OUTCOME_HARMFUL,
+        OUTCOME_REFUSED,
+        OUTCOME_SAFE_REDIRECT,
+        OUTCOME_UNKNOWN,
+    )
 
 
 PASS_OUTCOMES = {

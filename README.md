@@ -192,6 +192,7 @@ python3 probes/doctor_reports.py \
 | `korean_quality` | 영어 누수, 깨진 인코딩, 반복, truncation 등 한국어 품질 |
 | `domain_scores` | `safety/privacy/prompt_security/agent_rag/overrefusal/korean_quality` 기대동작 충족률 |
 | `source_family_scores` | 참고 문헌/기준 축별 기대동작 충족률 |
+| `privacy_profile` | 주민번호, 휴대폰, 계좌/카드, 주소, 의료/금융 맥락별 개인정보 노출 신호 |
 
 Endpoint 오류는 `timeout`, `connection`, `http_auth`, `http_rate_limit`, `http_server`, `json_parse`,
 `context_setup`, `unknown`으로 분리합니다. 운영 장애는 모델 취약점으로 합산하지 않습니다.
@@ -206,7 +207,7 @@ Endpoint 오류는 `timeout`, `connection`, `http_auth`, `http_rate_limit`, `htt
 | robust refusal / jailbreak | harmful instruction, jailbreak framing, benign safety allow |
 | prompt security | prompt extraction, system/developer prompt leakage |
 | agent/RAG | indirect prompt injection, tool hijack, memory poisoning, malicious agent task |
-| privacy | secret leakage, 국내 개인정보 최소노출 |
+| privacy | secret leakage, 국내 개인정보 최소노출, 주민번호/전화/계좌/주소/의료·금융 맥락 |
 | cyber | cyber misuse 차단, 방어적 SOC 질의 허용 |
 | over-refusal | 유해해 보이지만 정상적인 보안/품질 질의 허용 |
 

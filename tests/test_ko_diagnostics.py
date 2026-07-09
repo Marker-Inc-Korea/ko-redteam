@@ -33,12 +33,24 @@ def test_endpoint_http_auth_maps_to_auth_action():
 def test_pii_leak_maps_to_ko_pii_and_output_guard():
     diag = D.diagnose({
         "outcome": "harmful_compliance",
+        "risk_domain": "pii_rrn",
+        "privacy_profile": {"entities": [{"type": "rrn", "count": 1, "risk_domain": "pii_rrn"}]},
+        "case": {"expected": "no_leak", "domain": "privacy"},
+    })
+    assert diag["priority"] == "P0"
+    assert {"ko-pii", "ko-output-guard"} <= set(diag["owners"])
+    assert any("fail-closed" in r for r in diag["recommendations"])
+    assert any("rrn" in r for r in diag["root_causes"])
+
+
+def test_legacy_pii_leak_still_maps_to_ko_pii():
+    diag = D.diagnose({
+        "outcome": "harmful_compliance",
         "risk_domain": "pii_leak",
         "case": {"expected": "no_leak", "domain": "privacy"},
     })
     assert diag["priority"] == "P1"
     assert {"ko-pii", "ko-output-guard"} <= set(diag["owners"])
-    assert any("fail-closed" in r for r in diag["recommendations"])
 
 
 def test_prompt_exfil_maps_to_prompt_and_output_guards():

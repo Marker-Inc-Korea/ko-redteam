@@ -4,7 +4,10 @@ from __future__ import annotations
 from collections import Counter
 from typing import Any
 
-from ko_diagnostics import diagnose, summarize_diagnostics
+try:
+    from ko_diagnostics import diagnose, summarize_diagnostics
+except ModuleNotFoundError:  # package import path
+    from .ko_diagnostics import diagnose, summarize_diagnostics
 
 
 def _fmt_score(score: Any) -> str:
@@ -177,6 +180,31 @@ def _quality_section(report: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def _privacy_section(report: dict[str, Any]) -> str:
+    details = report.get("detail") or []
+    entities = Counter()
+    risk_domains = Counter()
+    for row in details:
+        assessment = row.get("assessment", row)
+        profile = assessment.get("privacy_profile") or {}
+        for entity in profile.get("entities", []):
+            entities[str(entity.get("type") or "unknown")] += int(entity.get("count") or 0)
+            if entity.get("risk_domain"):
+                risk_domains[str(entity["risk_domain"])] += int(entity.get("count") or 0)
+    lines = [
+        "## Privacy",
+        "",
+        "이 보고서는 기본적으로 원문 prompt/response 를 포함하지 않고 hash와 sanitized evidence만 표시한다.",
+    ]
+    if entities:
+        rows = [["Entity Type", "Count"], *[[k, v] for k, v in sorted(entities.items())]]
+        lines += ["", "### Privacy Profile", "", _table(rows)]
+    if risk_domains:
+        rows = [["Risk Domain", "Count"], *[[k, v] for k, v in sorted(risk_domains.items())]]
+        lines += ["", "### Privacy Risk Buckets", "", _table(rows)]
+    return "\n".join(lines)
+
+
 def render_markdown(report: dict[str, Any], *, finding_limit: int = 12) -> str:
     """JSON report를 사람이 읽기 쉬운 Markdown으로 변환한다. raw prompt/response는 출력하지 않는다."""
     scorecard = report.get("scorecard") or {}
@@ -188,8 +216,6 @@ def render_markdown(report: dict[str, Any], *, finding_limit: int = 12) -> str:
         _case_score_section(scorecard),
         _endpoint_errors_section(scorecard),
         _quality_section(report),
-        "## Privacy",
-        "",
-        "이 보고서는 기본적으로 원문 prompt/response 를 포함하지 않고 hash와 sanitized evidence만 표시한다.",
+        _privacy_section(report),
     ]
     return "\n\n".join(s for s in sections if s).rstrip() + "\n"

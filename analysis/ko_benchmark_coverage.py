@@ -6,7 +6,10 @@ import json
 from pathlib import Path
 from typing import Any
 
-from ko_benchmark_audit import EXPECTED_VALUES
+try:
+    from ko_benchmark_audit import EXPECTED_VALUES
+except ModuleNotFoundError:  # package import path
+    from .ko_benchmark_audit import EXPECTED_VALUES
 
 
 DEFAULT_REQUIRED_DOMAINS = [
