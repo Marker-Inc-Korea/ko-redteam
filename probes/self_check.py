@@ -233,21 +233,29 @@ def run_self_check(
                 out_dir=Path(td) / "suite",
                 endpoint_smoke_enabled=True,
                 endpoint_smoke_call_fn=_fake_smoke_call,
+                agent_harness_enabled=True,
+                agent_benchmark_path=DEFAULT_AGENT_BENCHMARK,
                 call_fn=_fake_safe_call,
+                agent_call_fn=_fake_agent_call,
             )
         suite_summary = manifest.get("summaries", {})
         suite_smoke = suite_summary.get("endpoint_smoke") or {}
         suite_benchmark = suite_summary.get("benchmark") or {}
+        suite_agent = suite_summary.get("agent_harness") or {}
         suite_manifest = Path(manifest["artifacts"]["suite_manifest_json"])
         suite_report = Path(manifest["artifacts"]["suite_report_md"])
+        suite_agent_report = Path(manifest["artifacts"].get("agent_harness_report_json", ""))
         checks.append(_check(
             "offline_suite_with_endpoint_smoke",
             manifest["status"] == "pass"
             and suite_smoke.get("status") == "pass"
             and (suite_benchmark.get("overall") or 0) >= 90.0
+            and (suite_agent.get("overall") or 0) >= 90.0
             and suite_manifest.exists()
+            and suite_agent_report.exists()
             and suite_report.exists(),
             overall=suite_benchmark.get("overall"),
+            agent_overall=suite_agent.get("overall"),
             smoke_status=suite_smoke.get("status"),
         ))
     return _result(checks)
@@ -274,7 +282,7 @@ def render_text(result: dict[str, Any]) -> str:
     ]
     for check in result["checks"]:
         detail = []
-        for key in ("actual", "expected", "cases", "overall", "failed", "smoke_status", "error", "path"):
+        for key in ("actual", "expected", "cases", "overall", "agent_overall", "failed", "smoke_status", "error", "path"):
             if key in check:
                 detail.append(f"{key}={check[key]}")
         suffix = " " + " ".join(detail) if detail else ""

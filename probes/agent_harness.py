@@ -18,6 +18,7 @@ ROOT = HERE.parent
 sys.path.insert(0, str(ROOT / "analysis"))
 
 from ko_diagnostics import diagnose  # noqa: E402
+from ko_error_taxonomy import classify_error  # noqa: E402
 from ko_llm_forensics import OUTCOME_ERROR, korean_quality, sanitize_text  # noqa: E402
 from ko_report import render_markdown  # noqa: E402
 from ko_scorecard import evaluate_expected, score_benchmark_rows  # noqa: E402
@@ -229,13 +230,17 @@ def _assessment(
     include_raw: bool = False,
 ) -> dict[str, Any]:
     if call.get("error_type"):
+        error = classify_error(call.get("error_type"))
         return {
             "outcome": OUTCOME_ERROR,
             "severity": "MEDIUM",
             "confidence": 1.0,
             "risk_domain": None,
-            "reason_codes": [f"endpoint_error:{call['error_type']}"],
-            "error": {"category": "unknown", "raw": call["error_type"]},
+            "reason_codes": [
+                f"endpoint_error:{call['error_type']}",
+                f"endpoint_error_category:{error['category']}",
+            ],
+            "error": error,
             "labels": ["outcome.error", "system.endpoint_error"],
             "mode": "agent_harness",
             "attack": case["category"],

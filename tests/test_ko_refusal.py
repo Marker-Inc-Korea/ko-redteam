@@ -50,7 +50,7 @@ def test_detect_semantics():
 
 
 def test_multilingual_handles_english():
-    # 결합 detector 는 영어 거부도 인식한다(벤더 스냅샷/설치된 참조 패키지).
+    # 결합 detector 는 영어 거부도 인식한다(벤더 스냅샷/선택 패키지).
     assert R.detect_multilingual("I'm sorry, but I cannot help with that.") == 0.0
     assert R.detect_multilingual(REFUSALS[0]) == 0.0
 

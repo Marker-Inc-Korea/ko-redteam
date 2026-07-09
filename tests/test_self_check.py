@@ -35,6 +35,7 @@ def test_self_check_passes_repo_defaults():
     assert agent["overall"] >= 90.0
     assert agent["raw_fields"] == 0
     assert suite["overall"] >= 90.0
+    assert suite["agent_overall"] >= 90.0
     assert suite["smoke_status"] == "pass"
 
 

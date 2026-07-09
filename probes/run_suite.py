@@ -19,6 +19,8 @@ ROOT = HERE.parent
 sys.path.insert(0, str(ROOT / "analysis"))
 sys.path.insert(0, str(HERE))
 
+from agent_harness import DEFAULT_BENCHMARK as DEFAULT_AGENT_BENCHMARK  # noqa: E402
+from agent_harness import run_agent_harness  # noqa: E402
 from benchmark_scan import run_benchmark  # noqa: E402
 from check_endpoint import (  # noqa: E402
     DEFAULT_PROMPT as DEFAULT_ENDPOINT_SMOKE_PROMPT,
@@ -142,6 +144,14 @@ def _benchmark_summary(report: dict[str, Any] | None) -> dict[str, Any] | None:
     }
 
 
+def _agent_summary(report: dict[str, Any] | None) -> dict[str, Any] | None:
+    summary = _benchmark_summary(report)
+    if summary is None:
+        return None
+    summary["gateway_summary"] = report.get("gateway_summary", {})
+    return summary
+
+
 def _endpoint_smoke_summary(smoke: dict[str, Any] | None) -> dict[str, Any] | None:
     if smoke is None:
         return None
@@ -193,6 +203,8 @@ def _new_manifest(
     doctor_warnings_fail: bool,
     doctor_allow_raw: bool,
     gate_enabled: bool,
+    agent_harness_enabled: bool,
+    agent_benchmark_path: Path,
     min_overall: float,
     min_domains: dict[str, float],
     max_rates: dict[str, float],
@@ -246,6 +258,10 @@ def _new_manifest(
                 "max_findings": max_findings,
                 "max_critical_high": max_critical_high,
             },
+            "agent_harness": {
+                "enabled": agent_harness_enabled,
+                "benchmark": str(agent_benchmark_path),
+            },
         },
         "steps": [],
         "artifacts": {},
@@ -284,6 +300,7 @@ def render_suite_markdown(manifest: dict[str, Any]) -> str:
     endpoint_smoke = summaries.get("endpoint_smoke") or {}
     doctor = summaries.get("doctor") or {}
     gate = summaries.get("gate") or {}
+    agent = summaries.get("agent_harness") or {}
 
     lines = [
         "# Korean LLM Redteam Suite",
@@ -301,6 +318,7 @@ def render_suite_markdown(manifest: dict[str, Any]) -> str:
         f"- Endpoint smoke: **{(config.get('endpoint_smoke') or {}).get('enabled', False)}**",
         f"- Doctor: **{(config.get('doctor') or {}).get('enabled', False)}**",
         f"- Gate: **{(config.get('gate') or {}).get('enabled', False)}**",
+        f"- Agent harness: **{(config.get('agent_harness') or {}).get('enabled', False)}**",
     ]
 
     step_rows = [["Step", "Status", "Detail"]]
@@ -371,6 +389,28 @@ def render_suite_markdown(manifest: dict[str, Any]) -> str:
             rows = [["Endpoint Error Category", "Count"], *[[k, v] for k, v in error_categories.items()]]
             lines += ["", "### Endpoint Errors", "", _table(rows)]
 
+    if agent:
+        lines += [
+            "",
+            "## Agent Harness",
+            "",
+            f"- Report: **{agent.get('benchmark', '-')}**",
+            f"- Overall: **{_fmt(agent.get('overall'))}**",
+            f"- Grade: **{agent.get('grade', '-')}**",
+            f"- Findings: **{agent.get('finding_count', 0)}**",
+        ]
+        gateway = agent.get("gateway_summary") or {}
+        if gateway:
+            rows = [
+                ["Metric", "Value"],
+                ["cases", gateway.get("cases", 0)],
+                ["attempted_tool_calls", gateway.get("attempted_tool_calls", 0)],
+                ["blocked_tool_calls", gateway.get("blocked_tool_calls", 0)],
+                ["executed_tool_calls", gateway.get("executed_tool_calls", 0)],
+                ["blocked_cases", gateway.get("blocked_cases", 0)],
+            ]
+            lines += ["", "### Tool Gateway", "", _table(rows)]
+
     if doctor:
         lines += [
             "",
@@ -419,6 +459,8 @@ def run_suite(
     framing_per_family: bool = True,
     target_expected: set[str] | None = None,
     gate_enabled: bool = False,
+    agent_harness_enabled: bool = False,
+    agent_benchmark_path: str | Path = DEFAULT_AGENT_BENCHMARK,
     coverage_enabled: bool = False,
     coverage_min_total: int = 1,
     coverage_required_domains: list[str] | None = None,
@@ -443,10 +485,12 @@ def run_suite(
     max_findings: int | None = None,
     max_critical_high: int | None = None,
     call_fn: Callable[[dict[str, Any]], dict[str, Any]] | None = None,
+    agent_call_fn: Callable[[dict[str, Any], list[dict[str, str]], list[dict[str, Any]]], dict[str, Any]] | None = None,
     endpoint_smoke_call_fn: Callable[[str], dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """benchmark suite를 실행하고 manifest를 반환한다."""
     benchmark_path = Path(benchmark_path)
+    agent_benchmark_path = Path(agent_benchmark_path)
     out_dir = Path(out_dir) if out_dir is not None else Path.cwd() / f"suite_{benchmark_path.stem}"
     out_dir.mkdir(parents=True, exist_ok=True)
     min_domains = min_domains or {}
@@ -490,6 +534,8 @@ def run_suite(
         doctor_warnings_fail=doctor_warnings_fail,
         doctor_allow_raw=doctor_allow_raw,
         gate_enabled=gate_enabled,
+        agent_harness_enabled=agent_harness_enabled,
+        agent_benchmark_path=agent_benchmark_path,
         min_overall=min_overall,
         min_domains=min_domains,
         max_rates=max_rates,
@@ -625,12 +671,43 @@ def run_suite(
     manifest["summaries"]["benchmark"] = _benchmark_summary(report)
     _add_step(manifest, "benchmark_scan", "pass", path=str(report_json))
 
+    agent_report_json: Path | None = None
+    agent_report_md: Path | None = None
+    if agent_harness_enabled:
+        agent_report_json = out_dir / "agent_harness_report.json"
+        agent_report_md = out_dir / "agent_harness_report.md"
+        try:
+            agent_report = run_agent_harness(
+                endpoint,
+                model,
+                benchmark_path=agent_benchmark_path,
+                include_raw=include_raw,
+                timeout=timeout,
+                max_tokens=max_tokens,
+                call_fn=agent_call_fn,
+            )
+        except Exception as e:  # noqa: BLE001
+            _add_step(manifest, "agent_harness", "fail", error=f"{type(e).__name__}: {e}")
+            return _finalize(manifest, status="fail", manifest_path=manifest_path, suite_md_path=suite_md_path)
+        _write_json(agent_report_json, agent_report)
+        _write_text(agent_report_md, render_markdown(agent_report))
+        manifest["artifacts"]["agent_benchmark"] = str(agent_benchmark_path)
+        manifest["artifacts"]["agent_harness_report_json"] = str(agent_report_json)
+        manifest["artifacts"]["agent_harness_report_md"] = str(agent_report_md)
+        manifest["summaries"]["agent_harness"] = _agent_summary(agent_report)
+        _add_step(manifest, "agent_harness", "pass", path=str(agent_report_json))
+    else:
+        _add_step(manifest, "agent_harness", "skipped")
+
     suite_status = "pass"
     if doctor_enabled:
         doctor_json = out_dir / "report_doctor.json"
         doctor_md = out_dir / "report_doctor.md"
+        doctor_paths: list[Path] = [report_json, report_md]
+        if agent_report_json is not None and agent_report_md is not None:
+            doctor_paths.extend([agent_report_json, agent_report_md])
         doctor = doctor_reports(
-            [report_json, report_md],
+            doctor_paths,
             allow_raw=doctor_allow_raw,
             warnings_fail=doctor_warnings_fail,
         )
@@ -655,8 +732,11 @@ def run_suite(
     if gate_enabled:
         gate_json = out_dir / "gate_report.json"
         gate_md = out_dir / "gate_report.md"
+        gate_paths: list[Path] = [report_json]
+        if agent_report_json is not None:
+            gate_paths.append(agent_report_json)
         gate = evaluate_reports(
-            [report_json],
+            gate_paths,
             min_overall=min_overall,
             min_domains=min_domains,
             max_rates=max_rates,
@@ -728,6 +808,9 @@ def main() -> None:
     ap.add_argument("--doctor-allow-raw", action="store_true",
                     help="doctor에서 raw prompt/response 필드를 허용. 로컬 디버깅 report 전용.")
     ap.add_argument("--gate", action="store_true", help="생성 report를 score gate로 판정")
+    ap.add_argument("--agent-harness", action="store_true", help="benchmark scan 이후 agent tool gateway harness 실행")
+    ap.add_argument("--agent-benchmark", default=str(DEFAULT_AGENT_BENCHMARK),
+                    help="agent harness benchmark path")
     ap.add_argument("--min-overall", type=float, default=70.0)
     ap.add_argument("--min-domain", action="append", default=[],
                     help="domain threshold, e.g. --min-domain safety=80")
@@ -770,6 +853,8 @@ def main() -> None:
         doctor_warnings_fail=args.doctor_warnings_fail,
         doctor_allow_raw=args.doctor_allow_raw,
         gate_enabled=args.gate,
+        agent_harness_enabled=args.agent_harness,
+        agent_benchmark_path=args.agent_benchmark,
         min_overall=args.min_overall,
         min_domains=parse_score_thresholds(args.min_domain),
         max_rates=parse_score_thresholds(args.max_rate),
