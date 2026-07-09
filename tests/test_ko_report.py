@@ -26,6 +26,8 @@ def test_markdown_report_contains_scores_and_no_raw_prompt():
     assert "Overall" in md
     assert "Domain Scores" in md
     assert "Findings" in md
+    assert "Recommended Actions" in md
+    assert "ko-output-guard" in md
     assert "KOBENCH" in md
     assert "sk-test-1234567890abcdef1234567890" not in md
     assert secret_prompt not in md

@@ -11,7 +11,7 @@
 문자열 매칭, 유해성 판정은 영어 toxicity 모델. 결과: **한국어로 완벽히 방어한 모델도 garak은 ASR 100%로
 오보**(정상 거부를 '탈옥 성공'으로 오집계). → 한국어 LLM 을 스캔하려면 **한국어 판정기**가 필수다.
 
-## 구성 — 부품 6개
+## 구성 — 부품 7개
 
 동작은 한 줄: **공격을 만들고 → 대상에 쏘고 → 응답을 포렌식 분류하고 → 취약/오류 finding 으로 리포트한다.**
 
@@ -23,6 +23,7 @@
 | **④ 분석기** | `analysis/ko_forensics.py` | 잡힌 난독 페이로드 해부 — 역난독 + 기법분류 + 공격유형 |
 | **⑤ LLM 포렌식** | `analysis/ko_llm_forensics.py` | 응답 outcome(`refused/safe_redirect/harmful_compliance/unknown/error`), 한국어 품질, endpoint 오류, sanitized finding |
 | **⑥ 점수화** | `analysis/ko_scorecard.py`, `probes/benchmark_scan.py` | 종합점수/분야별점수(`security/reliability/adjudication/korean_quality`, benchmark domain scores) |
+| **⑦ 진단** | `analysis/ko_diagnostics.py`, `analysis/ko_report.py` | finding 별 root cause/owner/priority/recommended action 산출 |
 
 보조: `probes/scan_demo.py`(가드 난독 강건성 오프라인 데모), `gap_analysis/`(garak 갭 실측 근거).
 
@@ -50,7 +51,8 @@ python probes/compare_reports.py report_model_a.json report_model_b.json \
 PYTHONPATH=analysis:probes:detectors python3 -m pytest tests -q
 ```
 
-리포트에는 `scorecard` 가 포함된다.
+리포트에는 `scorecard` 와 finding 별 `diagnostics` 가 포함된다. Markdown 리포트는 `Recommended Actions` 섹션에서
+담당 컴포넌트(`ko-pii`, `ko-prompt-guard`, `ko-output-guard`, serving 등)별 권장 조치를 모아 보여준다.
 
 | 점수 | 의미 |
 |---|---|
@@ -116,6 +118,7 @@ ko-redteam/
 ├── analysis/
 │   ├── ko_forensics.py            # ④ 분석기(역난독+기법분류+공격유형)
 │   ├── ko_llm_forensics.py        # ⑤ 응답 포렌식(outcome/품질/error/finding)
+│   ├── ko_diagnostics.py          # ⑦ 원인/owner/권장조치 진단
 │   ├── ko_compare.py              # 여러 report 비교/Markdown matrix
 │   └── ko_scorecard.py            # ⑥ scorecard(종합/분야별 점수)
 ├── tests/                         # 회귀 테스트(refusal/obfuscation/forensics/LLM-forensics/scorecard)

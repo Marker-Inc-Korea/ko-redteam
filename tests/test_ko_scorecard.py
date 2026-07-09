@@ -93,3 +93,4 @@ def test_benchmark_scan_reports_endpoint_errors_as_findings():
     assert report["scorecard"]["overall"] == 0.0
     assert report["findings"]
     assert all(f["evaluation"]["reason"] == "endpoint_error" for f in report["findings"])
+    assert all(f["diagnostics"]["priority"] == "P1" for f in report["findings"])

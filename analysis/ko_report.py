@@ -4,6 +4,8 @@ from __future__ import annotations
 from collections import Counter
 from typing import Any
 
+from ko_diagnostics import diagnose, summarize_diagnostics
+
 
 def _fmt_score(score: Any) -> str:
     if isinstance(score, (int, float)):
@@ -18,6 +20,10 @@ def _table(rows: list[list[Any]]) -> str:
     sep = "| " + " | ".join("---" for _ in rows[0]) + " |"
     body = ["| " + " | ".join(str(x) for x in r) + " |" for r in rows[1:]]
     return "\n".join([header, sep, *body])
+
+
+def _owners(diag: dict[str, Any]) -> str:
+    return ", ".join(diag.get("owners") or ["review"])
 
 
 def _scorecard_section(scorecard: dict[str, Any]) -> str:
@@ -54,12 +60,15 @@ def _findings_section(findings: list[dict[str, Any]], *, limit: int = 12) -> str
         return "\n".join([*lines, "주요 finding 없음."])
     sev_order = {"CRITICAL": 0, "HIGH": 1, "MEDIUM": 2, "LOW": 3, "INFO": 4}
     ranked = sorted(findings, key=lambda f: (sev_order.get(f.get("severity", "LOW"), 9), f.get("id", "")))
-    rows = [["ID", "Severity", "Outcome", "Title", "Evidence"]]
+    rows = [["ID", "Severity", "Priority", "Owners", "Outcome", "Title", "Evidence"]]
     for f in ranked[:limit]:
         evidence = f.get("evidence") or {}
+        diag = f.get("diagnostics") or diagnose(f)
         rows.append([
             f.get("id", "-"),
             f.get("severity", "-"),
+            diag.get("priority", "-"),
+            _owners(diag),
             f.get("outcome", "-"),
             f.get("title", "-"),
             evidence.get("sanitized_excerpt", "-"),
@@ -67,6 +76,27 @@ def _findings_section(findings: list[dict[str, Any]], *, limit: int = 12) -> str
     lines.append(_table(rows))
     if len(findings) > limit:
         lines += ["", f"_상위 {limit}개만 표시. 전체 finding: {len(findings)}개._"]
+    return "\n".join(lines)
+
+
+def _recommended_actions_section(findings: list[dict[str, Any]], *, limit: int = 16) -> str:
+    lines = ["## Recommended Actions", ""]
+    if not findings:
+        return "\n".join([*lines, "권장 조치 없음."])
+    actions = summarize_diagnostics(findings)
+    if not actions:
+        return "\n".join([*lines, "권장 조치 없음."])
+    rows = [["Priority", "Owner", "Count", "Recommendation"]]
+    for action in actions[:limit]:
+        rows.append([
+            action.get("top_priority", "-"),
+            action.get("owner", "-"),
+            action.get("count", "-"),
+            action.get("recommendation", "-"),
+        ])
+    lines.append(_table(rows))
+    if len(actions) > limit:
+        lines += ["", f"_상위 {limit}개 action만 표시. 전체 action: {len(actions)}개._"]
     return "\n".join(lines)
 
 
@@ -136,6 +166,7 @@ def render_markdown(report: dict[str, Any], *, finding_limit: int = 12) -> str:
         _metadata_section(report),
         _scorecard_section(scorecard),
         _findings_section(report.get("findings") or [], limit=finding_limit),
+        _recommended_actions_section(report.get("findings") or []),
         _case_score_section(scorecard),
         _quality_section(report),
         "## Privacy",

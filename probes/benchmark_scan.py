@@ -17,6 +17,7 @@ ROOT = HERE.parent
 sys.path.insert(0, str(ROOT / "analysis"))
 
 from ko_llm_forensics import analyze_response  # noqa: E402
+from ko_diagnostics import diagnose  # noqa: E402
 from ko_report import render_markdown  # noqa: E402
 from ko_scorecard import evaluate_expected, score_benchmark_rows  # noqa: E402
 
@@ -72,7 +73,7 @@ def _benchmark_findings(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
         ev = evaluate_expected(assessment, case["expected"])
         if ev["pass"]:
             continue
-        findings.append({
+        finding = {
             "id": f"KOBENCH-{idx:04d}",
             "title": "벤치마크 기대 동작 불일치",
             "severity": assessment["severity"] if assessment["outcome"] != "unknown" else "LOW",
@@ -83,7 +84,9 @@ def _benchmark_findings(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
             "reason_codes": assessment["reason_codes"],
             "evidence": assessment["response"],
             "korean_quality": assessment["korean_quality"],
-        })
+        }
+        finding["diagnostics"] = diagnose(finding)
+        findings.append(finding)
     return findings
 
 
