@@ -55,6 +55,12 @@ python probes/analyze_responses.py --input responses.jsonl --model gemma-4-31B-i
 # benchmark seed 품질/커버리지 검증
 python probes/validate_benchmarks.py --markdown-output benchmark_audit.md
 
+# 외부 CSV/JSON/JSONL benchmark를 ko-redteam benchmark schema로 변환 후 audit
+python probes/import_benchmark.py --input external_cases.csv --output benchmarks/external_cases.local.json \
+  --name external_cases_ko --source-id external-suite --id-field id --prompt-field prompt \
+  --domain-field domain --category-field category --expected-field expected \
+  --audit-markdown-output external_cases_audit.md
+
 # benchmark seed를 한국어 난독/프레이밍 변형 세트로 확장
 python probes/expand_benchmark.py --input benchmarks/ko_llm_paperbench_v1.json \
   --output benchmarks/ko_llm_paperbench_v1_expanded.local.json
@@ -121,6 +127,11 @@ Top 10/OR-Bench/SORRY-Bench의 축을 참고하되, 한국어 prompt는 자체 �
 
 `validate_benchmarks.py` 는 benchmark JSON의 schema, 필수 키, ID 중복, expected 값, secret-like prompt,
 domain/category/source-family 커버리지를 정적 검증한다. audit report에는 raw prompt를 쓰지 않는다.
+
+`import_benchmark.py` 는 외부 CSV/JSON/JSONL을 `ko-redteam.benchmark.v1`로 변환한다. `--id-field`,
+`--prompt-field`, `--domain-field`, `--category-field`, `--expected-field`, `--source-family-field`, `--tags-field`
+로 입력 컬럼을 매핑하고, 생성 직후 audit JSON/Markdown을 같이 만들 수 있다. 변환된 benchmark에는 실행용
+prompt가 포함되지만 audit/manifest에는 raw prompt를 반복 출력하지 않는다.
 
 `expand_benchmark.py` 는 기존 benchmark seed를 원본 plain, 난독, 프레이밍 변형 benchmark로 확장한다. 기본은
 `expected=refuse_or_redirect` 케이스만 변형해 over-refusal/allow 측정을 왜곡하지 않는다.
@@ -195,6 +206,7 @@ ko-redteam/
 │   ├── benchmark_scan.py          # 기대 outcome 기반 benchmark + scorecard
 │   ├── analyze_responses.py       # 저장된 JSONL/JSON 응답 로그 오프라인 포렌식
 │   ├── validate_benchmarks.py     # benchmark seed 품질/커버리지 audit
+│   ├── import_benchmark.py        # 외부 CSV/JSON/JSONL benchmark를 표준 schema로 변환
 │   ├── expand_benchmark.py        # benchmark seed 난독/프레이밍 변형 확장
 │   ├── run_suite.py               # audit/expand/benchmark/markdown/gate 통합 실행기
 │   ├── analyze_repeats.py         # 반복 실행 안정성/flaky case/endpoint error 분석
@@ -214,6 +226,8 @@ ko-redteam/
 │   ├── ko_benchmark_audit.py      # benchmark seed 정적 검증/커버리지
 │   ├── ko_gate.py                 # report scorecard gate 판정/Markdown
 │   ├── ko_regression.py           # baseline 대비 score/finding 회귀 판정
+│   ├── ko_stability.py            # 반복 실행 안정성/flaky case 분석
+│   ├── ko_report_doctor.py        # report 구조/privacy leakage 검증
 │   ├── ko_compare.py              # 여러 report 비교/Markdown matrix
 │   └── ko_scorecard.py            # ⑥ scorecard(종합/분야별 점수)
 ├── tests/                         # 회귀 테스트(refusal/obfuscation/forensics/LLM-forensics/scorecard)
