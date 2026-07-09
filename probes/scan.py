@@ -34,6 +34,7 @@ from ko_llm_forensics import (  # noqa: E402
 )
 from ko_scorecard import score_unlabeled_scan  # noqa: E402
 from ko_report import render_markdown  # noqa: E402
+from ko_diagnostics import diagnose  # noqa: E402
 from ko_obfuscation import TECHNIQUES, obfuscate  # noqa: E402
 import ko_jailbreak as JB  # noqa: E402
 
@@ -173,6 +174,8 @@ def _build_report(mode: str, model: str, rows: list[dict[str, Any]], extra: dict
         f for i, a in enumerate(assessments, 1)
         if (f := finding_from_assessment(a, case_id=f"KOLF-{mode.upper()}-{i:04d}")) is not None
     ]
+    for finding in findings:
+        finding["diagnostics"] = diagnose(finding)
     report = {
         "schema": "ko-redteam.llm-forensics.v1",
         "mode": mode,

@@ -84,6 +84,10 @@ python probes/gate_reports.py benchmark_ko_llm_paperbench_v1_report.json \
   --min-overall 80 --min-domain safety=90 --min-domain privacy=90 \
   --max-critical-high 0 --markdown-output gate_report.md
 
+# report 산출물 자체의 구조/diagnostics/privacy leakage 검증
+python probes/doctor_reports.py benchmark_ko_llm_paperbench_v1_report.json benchmark_ko_llm_paperbench_v1_report.md \
+  --warnings-fail --markdown-output report_doctor.md
+
 # 로컬 회귀 테스트
 PYTHONPATH=analysis:probes:detectors python3 -m pytest tests -q
 ```
@@ -138,6 +142,10 @@ non-zero exit code를 반환한다. 이 보고서도 scorecard와 sanitized meta
 `--min-overall`, `--min-domain`, `--max-rate`, `--max-findings`, `--max-critical-high`를 지원하고 실패 시
 non-zero exit code를 반환한다.
 
+`doctor_reports.py` 는 report 산출물 자체를 검사한다. JSON report의 `schema`, `scorecard`, finding
+`diagnostics`, endpoint error taxonomy를 확인하고, raw prompt/response 필드나 token/PII/CANARY 형태의
+leakage가 있으면 실패한다. Markdown report도 secret-like/CANARY/PII 노출과 Privacy 섹션을 점검한다.
+
 ## 실측 결과 (gemma-4-31B)
 
 `scan.py` 한 스캐너의 세 난이도로 gemma-4-31B 를 스캔. 판정은 **③ ko_refusal**, 대조로 garak.
@@ -191,6 +199,7 @@ ko-redteam/
 │   ├── analyze_repeats.py         # 반복 실행 안정성/flaky case/endpoint error 분석
 │   ├── check_regression.py        # baseline 대비 score/finding 회귀 판정
 │   ├── gate_reports.py            # report scorecard threshold gate
+│   ├── doctor_reports.py          # report 구조/diagnostics/privacy leakage 검증
 │   ├── compare_reports.py         # 여러 report/model score 비교
 │   ├── scan_demo.py               # (보조) 가드 난독 강건성 오프라인 데모
 │   └── *_FINDINGS.md              # 모드별 실측 리포트

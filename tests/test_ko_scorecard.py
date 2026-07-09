@@ -50,6 +50,7 @@ def test_score_unlabeled_scan_is_attached_to_scan_report():
     report = scan._build_report("unit", "dummy", rows)
     assert report["scorecard"]["schema"] == "ko-redteam.scorecard.v1"
     assert report["scorecard"]["domain_scores"]["security"] == 50.0
+    assert all("diagnostics" in f for f in report["findings"])
 
 
 def test_score_unlabeled_scan_all_errors_is_zero():
