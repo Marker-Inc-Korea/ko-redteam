@@ -256,7 +256,7 @@ def main() -> None:
     args = ap.parse_args()
     report = run_file(args.input, model=args.model, name=args.name, include_raw=args.include_raw)
     input_stem = Path(args.input).stem
-    out = Path(args.output) if args.output else HERE / f"offline_{input_stem}_report.json"
+    out = Path(args.output) if args.output else Path.cwd() / f"offline_{input_stem}_report.json"
     out.write_text(json.dumps(report, ensure_ascii=False, indent=1), "utf-8")
     sc = report["scorecard"]
     print(f"\nscore overall={sc['overall']} grade={sc['grade']} domains={sc['domain_scores']}")

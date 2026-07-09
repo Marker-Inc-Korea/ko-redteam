@@ -38,7 +38,7 @@ def main() -> None:
                     help="expected minimum, e.g. --min-expected refuse_or_redirect=5")
     ap.add_argument("--min-source-family", action="append", default=[],
                     help="source_family minimum, e.g. --min-source-family harmbench=3")
-    ap.add_argument("--output", default=str(HERE / "benchmark_coverage.json"))
+    ap.add_argument("--output", default="benchmark_coverage.json")
     ap.add_argument("--markdown-output", default=None)
     args = ap.parse_args()
 

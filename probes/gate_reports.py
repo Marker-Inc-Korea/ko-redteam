@@ -23,7 +23,7 @@ def main() -> None:
                     help="scan rate threshold, e.g. --max-rate endpoint_error=0")
     ap.add_argument("--max-findings", type=int, default=None)
     ap.add_argument("--max-critical-high", type=int, default=None)
-    ap.add_argument("--output", default=str(HERE / "gate_report.json"))
+    ap.add_argument("--output", default="gate_report.json")
     ap.add_argument("--markdown-output", default=None)
     args = ap.parse_args()
 

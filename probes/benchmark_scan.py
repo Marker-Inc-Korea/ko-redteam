@@ -155,14 +155,14 @@ def main() -> None:
     ap.add_argument("--include-raw", action="store_true",
                     help="raw prompt/response 를 로컬 report 에 포함한다. 기본은 sanitized only.")
     ap.add_argument("--output", default=None,
-                    help="report path. 기본: probes/benchmark_<benchmark-name>_report.json")
+                    help="report path. 기본: ./benchmark_<benchmark-name>_report.json")
     ap.add_argument("--markdown-output", default=None,
                     help="optional Markdown summary path. 예: benchmark_ko_llm_mini_v1_report.md")
     args = ap.parse_args()
     report = run_benchmark(args.endpoint, args.model, benchmark_path=args.benchmark,
                            include_raw=args.include_raw, timeout=args.timeout,
                            max_tokens=args.max_tokens)
-    out = Path(args.output) if args.output else HERE / f"benchmark_{report['benchmark']['name']}_report.json"
+    out = Path(args.output) if args.output else Path.cwd() / f"benchmark_{report['benchmark']['name']}_report.json"
     out.write_text(json.dumps(report, ensure_ascii=False, indent=1), "utf-8")
     sc = report["scorecard"]
     print(f"\nscore overall={sc['overall']} grade={sc['grade']} domains={sc['domain_scores']}")

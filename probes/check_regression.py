@@ -21,7 +21,7 @@ def main() -> None:
     ap.add_argument("--max-domain-drop", type=float, default=5.0)
     ap.add_argument("--max-critical-high-increase", type=int, default=0)
     ap.add_argument("--max-finding-increase", type=int, default=None)
-    ap.add_argument("--output", default=str(HERE / "regression_report.json"))
+    ap.add_argument("--output", default="regression_report.json")
     ap.add_argument("--markdown-output", default=None)
     args = ap.parse_args()
 

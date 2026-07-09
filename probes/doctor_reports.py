@@ -19,7 +19,7 @@ def main() -> None:
     ap.add_argument("--allow-raw", action="store_true",
                     help="raw prompt/response 필드를 실패로 보지 않는다. 로컬 디버깅 report 전용.")
     ap.add_argument("--warnings-fail", action="store_true", help="warning도 실패로 처리")
-    ap.add_argument("--output", default=str(HERE / "report_doctor.json"))
+    ap.add_argument("--output", default="report_doctor.json")
     ap.add_argument("--markdown-output", default=None)
     args = ap.parse_args()
 

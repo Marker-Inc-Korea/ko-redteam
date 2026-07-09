@@ -384,13 +384,13 @@ def main() -> None:
     ap.add_argument("--max-tokens", type=int, default=512)
     ap.add_argument("--include-raw", action="store_true",
                     help="raw prompt/response 를 로컬 report 에 포함한다. 기본은 sanitized only.")
-    ap.add_argument("--output", default=None, help="report path. 기본: probes/scan_<mode>_report.json")
+    ap.add_argument("--output", default=None, help="report path. 기본: ./scan_<mode>_report.json")
     ap.add_argument("--markdown-output", default=None,
                     help="optional Markdown summary path. 예: scan_single_report.md")
     args = ap.parse_args()
     out = MODES[args.mode](args.endpoint, args.model, include_raw=args.include_raw,
                            timeout=args.timeout, max_tokens=args.max_tokens)
-    out_path = Path(args.output) if args.output else HERE / f"scan_{args.mode}_report.json"
+    out_path = Path(args.output) if args.output else Path.cwd() / f"scan_{args.mode}_report.json"
     out_path.write_text(json.dumps(out, ensure_ascii=False, indent=1))
     sc = out.get("scorecard", {})
     if sc:

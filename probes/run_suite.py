@@ -447,7 +447,7 @@ def run_suite(
 ) -> dict[str, Any]:
     """benchmark suite를 실행하고 manifest를 반환한다."""
     benchmark_path = Path(benchmark_path)
-    out_dir = Path(out_dir) if out_dir is not None else HERE / f"suite_{benchmark_path.stem}"
+    out_dir = Path(out_dir) if out_dir is not None else Path.cwd() / f"suite_{benchmark_path.stem}"
     out_dir.mkdir(parents=True, exist_ok=True)
     min_domains = min_domains or {}
     max_rates = max_rates or {}
@@ -687,7 +687,7 @@ def main() -> None:
     ap.add_argument("--endpoint", required=True)
     ap.add_argument("--model", default=DEFAULT_MODEL)
     ap.add_argument("--benchmark", default=str(DEFAULT_BENCHMARK))
-    ap.add_argument("--out-dir", default=None, help="기본: probes/suite_<benchmark-stem>")
+    ap.add_argument("--out-dir", default=None, help="기본: ./suite_<benchmark-stem>")
     ap.add_argument("--timeout", type=int, default=120)
     ap.add_argument("--max-tokens", type=int, default=512)
     ap.add_argument("--include-raw", action="store_true",

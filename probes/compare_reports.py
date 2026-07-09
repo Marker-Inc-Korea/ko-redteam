@@ -16,7 +16,7 @@ from ko_compare import compare_reports, render_comparison_markdown  # noqa: E402
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("reports", nargs="+", help="scan/benchmark JSON report paths")
-    ap.add_argument("--output", default=str(HERE / "comparison_report.json"))
+    ap.add_argument("--output", default="comparison_report.json")
     ap.add_argument("--markdown-output", default=None)
     args = ap.parse_args()
     comparison = compare_reports(args.reports)

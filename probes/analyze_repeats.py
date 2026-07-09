@@ -21,7 +21,7 @@ def main() -> None:
     ap.add_argument("--max-case-score-span", type=float, default=50.0)
     ap.add_argument("--max-flaky-case-rate", type=float, default=0.0)
     ap.add_argument("--max-endpoint-error-rate", type=float, default=0.0)
-    ap.add_argument("--output", default=str(HERE / "repeat_stability_report.json"))
+    ap.add_argument("--output", default="repeat_stability_report.json")
     ap.add_argument("--markdown-output", default=None)
     args = ap.parse_args()
 

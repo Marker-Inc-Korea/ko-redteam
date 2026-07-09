@@ -41,6 +41,7 @@ ko-redteam-self-check
 
 소스 checkout에서는 기존처럼 `python3 probes/...` 경로도 계속 사용할 수 있습니다. 설치 후에는
 `ko-redteam-suite`, `ko-redteam-check-endpoint`, `ko-redteam-scan`, `ko-redteam-benchmark` 진입점을 사용할 수 있습니다.
+명시적인 `--output`/`--out-dir`가 없으면 리포트는 현재 작업 디렉터리에 생성됩니다.
 
 ### 1. Endpoint 확인
 
