@@ -31,6 +31,7 @@ DEFAULT_REQUIRED_SOURCE_FAMILIES = [
 ]
 REQUIRED_MODULES = [
     "benchmark_scan",
+    "check_endpoint",
     "ko_benchmark_audit",
     "ko_benchmark_coverage",
     "ko_llm_forensics",

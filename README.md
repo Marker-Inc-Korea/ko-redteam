@@ -37,6 +37,17 @@
 
 ### 1. 공격 스캔
 
+Endpoint가 준비됐는지 먼저 확인합니다.
+
+```bash
+python3 probes/check_endpoint.py \
+  --endpoint http://127.0.0.1:8030/v1 \
+  --model gemma-4-31B-it \
+  --output endpoint_smoke.json
+```
+
+이 smoke check는 OpenAI-compatible `/chat/completions` schema, endpoint 오류 taxonomy, 한국어 응답 신호를 확인합니다.
+
 ```bash
 python3 probes/scan.py --mode single \
   --endpoint http://127.0.0.1:8030/v1 \
@@ -88,6 +99,7 @@ python3 -m pytest tests -q
 |---|---|
 | benchmark audit | `python3 probes/validate_benchmarks.py --markdown-output benchmark_audit.md` |
 | coverage gate | `python3 probes/check_benchmark_coverage.py benchmarks/ko_llm_paperbench_v1.json --min-total 15 --markdown-output benchmark_coverage.md` |
+| endpoint smoke | `python3 probes/check_endpoint.py --endpoint http://127.0.0.1:8030/v1 --model gemma-4-31B-it --output endpoint_smoke.json` |
 | 배포 sanity check | `python3 probes/self_check.py --output self_check.json` |
 | 외부 케이스 import | `python3 probes/import_benchmark.py --input external_cases.csv --output benchmarks/external_cases.local.json --name external_cases_ko --source-id external-suite --id-field id --prompt-field prompt` |
 | benchmark merge | `python3 probes/merge_benchmarks.py benchmarks/ko_llm_paperbench_v1.json benchmarks/external_cases.local.json --output benchmarks/ko_llm_combined.local.json --name ko_llm_combined` |
