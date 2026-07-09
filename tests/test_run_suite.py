@@ -68,8 +68,11 @@ def test_run_suite_writes_sanitized_manifest_and_reports(tmp_path):
     assert manifest["status"] == "pass"
     assert manifest["config"]["endpoint"] == "http://127.0.0.1:9/v1"
     assert manifest["summaries"]["benchmark"]["overall"] >= 70.0
+    assert manifest["summaries"]["doctor"]["status"] == "pass"
     assert (out_dir / "benchmark_report.json").exists()
     assert (out_dir / "benchmark_report.md").exists()
+    assert (out_dir / "report_doctor.json").exists()
+    assert (out_dir / "report_doctor.md").exists()
     assert (out_dir / "suite_manifest.json").exists()
     assert (out_dir / "suite_report.md").exists()
 
@@ -80,6 +83,7 @@ def test_run_suite_writes_sanitized_manifest_and_reports(tmp_path):
     assert "user:pass" not in manifest_text
     assert "token=secret" not in manifest_text
     assert "원문 prompt/response" in suite_md
+    assert "Report Doctor" in suite_md
 
 
 def test_run_suite_expands_benchmark_and_audits_executed_file(tmp_path):
@@ -128,6 +132,47 @@ def test_run_suite_gate_failure_sets_nonzero_status(tmp_path):
     assert manifest["status"] == "fail"
     assert gate["status"] == "fail"
     assert manifest["summaries"]["gate"]["failed"] == 1
+
+
+def test_run_suite_doctor_failure_sets_nonzero_status(tmp_path):
+    bench = tmp_path / "bench.json"
+    out_dir = tmp_path / "suite_doctor_fail"
+    _write_bench(bench)
+
+    manifest = S.run_suite(
+        "http://127.0.0.1:9/v1",
+        "dummy-model",
+        benchmark_path=bench,
+        out_dir=out_dir,
+        include_raw=True,
+        call_fn=_safe_call,
+    )
+
+    doctor = json.loads((out_dir / "report_doctor.json").read_text("utf-8"))
+    assert manifest["status"] == "fail"
+    assert manifest["summaries"]["doctor"]["status"] == "fail"
+    assert doctor["status"] == "fail"
+    assert any(s["name"] == "report_doctor" and s["status"] == "fail" for s in manifest["steps"])
+
+
+def test_run_suite_doctor_can_be_disabled_for_local_raw_debug(tmp_path):
+    bench = tmp_path / "bench.json"
+    out_dir = tmp_path / "suite_no_doctor"
+    _write_bench(bench)
+
+    manifest = S.run_suite(
+        "http://127.0.0.1:9/v1",
+        "dummy-model",
+        benchmark_path=bench,
+        out_dir=out_dir,
+        include_raw=True,
+        doctor_enabled=False,
+        call_fn=_safe_call,
+    )
+
+    assert manifest["status"] == "pass"
+    assert "doctor" not in manifest["summaries"]
+    assert any(s["name"] == "report_doctor" and s["status"] == "skipped" for s in manifest["steps"])
 
 
 def test_run_suite_expansion_error_is_recorded_in_manifest(tmp_path):
@@ -190,6 +235,7 @@ def test_run_suite_cli_writes_outputs_on_endpoint_error_without_gate(tmp_path):
     report = json.loads((out_dir / "benchmark_report.json").read_text("utf-8"))
     assert "suite status=pass" in cp.stdout
     assert manifest["status"] == "pass"
+    assert manifest["summaries"]["doctor"]["status"] == "pass"
     assert report["scorecard"]["overall"] == 0.0
     assert report["scorecard"]["error_categories"]
 

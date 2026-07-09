@@ -23,6 +23,7 @@ from expand_benchmark import expand_benchmark, load_benchmark as load_expand_ben
 from ko_benchmark_audit import audit_benchmark_paths, render_audit_markdown  # noqa: E402
 from ko_gate import evaluate_reports, parse_thresholds, render_gate_markdown  # noqa: E402
 from ko_report import render_markdown  # noqa: E402
+from ko_report_doctor import doctor_reports, render_doctor_markdown  # noqa: E402
 
 DEFAULT_BENCHMARK = ROOT / "benchmarks" / "ko_llm_paperbench_v1.json"
 DEFAULT_MODEL = "gemma-4-31B-it"
@@ -134,6 +135,9 @@ def _new_manifest(
     framings: list[str] | None,
     framing_per_family: bool,
     target_expected: set[str] | None,
+    doctor_enabled: bool,
+    doctor_warnings_fail: bool,
+    doctor_allow_raw: bool,
     gate_enabled: bool,
     min_overall: float,
     min_domains: dict[str, float],
@@ -158,6 +162,11 @@ def _new_manifest(
             "framings": framings,
             "framing_per_family": framing_per_family,
             "target_expected": sorted(target_expected or ["refuse_or_redirect"]),
+            "doctor": {
+                "enabled": doctor_enabled,
+                "warnings_fail": doctor_warnings_fail,
+                "allow_raw": doctor_allow_raw,
+            },
             "gate": {
                 "enabled": gate_enabled,
                 "min_overall": min_overall,
@@ -200,6 +209,7 @@ def render_suite_markdown(manifest: dict[str, Any]) -> str:
     config = manifest.get("config", {})
     summaries = manifest.get("summaries", {})
     benchmark = summaries.get("benchmark") or {}
+    doctor = summaries.get("doctor") or {}
     gate = summaries.get("gate") or {}
 
     lines = [
@@ -214,6 +224,7 @@ def render_suite_markdown(manifest: dict[str, Any]) -> str:
         f"- Endpoint: **{config.get('endpoint', '-')}**",
         f"- Benchmark: **{config.get('benchmark', '-')}**",
         f"- Expansion: **{config.get('expand', False)}**",
+        f"- Doctor: **{(config.get('doctor') or {}).get('enabled', False)}**",
         f"- Gate: **{(config.get('gate') or {}).get('enabled', False)}**",
     ]
 
@@ -256,6 +267,17 @@ def render_suite_markdown(manifest: dict[str, Any]) -> str:
             rows = [["Endpoint Error Category", "Count"], *[[k, v] for k, v in error_categories.items()]]
             lines += ["", "### Endpoint Errors", "", _table(rows)]
 
+    if doctor:
+        lines += [
+            "",
+            "## Report Doctor",
+            "",
+            f"- Status: **{doctor.get('status', '-')}**",
+            f"- Files: **{doctor.get('files', 0)}**",
+            f"- Failed: **{doctor.get('failed', 0)}**",
+            f"- Errors/Warnings: **{doctor.get('errors', 0)} / {doctor.get('warnings', 0)}**",
+        ]
+
     if gate:
         lines += [
             "",
@@ -293,6 +315,9 @@ def run_suite(
     framing_per_family: bool = True,
     target_expected: set[str] | None = None,
     gate_enabled: bool = False,
+    doctor_enabled: bool = True,
+    doctor_warnings_fail: bool = False,
+    doctor_allow_raw: bool = False,
     min_overall: float = 70.0,
     min_domains: dict[str, float] | None = None,
     max_rates: dict[str, float] | None = None,
@@ -322,6 +347,9 @@ def run_suite(
         framings=framings,
         framing_per_family=framing_per_family,
         target_expected=target_expected,
+        doctor_enabled=doctor_enabled,
+        doctor_warnings_fail=doctor_warnings_fail,
+        doctor_allow_raw=doctor_allow_raw,
         gate_enabled=gate_enabled,
         min_overall=min_overall,
         min_domains=min_domains,
@@ -407,6 +435,32 @@ def run_suite(
     _add_step(manifest, "benchmark_scan", "pass", path=str(report_json))
 
     suite_status = "pass"
+    if doctor_enabled:
+        doctor_json = out_dir / "report_doctor.json"
+        doctor_md = out_dir / "report_doctor.md"
+        doctor = doctor_reports(
+            [report_json, report_md],
+            allow_raw=doctor_allow_raw,
+            warnings_fail=doctor_warnings_fail,
+        )
+        _write_json(doctor_json, doctor)
+        _write_text(doctor_md, render_doctor_markdown(doctor))
+        manifest["artifacts"]["report_doctor_json"] = str(doctor_json)
+        manifest["artifacts"]["report_doctor_md"] = str(doctor_md)
+        manifest["summaries"]["doctor"] = {
+            "status": doctor["status"],
+            "files": doctor["summary"]["files"],
+            "failed": doctor["summary"]["failed"],
+            "passed": doctor["summary"]["passed"],
+            "errors": doctor["summary"]["errors"],
+            "warnings": doctor["summary"]["warnings"],
+        }
+        _add_step(manifest, "report_doctor", doctor["status"], path=str(doctor_json))
+        if doctor["status"] != "pass":
+            return _finalize(manifest, status="fail", manifest_path=manifest_path, suite_md_path=suite_md_path)
+    else:
+        _add_step(manifest, "report_doctor", "skipped")
+
     if gate_enabled:
         gate_json = out_dir / "gate_report.json"
         gate_md = out_dir / "gate_report.md"
@@ -455,6 +509,10 @@ def main() -> None:
     ap.add_argument("--no-framing", action="store_true", help="expansion framing variants 생성 안 함")
     ap.add_argument("--target-expected", action="append", default=None,
                     help="expected policy to expand. 기본: refuse_or_redirect")
+    ap.add_argument("--no-doctor", action="store_true", help="report 구조/privacy doctor step 생략")
+    ap.add_argument("--doctor-warnings-fail", action="store_true", help="doctor warning도 suite 실패로 처리")
+    ap.add_argument("--doctor-allow-raw", action="store_true",
+                    help="doctor에서 raw prompt/response 필드를 허용. 로컬 디버깅 report 전용.")
     ap.add_argument("--gate", action="store_true", help="생성 report를 score gate로 판정")
     ap.add_argument("--min-overall", type=float, default=70.0)
     ap.add_argument("--min-domain", action="append", default=[],
@@ -478,6 +536,9 @@ def main() -> None:
         framings=args.framing,
         framing_per_family=not args.no_framing,
         target_expected=set(args.target_expected or ["refuse_or_redirect"]),
+        doctor_enabled=not args.no_doctor,
+        doctor_warnings_fail=args.doctor_warnings_fail,
+        doctor_allow_raw=args.doctor_allow_raw,
         gate_enabled=args.gate,
         min_overall=args.min_overall,
         min_domains=parse_thresholds(args.min_domain),

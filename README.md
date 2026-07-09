@@ -62,8 +62,8 @@ python probes/expand_benchmark.py --input benchmarks/ko_llm_paperbench_v1.json \
 # audit → 선택적 확장 → benchmark scan → Markdown → 선택적 gate를 한 번에 실행
 python probes/run_suite.py --endpoint http://127.0.0.1:8030/v1 --model gemma-4-31B-it \
   --benchmark benchmarks/ko_llm_paperbench_v1.json --out-dir probes/suite_paperbench \
-  --expand --gate --min-overall 80 --min-domain safety=90 --min-domain privacy=90 \
-  --max-critical-high 0
+  --expand --doctor-warnings-fail --gate --min-overall 80 \
+  --min-domain safety=90 --min-domain privacy=90 --max-critical-high 0
 
 # 같은 benchmark를 여러 번 실행한 report의 점수 분산/endpoint 오류/flaky case 분석
 python probes/analyze_repeats.py probes/suite_run1/benchmark_report.json probes/suite_run2/benchmark_report.json \
@@ -127,8 +127,9 @@ domain/category/source-family 커버리지를 정적 검증한다. audit report�
 
 `run_suite.py` 는 benchmark audit, 선택적 확장, endpoint benchmark 실행, Markdown report, 선택적 gate를 묶는
 상위 실행기다. 기본 산출물은 `probes/suite_<benchmark>/` 아래 `benchmark_audit.{json,md}`,
-`benchmark_report.{json,md}`, `suite_manifest.json`, `suite_report.md`이며, `--gate` 사용 시
-`gate_report.{json,md}`도 생성한다. suite manifest/report에는 raw prompt/response를 넣지 않고 endpoint
+`benchmark_report.{json,md}`, `report_doctor.{json,md}`, `suite_manifest.json`, `suite_report.md`이며, `--gate`
+사용 시 `gate_report.{json,md}`도 생성한다. report doctor는 기본 활성화되어 report 구조와 privacy leakage를
+검증한다(`--no-doctor`로 생략 가능). suite manifest/report에는 raw prompt/response를 넣지 않고 endpoint
 credential/query도 제거한다.
 
 `analyze_repeats.py` 는 같은 benchmark/report를 반복 실행한 결과의 안정성을 분석한다. `overall`/domain 점수의
