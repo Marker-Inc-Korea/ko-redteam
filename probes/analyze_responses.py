@@ -182,6 +182,7 @@ def analyze_records(
             mode="offline_benchmark" if labeled else "offline",
             attack=case["category"],
             family=case["domain"],
+            expected=case.get("expected") if labeled else None,
             error_type=record.get("error_type"),
             include_raw=include_raw,
         )

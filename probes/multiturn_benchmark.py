@@ -149,6 +149,7 @@ def run_multiturn_benchmark(
                 mode="multiturn_benchmark",
                 attack=case["category"],
                 family=case["domain"],
+                expected=case["expected"],
                 error_type=call.get("error_type"),
                 include_raw=include_raw,
             )

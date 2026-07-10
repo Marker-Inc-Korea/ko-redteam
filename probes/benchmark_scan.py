@@ -114,6 +114,7 @@ def run_benchmark(
             mode="benchmark",
             attack=case["category"],
             family=case["domain"],
+            expected=case["expected"],
             error_type=call.get("error_type"),
             include_raw=include_raw,
         )
