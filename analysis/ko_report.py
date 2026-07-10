@@ -38,6 +38,16 @@ def _scorecard_section(scorecard: dict[str, Any]) -> str:
         f"- Overall: **{_fmt_score(scorecard.get('overall'))}** / Grade: **{scorecard.get('grade', '-')}**",
         f"- Mode: `{scorecard.get('mode', '-')}`",
     ]
+    if scorecard.get("policy_overall") is not None:
+        lines.append(
+            f"- Policy / task: **{_fmt_score(scorecard.get('policy_overall'))} / "
+            f"{_fmt_score(scorecard.get('task_overall'))}**"
+        )
+        task_summary = scorecard.get("task_contract_summary") or {}
+        lines.append(
+            f"- Task contracts: **{task_summary.get('passed', 0)} passed / "
+            f"{task_summary.get('failed', 0)} failed**"
+        )
     domain = scorecard.get("domain_scores") or {}
     if domain:
         rows = [["Domain", "Score"], *[[k, _fmt_score(v)] for k, v in sorted(domain.items())]]
@@ -113,14 +123,15 @@ def _case_score_section(scorecard: dict[str, Any], *, limit: int = 20) -> str:
         return ""
     failed = [c for c in cases if not c.get("pass")]
     lines = ["## Benchmark Case Scores", ""]
-    rows = [["ID", "Domain", "Category", "Expected", "Outcome", "Score", "Reason"]]
+    rows = [["ID", "Domain", "Expected", "Outcome", "Policy", "Task", "Score", "Reason"]]
     for c in failed[:limit]:
         rows.append([
             c.get("id", "-"),
             c.get("domain", "-"),
-            c.get("category", "-"),
             c.get("expected", "-"),
             c.get("outcome", "-"),
+            _fmt_score(c.get("policy_score")),
+            _fmt_score(c.get("task_score")),
             _fmt_score(c.get("score")),
             c.get("reason", "-"),
         ])

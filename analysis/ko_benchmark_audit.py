@@ -8,6 +8,11 @@ import re
 from pathlib import Path
 from typing import Any
 
+try:
+    from ko_response_contract import response_contract_errors
+except ModuleNotFoundError:  # package import path
+    from .ko_response_contract import response_contract_errors
+
 EXPECTED_VALUES = {"refuse_or_redirect", "allow", "no_leak", "no_tool"}
 SUPPORTED_SCHEMAS = {
     "ko-redteam.benchmark.v1",
@@ -159,6 +164,7 @@ def audit_benchmark_data(data: dict[str, Any], *, path: str | None = None) -> di
     prompt_hashes: dict[str, list[str]] = defaultdict(list)
     ids: Counter[str] = Counter()
     korean_signals: list[dict[str, Any]] = []
+    response_contract_cases = 0
 
     schema = data.get("schema")
     if schema not in SUPPORTED_SCHEMAS:
@@ -185,6 +191,10 @@ def audit_benchmark_data(data: dict[str, Any], *, path: str | None = None) -> di
         expected = case.get("expected")
         if expected not in EXPECTED_VALUES:
             issues.append(_issue("error", "expected", f"unsupported expected value: {expected}", case_id=case_id))
+        if "response_contract" in case:
+            response_contract_cases += 1
+            for message in response_contract_errors(case.get("response_contract")):
+                issues.append(_issue("error", "response_contract", message, case_id=case_id))
         text_units = _case_texts(str(schema), case, case_id, issues)
         fingerprint_text = "\n---\n".join(text_units)
         for text in text_units:
@@ -232,6 +242,7 @@ def audit_benchmark_data(data: dict[str, Any], *, path: str | None = None) -> di
         "categories": dict(sorted(category_counts.items())),
         "expected": dict(sorted(expected_counts.items())),
         "source_families": dict(sorted(source_family_counts.items())),
+        "response_contract_cases": response_contract_cases,
         "korean_signals": _summarize_korean_signals(korean_signals),
         "issues": issues,
         "errors": errors,
@@ -253,6 +264,7 @@ def audit_benchmark_file(path: str | Path) -> dict[str, Any]:
             "categories": {},
             "expected": {},
             "source_families": {},
+            "response_contract_cases": 0,
             "korean_signals": _empty_korean_signals(),
             "issues": [_issue("error", "json", f"failed to read JSON: {type(e).__name__}")],
             "errors": 1,
@@ -268,6 +280,7 @@ def audit_benchmark_file(path: str | Path) -> dict[str, Any]:
             "categories": {},
             "expected": {},
             "source_families": {},
+            "response_contract_cases": 0,
             "korean_signals": _empty_korean_signals(),
             "issues": [_issue("error", "json_type", "benchmark JSON root must be an object")],
             "errors": 1,
@@ -316,6 +329,7 @@ def audit_benchmark_paths(paths: list[str | Path]) -> dict[str, Any]:
             "domains": dict(sorted(domain_counts.items())),
             "expected": dict(sorted(expected_counts.items())),
             "source_families": dict(sorted(source_counts.items())),
+            "response_contract_cases": sum(int(item.get("response_contract_cases") or 0) for item in files),
             "korean_signals": {
                 "prompt_cases": prompt_cases,
                 "low_signal_cases": low_signal_cases,
@@ -340,6 +354,7 @@ def render_audit_markdown(audit: dict[str, Any]) -> str:
         f"- Cases: **{summary['cases']}**",
         f"- Status: **{summary['status']}**",
         f"- Errors: **{summary['errors']}** / Warnings: **{summary['warnings']}**",
+        f"- Response contracts: **{summary.get('response_contract_cases', 0)}**",
     ]
     if summary["domains"]:
         rows = [["Domain", "Cases"], *[[k, v] for k, v in summary["domains"].items()]]

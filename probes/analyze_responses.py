@@ -19,6 +19,7 @@ sys.path.insert(0, str(ROOT / "analysis"))
 from ko_diagnostics import diagnose  # noqa: E402
 from ko_llm_forensics import analyze_response, finding_from_assessment, summarize_assessments  # noqa: E402
 from ko_report import render_markdown  # noqa: E402
+from ko_response_contract import response_contract_errors  # noqa: E402
 from ko_scorecard import evaluate_expected, score_benchmark_rows, score_unlabeled_scan  # noqa: E402
 
 EXPECTED_VALUES = {"refuse_or_redirect", "allow", "no_leak", "no_tool"}
@@ -105,6 +106,8 @@ def _case_public(record: dict[str, Any], idx: int, *, labeled: bool) -> dict[str
     }
     if labeled:
         case["expected"] = record.get("expected")
+        if "response_contract" in record:
+            case["response_contract"] = record["response_contract"]
     for key in ("source", "source_family", "tags"):
         if key in record:
             case[key] = record[key]
@@ -120,6 +123,10 @@ def _validate_expected(records: list[dict[str, Any]]) -> bool:
     invalid = sorted({str(r.get("expected")) for r in records if r.get("expected") not in EXPECTED_VALUES})
     if invalid:
         raise ValueError(f"unsupported expected values: {invalid}")
+    for record in records:
+        errors = response_contract_errors(record.get("response_contract"))
+        if errors:
+            raise ValueError(f"invalid response_contract for {_record_id(record, 0)}: {'; '.join(errors)}")
     return True
 
 
@@ -142,6 +149,7 @@ def _labeled_findings(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
             "reason_codes": assessment["reason_codes"],
             "evidence": assessment["response"],
             "korean_quality": assessment["korean_quality"],
+            "response_contract": assessment.get("response_contract"),
             "error": assessment.get("error"),
         }
         finding["diagnostics"] = diagnose(finding)
@@ -183,6 +191,7 @@ def analyze_records(
             attack=case["category"],
             family=case["domain"],
             expected=case.get("expected") if labeled else None,
+            response_contract=case.get("response_contract") if labeled else None,
             error_type=record.get("error_type"),
             include_raw=include_raw,
         )

@@ -57,6 +57,7 @@ ko-redteam-suite \
   --model gemma-4-31B-it \
   --benchmark benchmarks/ko_llm_paperbench_v1.json \
   --out-dir probes/suite_paperbench \
+  --expand \
   --endpoint-smoke \
   --coverage --coverage-min-total 15 \
   --coverage-required-source-family agentdojo \
@@ -229,6 +230,9 @@ ko-redteam-doctor-reports \
 | 지표 | 의미 |
 |---|---|
 | `overall` / `grade` | 종합 점수와 A-F 등급 |
+| `policy_overall` | 유해 순응, 정보 노출, 무단 도구 호출, 과잉거부 기준의 정책 충족도 |
+| `task_overall` | 정상 요청과 안전한 요약에서 핵심 내용·형식을 지킨 정도 |
+| `task_contract_summary` | 내용 충실도 계약의 통과/실패 수와 통과율 |
 | `domain_scores` | `safety`, `privacy`, `prompt_security`, `agent_rag`, `overrefusal`, `korean_quality`별 충족률 |
 | `source_family_scores` | 참고 문헌/기준 축별 충족률 |
 | `outcome_counts` | `harmful_compliance`, `safe_redirect`, `unknown`, `error` 등 결과 분포 |
@@ -250,6 +254,11 @@ ko-redteam-doctor-reports \
 `benchmarks/ko_llm_paperbench_v1.json`은 공개 논문과 가이드의 평가 축만 참고한 한국어 자체 seed입니다.
 원본 prompt, 외부 도구 결과, 순위표를 가져오지 않습니다.
 
+정상 응답과 안전한 요약 문항은 선택적 `response_contract`로 핵심 개념, 최소 길이, 목록 수,
+문장 수와 존댓말 같은 형식을 함께 검사합니다. 계약은 정답 문장 전체를 고정하지 않으며, 판정 결과에는
+원문 대신 충족한 개념 그룹 수와 실패한 검사 이름만 남깁니다. 따라서 단순 무응답이나 무관한 답변을
+보안 통과로만 처리하지 않고 정책 준수와 과업 충실도를 분리해 볼 수 있습니다.
+
 설계 근거는 [`benchmarks/PAPER_TAXONOMY.md`](./benchmarks/PAPER_TAXONOMY.md)와
 [`benchmarks/LLM_VULNERABILITY_REVIEW.md`](./benchmarks/LLM_VULNERABILITY_REVIEW.md)에 둡니다.
 영어 중심 판정 규칙의 한국어 전이 한계는 특정 제품 비교가 아니라, 한국어 평가 기준을 분리해야 하는
@@ -267,6 +276,7 @@ ko-redteam-doctor-reports \
 | 공격 생성 | `probes/ko_obfuscation.py`, `probes/ko_jailbreak.py` |
 | 한국어 판정 | `detectors/ko_refusal.py` |
 | 응답 포렌식 | `analysis/ko_llm_forensics.py` |
+| 과업 충실도 | `analysis/ko_response_contract.py` |
 | 진단/리포트 | `analysis/ko_diagnostics.py`, `analysis/ko_report.py` |
 | 점수화 | `analysis/ko_scorecard.py` |
 | 품질 게이트 | `analysis/ko_benchmark_audit.py`, `analysis/ko_benchmark_coverage.py`, `analysis/ko_report_doctor.py` |

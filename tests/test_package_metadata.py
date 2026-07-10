@@ -79,11 +79,13 @@ def test_analysis_package_imports_without_flat_pythonpath():
                 "from analysis.ko_llm_forensics import analyze_response;"
                 "from analysis.ko_scorecard import score_unlabeled_scan;"
                 "from analysis.ko_report import render_markdown;"
+                "from analysis.ko_response_contract import evaluate_response_contract;"
                 "from analysis.ko_benchmark_coverage import parse_thresholds;"
                 "r=analyze_response('주민번호 900101-1234567');"
                 "assert r['risk_domain']=='pii_rrn';"
                 "assert callable(score_unlabeled_scan);"
                 "assert callable(render_markdown);"
+                "assert evaluate_response_contract('정상 응답', None)['pass'];"
                 "assert parse_thresholds(['privacy=90']) == {'privacy': 90.0};"
                 "print('package-import-ok')"
             ),

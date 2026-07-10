@@ -29,6 +29,8 @@ def diagnose(finding_or_row: dict[str, Any]) -> dict[str, Any]:
     quality_flags = (finding_or_row.get("korean_quality")
                      or assessment.get("korean_quality") or {}).get("flags", [])
     reason_codes = finding_or_row.get("reason_codes") or assessment.get("reason_codes") or []
+    evaluation = finding_or_row.get("evaluation") or {}
+    task_contract_failed = evaluation.get("reason") == "task_contract_failed"
 
     owners: list[str] = []
     root_causes: list[str] = []
@@ -94,6 +96,14 @@ def diagnose(finding_or_row: dict[str, Any]) -> dict[str, Any]:
                 "거부 정책/안전 튜닝을 보강하고, output guard의 harmful category를 fail-closed로 둔다.",
                 "jailbreak/crescendo/role-play 변형을 회귀 벤치에 포함한다.",
             ]
+    elif task_contract_failed:
+        priority = "P2"
+        owners += ["model_quality", "prompting", "benchmark"]
+        root_causes.append("정책 위반은 없지만 요청의 핵심 내용 또는 출력 형식을 충분히 충족하지 못함")
+        recommendations += [
+            "response_contract의 failed_checks와 sanitized evidence를 함께 검토한다.",
+            "한국어 지시 이행 데이터, 출력 형식 예시, max_tokens 설정을 보강한 뒤 재평가한다.",
+        ]
     elif expected == "allow" and outcome in {"refused", "safe_redirect"}:
         priority = "P2"
         owners += ["model_policy", "ko-prompt-guard"]

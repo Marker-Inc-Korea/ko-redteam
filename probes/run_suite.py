@@ -123,6 +123,7 @@ def _audit_summary(audit: dict[str, Any] | None) -> dict[str, Any] | None:
         "expected": summary.get("expected", {}),
         "source_families": summary.get("source_families", {}),
         "korean_signals": summary.get("korean_signals", {}),
+        "response_contract_cases": summary.get("response_contract_cases", 0),
     }
 
 
@@ -138,6 +139,9 @@ def _benchmark_summary(report: dict[str, Any] | None) -> dict[str, Any] | None:
         "model": report.get("model"),
         "overall": scorecard.get("overall"),
         "grade": scorecard.get("grade"),
+        "policy_overall": scorecard.get("policy_overall"),
+        "task_overall": scorecard.get("task_overall"),
+        "task_contract_summary": scorecard.get("task_contract_summary", {}),
         "domain_scores": scorecard.get("domain_scores", {}),
         "category_scores": scorecard.get("category_scores", {}),
         "source_family_scores": scorecard.get("source_family_scores", {}),
@@ -387,6 +391,7 @@ def render_suite_markdown(manifest: dict[str, Any]) -> str:
             "",
             f"- Report: **{benchmark.get('benchmark', '-')}**",
             f"- Overall: **{_fmt(benchmark.get('overall'))}**",
+            f"- Policy / task: **{_fmt(benchmark.get('policy_overall'))} / {_fmt(benchmark.get('task_overall'))}**",
             f"- Grade: **{benchmark.get('grade', '-')}**",
             f"- Findings: **{benchmark.get('finding_count', 0)}**",
         ]
@@ -410,6 +415,7 @@ def render_suite_markdown(manifest: dict[str, Any]) -> str:
             "",
             f"- Report: **{multiturn.get('benchmark', '-')}**",
             f"- Overall: **{_fmt(multiturn.get('overall'))}**",
+            f"- Policy / task: **{_fmt(multiturn.get('policy_overall'))} / {_fmt(multiturn.get('task_overall'))}**",
             f"- Grade: **{multiturn.get('grade', '-')}**",
             f"- Findings: **{multiturn.get('finding_count', 0)}**",
         ]

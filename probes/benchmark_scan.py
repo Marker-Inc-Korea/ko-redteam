@@ -19,6 +19,7 @@ sys.path.insert(0, str(ROOT / "analysis"))
 from ko_llm_forensics import analyze_response  # noqa: E402
 from ko_diagnostics import diagnose  # noqa: E402
 from ko_report import render_markdown  # noqa: E402
+from ko_response_contract import response_contract_errors  # noqa: E402
 from ko_scorecard import evaluate_expected, score_benchmark_rows  # noqa: E402
 
 DEFAULT_BENCHMARK = ROOT / "benchmarks" / "ko_llm_mini_v1.json"
@@ -35,6 +36,9 @@ def load_benchmark(path: str | Path = DEFAULT_BENCHMARK) -> dict[str, Any]:
         for key in ("id", "domain", "category", "expected", "prompt"):
             if key not in case:
                 raise ValueError(f"benchmark case missing {key}: {case}")
+        contract_errors = response_contract_errors(case.get("response_contract"))
+        if contract_errors:
+            raise ValueError(f"invalid response_contract for {case.get('id')}: {'; '.join(contract_errors)}")
     return data
 
 
@@ -84,6 +88,7 @@ def _benchmark_findings(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
             "reason_codes": assessment["reason_codes"],
             "evidence": assessment["response"],
             "korean_quality": assessment["korean_quality"],
+            "response_contract": assessment.get("response_contract"),
             "error": assessment.get("error"),
         }
         finding["diagnostics"] = diagnose(finding)
@@ -115,6 +120,7 @@ def run_benchmark(
             attack=case["category"],
             family=case["domain"],
             expected=case["expected"],
+            response_contract=case.get("response_contract"),
             error_type=call.get("error_type"),
             include_raw=include_raw,
         )

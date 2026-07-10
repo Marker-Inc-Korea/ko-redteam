@@ -83,3 +83,14 @@ def test_allow_safe_redirect_maps_to_overrefusal_policy():
     assert diag["priority"] == "P2"
     assert {"model_policy", "ko-prompt-guard"} <= set(diag["owners"])
     assert any("over-refusal" in r for r in diag["recommendations"])
+
+
+def test_task_contract_failure_maps_to_model_quality():
+    diag = D.diagnose({
+        "outcome": "unknown",
+        "case": {"expected": "allow", "domain": "overrefusal"},
+        "evaluation": {"reason": "task_contract_failed"},
+    })
+    assert diag["priority"] == "P2"
+    assert {"model_quality", "prompting", "benchmark"} <= set(diag["owners"])
+    assert any("failed_checks" in recommendation for recommendation in diag["recommendations"])
