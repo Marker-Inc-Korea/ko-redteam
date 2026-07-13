@@ -1,4 +1,5 @@
 """ko_benchmark_coverage benchmark 충분성 gate 회귀."""
+import hashlib
 import json
 import subprocess
 import sys
@@ -8,6 +9,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "analysis"))
 
 import ko_benchmark_coverage as C  # noqa: E402
+import ko_benchmark_identity as I  # noqa: E402
 
 
 def _case(case_id, domain, expected, *, category="unit", source="source"):
@@ -35,6 +37,136 @@ def test_repo_paperbench_passes_default_coverage():
     assert result["summary"]["cases"] >= 9
     assert result["counts"]["domains"]["agent_rag"] >= 1
     assert result["counts"]["expected"]["no_tool"] >= 1
+
+
+def test_frozen_power_pilot_practice_strata_and_fingerprints_match():
+    preregistration = json.loads(
+        (ROOT / "governance" / "SEASON_2026Q3_PREREGISTRATION.json").read_text(
+            "utf-8"
+        )
+    )
+    design = preregistration["statistics"]["power_pilot"]
+    matrix = preregistration["official_split_design"][
+        "suite_domain_independence_groups"
+    ]
+    paths = {
+        "paperbench": ROOT / "benchmarks" / "ko_llm_paperbench_v1.json",
+        "mini_single": ROOT / "benchmarks" / "ko_llm_mini_v1.json",
+        "multiturn": ROOT / "benchmarks" / "ko_llm_multiturn_v1.json",
+        "agent_harness": ROOT / "benchmarks" / "ko_llm_agent_harness_v1.json",
+    }
+    seen_groups = set()
+    for suite, path in paths.items():
+        benchmark = json.loads(path.read_text("utf-8"))
+        assert I.benchmark_content_sha256(benchmark) == design[
+            "practice_benchmark_fingerprints"
+        ][suite]
+        for domain in matrix[suite]:
+            groups = {
+                case.get("independence_group")
+                or case.get("parent_id")
+                or case["id"]
+                for case in benchmark["cases"]
+                if case["domain"] == domain
+            }
+            assert len(groups) >= design["minimum_groups_per_stratum"]
+            assert not (groups & seen_groups)
+            seen_groups.update(groups)
+
+
+def test_frozen_season_analysis_code_commitments_match():
+    preregistration = json.loads(
+        (ROOT / "governance" / "SEASON_2026Q3_PREREGISTRATION.json").read_text(
+            "utf-8"
+        )
+    )
+    statistics = preregistration["statistics"]
+    semantic = preregistration["semantic_overlap"]
+    calibration = preregistration["calibration"]
+    publication_gate = preregistration["publication_gate"]
+
+    def file_sha256(path: Path) -> str:
+        return hashlib.sha256(path.read_bytes()).hexdigest()
+
+    assert statistics["ranking_analysis_code_sha256"] == file_sha256(
+        ROOT / "analysis" / "ko_model_ranking.py"
+    )
+    assert statistics["power_analysis_code_sha256"] == file_sha256(
+        ROOT / "analysis" / "ko_power_evidence.py"
+    )
+    assert statistics["power_pilot"]["builder_code_sha256"] == file_sha256(
+        ROOT / "analysis" / "ko_power_pilot.py"
+    )
+    assert semantic["split_audit_code_sha256"] == file_sha256(
+        ROOT / "analysis" / "ko_split_evidence.py"
+    )
+    assert calibration["builder_code_sha256"] == file_sha256(
+        ROOT / "analysis" / "ko_calibration.py"
+    )
+    assert publication_gate["validator_code_sha256"] == file_sha256(
+        ROOT / "analysis" / "ko_leaderboard.py"
+    )
+    expected_model_commitment = hashlib.sha256(
+        f"{semantic['model_id']}@{semantic['model_revision']}".encode("utf-8")
+    ).hexdigest()
+    assert semantic["model_revision_sha256"] == expected_model_commitment
+
+
+def test_frozen_season_commit_contains_committed_code_and_benchmarks():
+    preregistration = json.loads(
+        (ROOT / "governance" / "SEASON_2026Q3_PREREGISTRATION.json").read_text(
+            "utf-8"
+        )
+    )
+    commit = preregistration["season"]["protocol_git_commit"]
+
+    def git_blob(relative_path: str) -> bytes:
+        result = subprocess.run(
+            [
+                "git",
+                "-C",
+                str(ROOT.parent),
+                "show",
+                f"{commit}:ko-redteam/{relative_path}",
+            ],
+            capture_output=True,
+        )
+        assert result.returncode == 0, result.stderr.decode("utf-8", errors="replace")
+        return result.stdout
+
+    statistics = preregistration["statistics"]
+    semantic = preregistration["semantic_overlap"]
+    calibration = preregistration["calibration"]
+    publication_gate = preregistration["publication_gate"]
+    code_commitments = {
+        "analysis/ko_model_ranking.py": statistics[
+            "ranking_analysis_code_sha256"
+        ],
+        "analysis/ko_power_evidence.py": statistics[
+            "power_analysis_code_sha256"
+        ],
+        "analysis/ko_power_pilot.py": statistics["power_pilot"][
+            "builder_code_sha256"
+        ],
+        "analysis/ko_split_evidence.py": semantic["split_audit_code_sha256"],
+        "analysis/ko_calibration.py": calibration["builder_code_sha256"],
+        "analysis/ko_leaderboard.py": publication_gate["validator_code_sha256"],
+    }
+    for relative_path, expected in code_commitments.items():
+        assert hashlib.sha256(git_blob(relative_path)).hexdigest() == expected
+
+    benchmark_paths = {
+        "paperbench": "benchmarks/ko_llm_paperbench_v1.json",
+        "mini_single": "benchmarks/ko_llm_mini_v1.json",
+        "multiturn": "benchmarks/ko_llm_multiturn_v1.json",
+        "agent_harness": "benchmarks/ko_llm_agent_harness_v1.json",
+    }
+    frozen_fingerprints = statistics["power_pilot"][
+        "practice_benchmark_fingerprints"
+    ]
+    for suite, relative_path in benchmark_paths.items():
+        benchmark = json.loads(git_blob(relative_path))
+        assert I.benchmark_content_sha256(benchmark) == frozen_fingerprints[suite]
 
 
 def test_coverage_fails_missing_domains_expected_and_source_family():

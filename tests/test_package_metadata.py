@@ -33,6 +33,7 @@ def test_console_script_targets_are_importable():
         "ko-redteam-rank-models",
         "ko-redteam-validate-leaderboard",
         "ko-redteam-build-calibration",
+        "ko-redteam-build-power-pilot",
         "ko-redteam-audit-splits",
         "ko-redteam-analyze-power",
         "ko-redteam-compare-reports",
@@ -62,6 +63,7 @@ def test_distribution_metadata_has_release_basics():
     assert "Natural Language :: Korean" in data["project"]["classifiers"]
     assert any(dep.startswith("build") for dep in data["project"]["optional-dependencies"]["dev"])
     assert data["tool"]["setuptools"]["include-package-data"] is False
+    assert "*.json" in data["tool"]["setuptools"]["package-data"]["governance"]
     assert data["tool"]["setuptools"]["exclude-package-data"]["detectors"] == [".gitignore"]
     assert data["tool"]["setuptools"]["exclude-package-data"]["probes"] == [".gitignore"]
 
@@ -74,6 +76,7 @@ def test_package_data_paths_exist():
     assert (ROOT / "probes" / "ko_jailbreak_templates.json").exists()
     assert (ROOT / "LEADERBOARD_PROTOCOL.md").exists()
     assert (ROOT / "governance" / "SEASON_OPERATIONS.md").exists()
+    assert (ROOT / "governance" / "SEASON_2026Q3_PREREGISTRATION.json").exists()
     assert (ROOT / "gap_analysis" / "_vendor" / "mitigationbypass_substrings.txt").exists()
 
 
@@ -96,6 +99,7 @@ def test_analysis_package_imports_without_flat_pythonpath():
                 "from analysis.ko_calibration import build_calibration_report;"
                 "from analysis.ko_split_evidence import build_split_audit;"
                 "from analysis.ko_power_evidence import build_power_report;"
+                "from analysis.ko_power_pilot import build_power_pilot_input;"
                 "r=analyze_response('주민번호 900101-1234567');"
                 "assert r['risk_domain']=='pii_rrn';"
                 "assert callable(score_unlabeled_scan);"
@@ -108,6 +112,7 @@ def test_analysis_package_imports_without_flat_pythonpath():
                 "assert callable(build_calibration_report);"
                 "assert callable(build_split_audit);"
                 "assert callable(build_power_report);"
+                "assert callable(build_power_pilot_input);"
                 "print('package-import-ok')"
             ),
         ],

@@ -102,7 +102,7 @@ ko-redteam-suite \
 | 평가 실행 | `ko-redteam-benchmark`, `ko-redteam-multiturn`, `ko-redteam-agent-harness` | 단일턴, 멀티턴, tool gateway 평가 |
 | 오프라인 분석 | `ko-redteam-scan`, `ko-redteam-analyze-responses` | 저장된 응답과 공격 스캔 결과 분석 |
 | 모델 비교 | `ko-redteam-rank-models`, `ko-redteam-analyze-repeats` | gate-first qualification, 반복 안정성, 신뢰구간 기반 tier 분석 |
-| 공식 증거 생성 | `ko-redteam-build-calibration`, `ko-redteam-audit-splits`, `ko-redteam-analyze-power` | 사람 판정 보정, split 중복, 검정력의 metadata-only 증거 생성 |
+| 공식 증거 생성 | `ko-redteam-build-calibration`, `ko-redteam-build-power-pilot`, `ko-redteam-audit-splits`, `ko-redteam-analyze-power` | 사람 판정 보정, reference pilot, split 중복, 검정력의 metadata-only 증거 생성 |
 | 공식 게시 검증 | `ko-redteam-validate-leaderboard` | hidden split, calibration, provenance, 통계, 외부 검토 publication gate |
 | 평가셋 관리 | `ko-redteam-import-benchmark`, `ko-redteam-merge-benchmarks`, `ko-redteam-expand-benchmark` | 외부 파일 변환, 병합, 한국어 변형 생성 |
 | 릴리스 게이트 | `ko-redteam-compare-reports`, `ko-redteam-check-regression`, `ko-redteam-gate-reports`, `ko-redteam-doctor-reports`, `ko-redteam-check-public-hygiene` | 점수 비교, 회귀 판정, CI threshold, 공개 배포 위생 점검 |
@@ -115,18 +115,29 @@ ko-redteam-suite \
 commitment와 집계값만 출력합니다. 실제 사람 라벨, official prompt, 개별 응답과 semantic vector는 접근
 통제된 저장소에 유지해야 합니다.
 
+시즌별 split 배분, 실행 설정, 통계 기준, reference revision은 official prompt 작성 전에 공개 사전등록하고
+release bundle의 hashed `preregistration` artifact로 결합합니다. 현재 설계 후보는
+[`governance/SEASON_2026Q3_PREREGISTRATION.json`](./governance/SEASON_2026Q3_PREREGISTRATION.json)이며,
+이 파일 자체는 순위 발표나 완료 증거가 아닙니다.
+
 ```bash
 # 1. Blinded human labels and evaluator calibration
 ko-redteam-build-calibration private/calibration_labels.json \
   --output release/calibration_report.json \
   --markdown-output release/calibration_report.md
 
-# 2. Pre-registered power analysis from paired pilot-group differences
+# 2. Aggregate-only paired pilot from the frozen four-suite reference runs
+ko-redteam-build-power-pilot private/reference/ranking_manifest.json \
+  --preregistration governance/SEASON_2026Q3_PREREGISTRATION.json \
+  --preregistered-at 2026-07-14T09:00:00+09:00 \
+  --output private/power_input.json
+
+# 3. Pre-registered power analysis from paired pilot-group differences
 ko-redteam-analyze-power private/power_input.json \
   --output release/power_analysis.json \
   --markdown-output release/power_analysis.md
 
-# 3. Practice/official exact and semantic overlap audit
+# 4. Practice/official exact and semantic overlap audit
 ko-redteam-audit-splits \
   --practice-suite paperbench=benchmarks/ko_llm_paperbench_v1.json \
   --practice-suite mini_single=benchmarks/ko_llm_mini_v1.json \
@@ -148,7 +159,7 @@ ko-redteam-audit-splits \
 Semantic vector 입력은 immutable 모델·설정 digest와 각 벡터의 정규화 문항 SHA-256을 포함해야 하며,
 ID 누락, 문항-벡터 불일치, cross-split 중복 또는 official 내부의 서로 다른 독립 그룹 간 의미 중복이 있으면
 감사가 중단됩니다. official suite별 case/group 집계도 ranking report와 정확히 일치해야 합니다. 입력 계약,
-실행 순서와 중단 조건은
+사전등록, 실행 순서와 중단 조건은
 [`LEADERBOARD_PROTOCOL.md`](./LEADERBOARD_PROTOCOL.md)와
 [`governance/SEASON_OPERATIONS.md`](./governance/SEASON_OPERATIONS.md)를 따릅니다.
 
@@ -384,10 +395,10 @@ ko-redteam-doctor-reports \
 
 | seed | 역할 |
 |---|---|
-| `ko_llm_paperbench_v1.json` | 논문/가이드 기반 단일턴 expected-outcome 평가 |
-| `ko_llm_multiturn_v1.json` | 12개 독립 원형으로 점진적 유해 전환, tool hijack, privacy 재노출, 정상 업무 utility 평가 |
-| `ko_llm_agent_harness_v1.json` | 한국어 업무 agent의 tool gateway 차단/허용 평가 |
-| `ko_llm_mini_v1.json` | self-check용 최소 smoke seed |
+| `ko_llm_paperbench_v1.json` | 20개 독립 원형의 논문/가이드 기반 단일턴 expected-outcome 평가 |
+| `ko_llm_multiturn_v1.json` | 17개 독립 원형으로 점진적 유해 전환, prompt security, tool hijack, privacy 재노출, 정상 업무 utility 평가 |
+| `ko_llm_agent_harness_v1.json` | 5개 독립 원형으로 한국어 업무 agent의 tool gateway 차단/허용 평가 |
+| `ko_llm_mini_v1.json` | 17개 독립 원형의 한국어 품질·과잉거부 포함 compact single-turn practice |
 
 `benchmarks/ko_llm_paperbench_v1.json`은 공개 논문과 가이드의 평가 축만 참고한 한국어 자체 seed입니다.
 원본 prompt, 외부 도구 결과, 순위표를 가져오지 않습니다.

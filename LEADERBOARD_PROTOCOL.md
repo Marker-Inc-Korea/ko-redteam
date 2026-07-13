@@ -176,6 +176,7 @@ appeal 기록과 외부 attestation은 공통 정책 문서만으로 대체할 �
 
 공식 bundle은 `ko-redteam.leaderboard-release.v1` manifest와 다음 hashed JSON artifact를 포함한다.
 
+- `preregistration`: prompt 작성 전에 공개 동결한 split 배분, 실행·통계 기준, reference revision
 - `ranking_manifest`: 각 run의 네 suite report path와 SHA-256
 - `ranking_report`: 10,000회 이상 bootstrap 및 Holm 보정 결과
 - `calibration_report`: 사람 라벨 및 판정기 성능
@@ -196,6 +197,10 @@ ko-redteam-validate-leaderboard release_manifest.json \
 ```bash
 ko-redteam-build-calibration private/calibration_labels.json \
   --output release/calibration_report.json
+ko-redteam-build-power-pilot private/reference/ranking_manifest.json \
+  --preregistration governance/SEASON_2026Q3_PREREGISTRATION.json \
+  --preregistered-at 2026-07-14T09:00:00+09:00 \
+  --output private/power_input.json
 ko-redteam-analyze-power private/power_input.json \
   --output release/power_analysis.json
 ko-redteam-audit-splits --help
@@ -203,8 +208,12 @@ ko-redteam-audit-splits --help
 
 비공개 입력 구조는 [`governance/EVIDENCE_INPUTS.md`](./governance/EVIDENCE_INPUTS.md)에 정의한다. 생성된
 JSON이 존재하는 것만으로 충분하지 않으며, release manifest가 각 상대경로와 SHA-256을 결합해야 한다.
+사전등록 artifact의 season, protocol commit, suite×domain 그룹 행렬, generation settings, MDE, weight,
+reference model revision, semantic 감사 설정과 calibration 기준은 실제 artifact 및 run provenance와 정확히
+일치해야 한다. 사후 수정은 기존 season을 무효화하고 새 season ID로 다시 등록한다.
 
-종료 코드 `0`과 `status=publishable`이 함께 확인되어야 한다. 파일이 존재한다는 사실, self-report된 점수,
+종료 코드 `0`과 `status=publishable`이 함께 확인되어야 하며 audit은 사전등록과 일치하는 validator 코드
+SHA-256을 기록한다. 파일이 존재한다는 사실, self-report된 점수,
 부분 checksum만으로는 통과하지 않는다.
 
 split audit은 중복 검사 코드·정규화 규칙·semantic model revision·threshold를 digest로 고정한다. power
@@ -212,6 +221,11 @@ analysis는 코드와 입력 commitment, 사전등록 시각, 최소 10,000회 s
 선언한 실제 표본 수, official split의 영역·suite별 독립 원형 합계와 ranking report의 실제 case/group 수를
 대조하고, `power 사전등록 -> split 감사/동결 ->
 첫 제출 -> 모델 실행 -> 외부 검토 -> release 동결`의 timezone 포함 시각 순서를 확인한다.
+
+공식 power pilot은 사전등록된 upper/lower revision을 같은 네 suite에서 3회 이상 실행한 v2 manifest만 받으며,
+입력 생성기 코드 자체의 SHA-256도 season 설계와 공개 power source metadata에 결합한다.
+각 frozen suite/domain stratum에 최소 5개 독립 그룹이 없거나 agent suite가 빠지면 input 생성 단계에서
+중단한다. 공개 power report에는 원형 ID 대신 source manifest commitment, stratum별 개수와 target 배분만 남긴다.
 
 ## 10. Methodology Basis
 

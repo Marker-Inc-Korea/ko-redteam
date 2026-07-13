@@ -19,7 +19,8 @@
 
 ## Required Order
 
-1. protocol version, 최소 검출 효과, alpha, target power, reference models와 제출 한도를 사전 등록한다.
+1. protocol version, suite×domain 배분, 최소 검출 효과, alpha, target power, generation settings, reference
+   revision과 제출 한도를 공개 사전등록하고 release bundle의 hashed artifact로 지정한다.
 2. 모델명에 blinded된 held-out 사람 라벨로 evaluator를 calibration하고 기준 미달 시 중단한다.
 3. practice와 official split의 exact·semantic overlap을 감사한다.
 4. official split과 모든 scoring/evaluator 설정을 첫 제출 전에 동결한다.
@@ -30,7 +31,8 @@
 9. release bundle을 동결하고 verifier를 새 환경에서 재실행한 뒤 게시한다.
 
 프로토콜 검증기는 `power 사전등록 -> split 감사 -> split 동결 -> 첫 제출 -> 실행 -> 외부 검토 -> release
-동결` 시각 순서도 확인한다.
+동결` 시각 순서와 공개 season 사전등록이 power 사전등록보다 늦지 않은지도 확인한다. 현재 후보 설계는
+[`SEASON_2026Q3_PREREGISTRATION.json`](./SEASON_2026Q3_PREREGISTRATION.json)에 있다.
 
 ## Evidence Handling
 
