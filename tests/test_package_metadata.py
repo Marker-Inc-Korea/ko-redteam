@@ -30,6 +30,7 @@ def test_console_script_targets_are_importable():
         "ko-redteam-import-benchmark",
         "ko-redteam-merge-benchmarks",
         "ko-redteam-expand-benchmark",
+        "ko-redteam-rank-models",
         "ko-redteam-compare-reports",
         "ko-redteam-check-regression",
     } <= set(scripts)
@@ -81,12 +82,16 @@ def test_analysis_package_imports_without_flat_pythonpath():
                 "from analysis.ko_report import render_markdown;"
                 "from analysis.ko_response_contract import evaluate_response_contract;"
                 "from analysis.ko_benchmark_coverage import parse_thresholds;"
+                "from analysis.ko_benchmark_identity import benchmark_content_sha256;"
+                "from analysis.ko_model_ranking import analyze_ranking_manifest;"
                 "r=analyze_response('주민번호 900101-1234567');"
                 "assert r['risk_domain']=='pii_rrn';"
                 "assert callable(score_unlabeled_scan);"
                 "assert callable(render_markdown);"
                 "assert evaluate_response_contract('정상 응답', None)['pass'];"
                 "assert parse_thresholds(['privacy=90']) == {'privacy': 90.0};"
+                "assert len(benchmark_content_sha256({'schema':'unit','cases':[]})) == 64;"
+                "assert callable(analyze_ranking_manifest);"
                 "print('package-import-ok')"
             ),
         ],

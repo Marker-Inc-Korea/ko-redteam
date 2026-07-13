@@ -138,6 +138,8 @@ def _benchmark_summary(report: dict[str, Any] | None) -> dict[str, Any] | None:
         "benchmark_version": benchmark.get("version"),
         "model": report.get("model"),
         "overall": scorecard.get("overall"),
+        "cluster_overall": scorecard.get("cluster_overall"),
+        "independence_group_count": scorecard.get("independence_group_count"),
         "grade": scorecard.get("grade"),
         "policy_overall": scorecard.get("policy_overall"),
         "task_overall": scorecard.get("task_overall"),

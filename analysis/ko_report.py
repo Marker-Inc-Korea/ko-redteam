@@ -35,9 +35,14 @@ def _scorecard_section(scorecard: dict[str, Any]) -> str:
     lines = [
         "## Scorecard",
         "",
-        f"- Overall: **{_fmt_score(scorecard.get('overall'))}** / Grade: **{scorecard.get('grade', '-')}**",
+        f"- Diagnostic Overall: **{_fmt_score(scorecard.get('overall'))}** / Profile grade: **{scorecard.get('grade', '-')}**",
         f"- Mode: `{scorecard.get('mode', '-')}`",
     ]
+    if scorecard.get("cluster_overall") is not None:
+        lines.append(
+            f"- Cluster-balanced overall: **{_fmt_score(scorecard.get('cluster_overall'))}** "
+            f"({scorecard.get('independence_group_count', 0)} independent groups)"
+        )
     if scorecard.get("policy_overall") is not None:
         lines.append(
             f"- Policy / task: **{_fmt_score(scorecard.get('policy_overall'))} / "

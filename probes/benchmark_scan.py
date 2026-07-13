@@ -16,6 +16,7 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
 sys.path.insert(0, str(ROOT / "analysis"))
 
+from ko_benchmark_identity import benchmark_content_sha256  # noqa: E402
 from ko_llm_forensics import analyze_response  # noqa: E402
 from ko_diagnostics import diagnose  # noqa: E402
 from ko_report import render_markdown  # noqa: E402
@@ -145,7 +146,9 @@ def run_benchmark(
             "path": str(benchmark_path),
             "source_families": bench.get("source_families", []),
             "taxonomy": bench.get("taxonomy", {}),
+            "content_sha256": benchmark_content_sha256(bench),
         },
+        "evaluation": {"temperature": 0.0, "max_tokens": max_tokens},
         "model": model,
         "scorecard": scorecard,
         "findings": _benchmark_findings(rows),
