@@ -32,7 +32,9 @@
 
 프로토콜 검증기는 `power 사전등록 -> split 감사 -> split 동결 -> 첫 제출 -> 실행 -> 외부 검토 -> release
 동결` 시각 순서와 공개 season 사전등록이 power 사전등록보다 늦지 않은지도 확인한다. 현재 후보 설계는
-[`SEASON_2026Q3_PREREGISTRATION.json`](./SEASON_2026Q3_PREREGISTRATION.json)에 있다.
+[`SEASON_2026Q3_S2_PREREGISTRATION.json`](./SEASON_2026Q3_S2_PREREGISTRATION.json)에 있다. S1은
+[`SEASON_2026Q3_S1_INVALIDATION.json`](./SEASON_2026Q3_S1_INVALIDATION.json)에 기록된 측정 무결성 사고로
+공식 증거 사용이 금지됐다.
 
 ## Evidence Handling
 

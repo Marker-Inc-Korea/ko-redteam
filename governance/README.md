@@ -13,7 +13,10 @@
 | [`CHANGELOG.md`](./CHANGELOG.md) | 프로토콜 및 시즌 변경 이력 |
 | [`SEASON_OPERATIONS.md`](./SEASON_OPERATIONS.md) | 시즌 준비부터 게시까지의 실행 순서 |
 | [`EVIDENCE_INPUTS.md`](./EVIDENCE_INPUTS.md) | 비공개 evidence JSON 입력 계약 |
-| [`SEASON_2026Q3.md`](./SEASON_2026Q3.md) | 현재 candidate season 상태와 사전등록 |
+| [`SEASON_2026Q3.md`](./SEASON_2026Q3.md) | 현재 S2 candidate 상태와 사전등록·S1 무효화 기록 |
+| [`SEASON_2026Q3_S2_PREREGISTRATION.json`](./SEASON_2026Q3_S2_PREREGISTRATION.json) | 현재 S2 동결 설계 |
+| [`SEASON_2026Q3_PREREGISTRATION.json`](./SEASON_2026Q3_PREREGISTRATION.json) | byte 보존된 과거 S1 동결 설계 |
+| [`SEASON_2026Q3_S1_INVALIDATION.json`](./SEASON_2026Q3_S1_INVALIDATION.json) | S1 측정 오류·영향·수정 commitment |
 
 현재 저장소의 공개 seed 및 비교 결과는 연구용 진단 자료다. 비공개 official split, 사람 라벨 기반
 calibration, 사전 power analysis, 불변 실행 provenance, 독립 외부 검토가 없는 결과에는 공식 순위 표현을

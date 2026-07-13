@@ -7,8 +7,8 @@ placeholder이며 공식 기준을 충족하지 않는다. 입력 파일에는 r
 ## Public Season Preregistration
 
 `ko-redteam.season-preregistration.v1`은 비공개 입력이 아니라 prompt 작성 전에 공개하는 동결 설계다. 최소
-suite×domain 독립 그룹 행렬, generation settings, 통계 기준과 weight, upper/lower reference의 immutable
-revision, semantic overlap 설정, 사람 calibration 기준과 publication gate를 포함한다. release manifest는 이
+suite×domain×expected 독립 그룹 행렬, Agent transport, generation settings, 통계 기준과 weight,
+upper/lower reference의 immutable revision, semantic overlap 설정, 사람 calibration 기준과 publication gate를 포함한다. release manifest는 이
 JSON을 상대경로와 SHA-256으로 결합하며 validator가 이후 split, ranking, power pilot builder, calibration 및 run context와
 대조한다. 변경이 필요하면 기존 파일을 덮어쓰지 않고 새 season ID를 등록한다.
 
@@ -60,8 +60,8 @@ JSON을 상대경로와 SHA-256으로 결합하며 validator가 이후 split, ra
 
 `difference`는 `estimand`에 적은 동일한 paired independence-group 단위의 파일럿 차이다. 최소 10개 그룹과
 10,000회 simulation이 필요하다. 공식 입력은 `ko-redteam-build-power-pilot`으로 만들며 네 suite와 frozen
-suite/domain 여섯 stratum을 모두 포함하고 stratum마다 최소 5개 pilot group이 필요하다. 실제 official group
-수는 split audit의 여섯 영역 합계와 같아야 한다.
+suite/domain/expected 7개 stratum을 모두 포함하고 stratum마다 최소 5개 pilot group이 필요하다. 실제
+official group 수는 split audit의 여섯 영역 합계와 같아야 한다.
 
 ```json
 {

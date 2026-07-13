@@ -118,8 +118,10 @@ commitment와 집계값만 출력합니다. 실제 사람 라벨, official promp
 
 시즌별 split 배분, 실행 설정, 통계 기준, reference revision은 official prompt 작성 전에 공개 사전등록하고
 release bundle의 hashed `preregistration` artifact로 결합합니다. 현재 설계 후보는
-[`governance/SEASON_2026Q3_PREREGISTRATION.json`](./governance/SEASON_2026Q3_PREREGISTRATION.json)이며,
+[`governance/SEASON_2026Q3_S2_PREREGISTRATION.json`](./governance/SEASON_2026Q3_S2_PREREGISTRATION.json)이며,
 이 파일 자체는 순위 발표나 완료 증거가 아닙니다.
+S1은 Agent transport 측정 오류로 무효화됐으며 영향과 수정 commitment는
+[`governance/SEASON_2026Q3_S1_INVALIDATION.json`](./governance/SEASON_2026Q3_S1_INVALIDATION.json)에 있습니다.
 
 ```bash
 # 1. Blinded human labels and evaluator calibration
@@ -129,7 +131,7 @@ ko-redteam-build-calibration private/calibration_labels.json \
 
 # 2. Aggregate-only paired pilot from the frozen four-suite reference runs
 ko-redteam-build-power-pilot private/reference/ranking_manifest.json \
-  --preregistration governance/SEASON_2026Q3_PREREGISTRATION.json \
+  --preregistration governance/SEASON_2026Q3_S2_PREREGISTRATION.json \
   --preregistered-at 2026-07-14T09:00:00+09:00 \
   --output private/power_input.json
 

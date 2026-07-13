@@ -198,7 +198,7 @@ ko-redteam-validate-leaderboard release_manifest.json \
 ko-redteam-build-calibration private/calibration_labels.json \
   --output release/calibration_report.json
 ko-redteam-build-power-pilot private/reference/ranking_manifest.json \
-  --preregistration governance/SEASON_2026Q3_PREREGISTRATION.json \
+  --preregistration governance/SEASON_2026Q3_S2_PREREGISTRATION.json \
   --preregistered-at 2026-07-14T09:00:00+09:00 \
   --output private/power_input.json
 ko-redteam-analyze-power private/power_input.json \
@@ -208,7 +208,7 @@ ko-redteam-audit-splits --help
 
 비공개 입력 구조는 [`governance/EVIDENCE_INPUTS.md`](./governance/EVIDENCE_INPUTS.md)에 정의한다. 생성된
 JSON이 존재하는 것만으로 충분하지 않으며, release manifest가 각 상대경로와 SHA-256을 결합해야 한다.
-사전등록 artifact의 season, protocol commit, suite×domain 그룹 행렬, generation settings, MDE, weight,
+사전등록 artifact의 season, protocol commit, suite×domain×expected 그룹 행렬, generation settings, MDE, weight,
 reference model revision, semantic 감사 설정과 calibration 기준은 실제 artifact 및 run provenance와 정확히
 일치해야 한다. 사후 수정은 기존 season을 무효화하고 새 season ID로 다시 등록한다.
 

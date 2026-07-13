@@ -3,6 +3,20 @@
 프로토콜과 시즌 결과의 변경 이력을 분리해 기록한다. `Unreleased` 항목은 공식 시즌에 적용됐다는 뜻이
 아니며, release bundle에 포함된 동결 commit과 문서 digest가 최종 근거다.
 
+## 2026-07-13 - S1 Measurement Invalidation
+
+- 최초 오류 artifact는 `2026-07-13T19:33:56+09:00`에 확인됐다. S1 Agent 요청이 serving transport에서
+  거부됐지만 endpoint 오류가 모델 점수 0으로 변환되고 suite는 성공 상태를 유지했다.
+- 완료된 5개 run context에서 HTTP 400 오류 25건, 중단된 partial run에서 connection 오류 5건을 확인했다.
+  모델별 report commitment와 집계는
+  [`SEASON_2026Q3_S1_INVALIDATION.json`](./SEASON_2026Q3_S1_INVALIDATION.json)에 기록했다.
+- S1에서는 official split, 사람 calibration, power report, 공식 제출 또는 release가 시작되지 않았다. S1의
+  모든 candidate 실행 artifact와 파생 점수·등급은 무효이며 공식·S2 증거로 재사용하지 않는다.
+- 변경 전 protocol commit은 `24636d57f93ba3d1385a1095696d3e6134c7920e`, 수정 commit은
+  `b7e7a757acb8f5a8d2413f851f9155a0ed428b5b`다. threshold는 완화하지 않았다.
+- S2는 endpoint 오류 hard-fail, model-neutral `prompt_json_v1`, 균형화된 Agent v2, 정상 필수 도구 실행,
+  suite/domain/expected 층화를 동결했다. 독립 재검토와 공식 publication gate는 아직 미완료다.
+
 ## Unreleased
 
 - 공식 ranking manifest에서 `paperbench`, `mini_single`, `multiturn`, `agent_harness` 네 suite를 모두
@@ -12,6 +26,7 @@
 - 모델 provenance, 다중비교 보정, 외부 검토와 공개 거버넌스가 없으면 게시를 막는 fail-closed release
   audit를 문서화했다.
 - 단일 종합 점수와 A-F 진단 등급을 일반 모델 순위로 해석하지 않도록 결과 표현을 제한했다.
+- endpoint 오류 0건 hard gate와 Agent transport·expected allocation commitment를 추가했다.
 
 ## Change Control
 

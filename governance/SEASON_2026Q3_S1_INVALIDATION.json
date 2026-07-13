@@ -1,0 +1,106 @@
+{
+  "schema": "ko-redteam.protocol-incident.v1",
+  "id": "KO-RT-2026-001",
+  "status": "closed_by_season_invalidation",
+  "severity": "blocking_measurement_integrity",
+  "detected_at": "2026-07-13T19:33:56+09:00",
+  "recorded_at": "2026-07-13T20:56:28+09:00",
+  "affected_season": "ko-redteam-2026q3-s1",
+  "summary": "Agent requests were rejected by the serving transport, but the S1 suite converted endpoint failures into zero scores without invalidating the run.",
+  "evidence": {
+    "models_observed": 3,
+    "generated_agent_reports": 6,
+    "completed_run_contexts": 5,
+    "partial_run_contexts": 1,
+    "endpoint_error_events": 30,
+    "native_tool_transport_http_400_events": 25,
+    "interrupted_connection_events": 5,
+    "report_commitments": [
+      {
+        "run_id": "powerpilot-gemma4_31b-r01",
+        "model": "gemma-4-31B-it",
+        "completion_status": "complete",
+        "endpoint_errors": 5,
+        "observed_transport": "http_400",
+        "sha256": "46f9c273a98f165d05b457809f87f0c3c7e0c2b41e781e7a209ad93ba0eff084"
+      },
+      {
+        "run_id": "powerpilot-gemma4_31b-r02",
+        "model": "gemma-4-31B-it",
+        "completion_status": "partial",
+        "endpoint_errors": 5,
+        "observed_transport": "connection_interrupted",
+        "sha256": "6ddeb7e08e762c8f08b7301731f7d98e538469f0f97c18815831572328951802"
+      },
+      {
+        "run_id": "powerpilot-qwen3_32b-r01",
+        "model": "Qwen3-32B",
+        "completion_status": "complete",
+        "endpoint_errors": 5,
+        "observed_transport": "http_400",
+        "sha256": "c27d2c4fa1c5f19e84df1a45c19ed82ed83a349989368b1282816bd409507b96"
+      },
+      {
+        "run_id": "powerpilot-tinyllama_1_1b-r01",
+        "model": "TinyLlama-1.1B-Chat-v1.0",
+        "completion_status": "complete",
+        "endpoint_errors": 5,
+        "observed_transport": "http_400",
+        "sha256": "6145ac907909630f294b03ffbfbb61a051b200527369151769c23b0962d0e7f9"
+      },
+      {
+        "run_id": "powerpilot-tinyllama_1_1b-r02",
+        "model": "TinyLlama-1.1B-Chat-v1.0",
+        "completion_status": "complete",
+        "endpoint_errors": 5,
+        "observed_transport": "http_400",
+        "sha256": "f995bd7223e8c64ba95b40c3b65db71853d8eabfc1e3ad5b2096abf90e08404e"
+      },
+      {
+        "run_id": "powerpilot-tinyllama_1_1b-r03",
+        "model": "TinyLlama-1.1B-Chat-v1.0",
+        "completion_status": "complete",
+        "endpoint_errors": 5,
+        "observed_transport": "http_400",
+        "sha256": "c5d689644ddcb42e39059e3a6be724f46ad16b8ab4b46605990bd4707898f2cf"
+      }
+    ]
+  },
+  "root_cause": {
+    "primary": "S1 used native tool requests without freezing and preflighting a compatible serving transport.",
+    "contributing_factors": [
+      "The client discarded HTTP status codes and classified request failures too coarsely.",
+      "The suite retained diagnostic reports but did not hard-fail when endpoint errors were present.",
+      "The five-case Agent seed was imbalanced toward protected behavior and did not require successful tool execution for benign utility."
+    ]
+  },
+  "impact": {
+    "official_split_constructed": false,
+    "official_model_submission_started": false,
+    "power_report_produced": false,
+    "official_release_published": false,
+    "invalidated_scope": "All S1 candidate execution artifacts and any score or grade derived from them.",
+    "research_preview_status": "Prior public-practice diagnostics remain non-official and cannot be used as S2 evidence."
+  },
+  "decision": {
+    "action": "invalidate_season_and_rerun_under_s2",
+    "affected_jobs_stopped": true,
+    "thresholds_relaxed": false,
+    "s1_preregistration_preserved": true,
+    "successor_season": "ko-redteam-2026q3-s2"
+  },
+  "change_control": {
+    "before_protocol_commit": "24636d57f93ba3d1385a1095696d3e6134c7920e",
+    "corrective_protocol_commit": "b7e7a757acb8f5a8d2413f851f9155a0ed428b5b",
+    "corrective_protocol_version": "1.1.0"
+  },
+  "corrective_controls": [
+    "Use prompt_json_v1 for model-neutral official Agent comparisons and reserve native_tools_v1 for diagnostics.",
+    "Require explicit zero endpoint errors and consistent error counts before a suite can pass.",
+    "Reject endpoint-error runs again in ranking and power construction.",
+    "Use the balanced Agent v2 seed with five protected and five required-tool utility groups.",
+    "Bind suite, domain, expected behavior, transport mode, benchmark fingerprint, and evaluator commit in S2 evidence."
+  ],
+  "independent_reinspection": "pending",
+  "raw_prompt_or_response_included": false
+}
