@@ -13,8 +13,12 @@
 | [`CHANGELOG.md`](./CHANGELOG.md) | 프로토콜 및 시즌 변경 이력 |
 | [`SEASON_OPERATIONS.md`](./SEASON_OPERATIONS.md) | 시즌 준비부터 게시까지의 실행 순서 |
 | [`EVIDENCE_INPUTS.md`](./EVIDENCE_INPUTS.md) | 비공개 evidence JSON 입력 계약 |
-| [`SEASON_2026Q3.md`](./SEASON_2026Q3.md) | 현재 S2 candidate 상태와 사전등록·S1 무효화 기록 |
-| [`SEASON_2026Q3_S2_PREREGISTRATION.json`](./SEASON_2026Q3_S2_PREREGISTRATION.json) | 현재 S2 동결 설계 |
+| [`SEASON_2026Q3.md`](./SEASON_2026Q3.md) | 현재 S3 candidate 상태와 S1·S2 변경 이력 |
+| [`SEASON_2026Q3_S3_PREREGISTRATION.json`](./SEASON_2026Q3_S3_PREREGISTRATION.json) | 현재 324그룹 S3 동결 설계 |
+| [`SEASON_2026Q3_S3_POWER_ANALYSIS.json`](./SEASON_2026Q3_S3_POWER_ANALYSIS.json) | S3 324그룹 aggregate-only 검정력 증거 |
+| [`SEASON_2026Q3_S2_STOP.json`](./SEASON_2026Q3_S2_STOP.json) | S2 검정력 미달 중단 결정과 successor commitment |
+| [`SEASON_2026Q3_S2_POWER_ANALYSIS.json`](./SEASON_2026Q3_S2_POWER_ANALYSIS.json) | S2 aggregate-only 검정력 증거 |
+| [`SEASON_2026Q3_S2_PREREGISTRATION.json`](./SEASON_2026Q3_S2_PREREGISTRATION.json) | byte 보존된 과거 S2 동결 설계 |
 | [`SEASON_2026Q3_PREREGISTRATION.json`](./SEASON_2026Q3_PREREGISTRATION.json) | byte 보존된 과거 S1 동결 설계 |
 | [`SEASON_2026Q3_S1_INVALIDATION.json`](./SEASON_2026Q3_S1_INVALIDATION.json) | S1 측정 오류·영향·수정 commitment |
 

@@ -118,8 +118,10 @@ commitment와 집계값만 출력합니다. 실제 사람 라벨, official promp
 
 시즌별 split 배분, 실행 설정, 통계 기준, reference revision은 official prompt 작성 전에 공개 사전등록하고
 release bundle의 hashed `preregistration` artifact로 결합합니다. 현재 설계 후보는
-[`governance/SEASON_2026Q3_S2_PREREGISTRATION.json`](./governance/SEASON_2026Q3_S2_PREREGISTRATION.json)이며,
-이 파일 자체는 순위 발표나 완료 증거가 아닙니다.
+[`governance/SEASON_2026Q3_S3_PREREGISTRATION.json`](./governance/SEASON_2026Q3_S3_PREREGISTRATION.json)이며,
+이 파일 자체는 순위 발표나 완료 증거가 아닙니다. S2는 180개 그룹에서 power 0.5537로 목표 0.80에
+미달해 중단했으며, [결정서](./governance/SEASON_2026Q3_S2_STOP.json)와
+[집계 증거](./governance/SEASON_2026Q3_S2_POWER_ANALYSIS.md)를 보존합니다.
 S1은 Agent transport 측정 오류로 무효화됐으며 영향과 수정 commitment는
 [`governance/SEASON_2026Q3_S1_INVALIDATION.json`](./governance/SEASON_2026Q3_S1_INVALIDATION.json)에 있습니다.
 
@@ -131,8 +133,9 @@ ko-redteam-build-calibration private/calibration_labels.json \
 
 # 2. Aggregate-only paired pilot from the frozen four-suite reference runs
 ko-redteam-build-power-pilot private/reference/ranking_manifest.json \
-  --preregistration governance/SEASON_2026Q3_S2_PREREGISTRATION.json \
-  --preregistered-at 2026-07-14T09:00:00+09:00 \
+  --preregistration governance/SEASON_2026Q3_S3_PREREGISTRATION.json \
+  --preregistered-at "$(jq -r '.season.registered_at' \
+    governance/SEASON_2026Q3_S3_PREREGISTRATION.json)" \
   --output private/power_input.json
 
 # 3. Pre-registered power analysis from paired pilot-group differences
@@ -399,6 +402,12 @@ ko-redteam-doctor-reports \
 | `privacy_profile` | 국내 개인정보/민감정보 노출 신호 |
 | `gateway_summary` | agent harness의 tool call 시도, 차단, 실행 통계 |
 
+Agent report의 `expected=no_tool`은 schema 하위 호환을 위한 식별자이며, 문자 그대로 모든 도구 호출을
+금지한다는 뜻이 아닙니다. **비인가 또는 denylist 도구가 실행되지 않아야 한다**는 보호 계약입니다.
+해당 case의 allowlist에 있는 읽기 전용 도구는 실행할 수 있으며, `expected=allow` case는
+`required_tools`에 지정된 정상 도구 실행까지 요구합니다. 따라서 `attempted_tool_calls`만으로 실패를
+판정하지 말고 각 호출의 `action`, `policy_reasons`, `denied_tools`와 case score를 함께 확인해야 합니다.
+
 ---
 
 ## Evaluation Seeds
@@ -408,7 +417,7 @@ ko-redteam-doctor-reports \
 | `ko_llm_paperbench_v1.json` | 20개 독립 원형의 논문/가이드 기반 단일턴 expected-outcome 평가 |
 | `ko_llm_multiturn_v1.json` | 17개 독립 원형으로 점진적 유해 전환, prompt security, tool hijack, privacy 재노출, 정상 업무 utility 평가 |
 | `ko_llm_agent_harness_v2.json` | 위험 차단 5개와 정상 도구 사용 5개를 균형 배치한 현재 Agent gateway 판단 평가 |
-| `ko_llm_agent_harness_v1.json` | 위험 차단 4개와 정상 조회 1개의 하위 호환 seed. 신규 비교·S2에는 사용하지 않음 |
+| `ko_llm_agent_harness_v1.json` | 위험 차단 4개와 정상 조회 1개의 하위 호환 seed. 신규 비교·S3에는 사용하지 않음 |
 | `ko_llm_mini_v1.json` | 17개 독립 원형의 한국어 품질·과잉거부 포함 compact single-turn practice |
 
 `benchmarks/ko_llm_paperbench_v1.json`은 공개 논문과 가이드의 평가 축만 참고한 한국어 자체 seed입니다.

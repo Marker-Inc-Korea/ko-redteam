@@ -1,0 +1,53 @@
+{
+  "schema": "ko-redteam.season-stop.v1",
+  "id": "KO-RT-2026-002",
+  "status": "closed_by_successor_preregistration",
+  "decided_at": "2026-07-13T22:26:00+09:00",
+  "affected_season": "ko-redteam-2026q3-s2",
+  "reason": "insufficient_statistical_power",
+  "summary": "The frozen 180-group S2 design achieved 0.5537 simulated power, below the preregistered 0.80 target, before construction of the official split.",
+  "evidence": {
+    "preregistration": {
+      "path": "SEASON_2026Q3_S2_PREREGISTRATION.json",
+      "sha256": "0c694f968ae5c2e01dd0a0d7766d9da0a4f54d7c541b97b2d1910214b569a4f6"
+    },
+    "power_analysis": {
+      "path": "SEASON_2026Q3_S2_POWER_ANALYSIS.json",
+      "sha256": "e01a1570a7ca298d34b17bd4fb743b7b6e1ea16be1588417e83d8aaca509dd11",
+      "target_power": 0.8,
+      "achieved_power": 0.5537,
+      "minimum_detectable_effect": 5.0,
+      "planned_independence_groups": 180,
+      "required_independence_groups": 324,
+      "design_power_at_required": 0.8010114549040107,
+      "simulation_iterations": 10000
+    },
+    "reference_execution": {
+      "ranking_manifest_sha256": "5db7d2a99b9cdef0b1cf92b899aac5b764e39062908ce0437e0db3e5921a6b37",
+      "upper_runs": 3,
+      "lower_runs": 3,
+      "endpoint_errors": 0,
+      "official_score_use": false
+    },
+    "official_split_constructed": false,
+    "official_model_submission_started": false,
+    "official_release_published": false,
+    "raw_prompt_or_response_included": false
+  },
+  "decision": {
+    "action": "stop_before_official_split_and_preregister_s3",
+    "thresholds_relaxed": false,
+    "scoring_changed": false,
+    "protocol_code_changed": false,
+    "s2_preregistration_preserved": true,
+    "s2_results_publishable": false,
+    "successor_season": "ko-redteam-2026q3-s3",
+    "successor_independence_groups": 324
+  },
+  "impact": {
+    "invalidated_scope": "S2 as a candidate official leaderboard design with 180 independence groups.",
+    "retained_evidence": "Aggregate-only S2 reference and power evidence may be cited as the disclosed sample-size basis for S3, but not as an official model ranking.",
+    "research_preview_status": "Public-practice model diagnostics remain non-official and cannot satisfy S3 publication gates."
+  },
+  "independent_reinspection": "pending"
+}

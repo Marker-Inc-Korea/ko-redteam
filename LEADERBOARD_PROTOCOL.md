@@ -198,8 +198,9 @@ ko-redteam-validate-leaderboard release_manifest.json \
 ko-redteam-build-calibration private/calibration_labels.json \
   --output release/calibration_report.json
 ko-redteam-build-power-pilot private/reference/ranking_manifest.json \
-  --preregistration governance/SEASON_2026Q3_S2_PREREGISTRATION.json \
-  --preregistered-at 2026-07-14T09:00:00+09:00 \
+  --preregistration governance/SEASON_2026Q3_S3_PREREGISTRATION.json \
+  --preregistered-at "$(jq -r '.season.registered_at' \
+    governance/SEASON_2026Q3_S3_PREREGISTRATION.json)" \
   --output private/power_input.json
 ko-redteam-analyze-power private/power_input.json \
   --output release/power_analysis.json
