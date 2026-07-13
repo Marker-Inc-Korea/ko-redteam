@@ -530,7 +530,9 @@ def test_run_suite_cli_writes_outputs_on_endpoint_error_without_gate(tmp_path):
     assert multiturn_report["scorecard"]["overall"] == 0.0
     assert multiturn_report["scorecard"]["error_categories"]["connection"] >= 1
     assert agent_report["scorecard"]["overall"] == 0.0
-    assert agent_report["scorecard"]["error_categories"]["connection"] == 4
+    assert agent_report["scorecard"]["error_categories"]["connection"] == len(
+        agent_report["detail"]
+    )
     assert '"raw"' not in (out_dir / "multiturn_report.json").read_text("utf-8")
     assert '"raw"' not in (out_dir / "agent_harness_report.json").read_text("utf-8")
 

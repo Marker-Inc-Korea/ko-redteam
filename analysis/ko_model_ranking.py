@@ -881,14 +881,18 @@ def analyze_ranking_manifest(
     group_counts = {}
     case_counts = {}
     domain_groups: dict[str, set[tuple[str, str]]] = {}
+    suite_domain_groups: dict[str, dict[str, set[str]]] = {}
     for suite in suites:
         group_counts[suite] = len({row["independence_group"] for row in baseline[suite].values()})
         case_counts[suite] = len(baseline[suite])
+        suite_domain_groups[suite] = {}
         for row in baseline[suite].values():
             domain = str(row.get("domain") or "")
+            group = str(row["independence_group"])
             domain_groups.setdefault(domain, set()).add(
-                (suite, str(row["independence_group"]))
+                (suite, group)
             )
+            suite_domain_groups[suite].setdefault(domain, set()).add(group)
     benchmark_identities = {
         suite: {
             "name": runs_by_model[diagnostic_order[0]][0]["_identities"][suite].get("benchmark_name"),
@@ -909,6 +913,7 @@ def analyze_ranking_manifest(
         "manifest_name": manifest.get("name"),
         "ranking_manifest_sha256": _file_sha256(manifest_path),
         "method": {
+            "analysis_code_sha256": _file_sha256(Path(__file__)),
             "gate_precedes_ranking": True,
             "primary_weight_profile": PRIMARY_WEIGHT_PROFILE,
             "weight_profiles": weight_profiles,
@@ -935,9 +940,23 @@ def analyze_ranking_manifest(
             "familywise_alpha": round(familywise_alpha, 6),
             "suite_independence_groups": group_counts,
             "suite_case_counts": case_counts,
+            "suite_generation_settings": {
+                suite: {
+                    "temperature": runs_by_model[diagnostic_order[0]][0]["_identities"][suite].get("temperature"),
+                    "max_tokens": runs_by_model[diagnostic_order[0]][0]["_identities"][suite].get("max_tokens"),
+                }
+                for suite in suites
+            },
             "domain_independence_groups": {
                 domain: len(groups)
                 for domain, groups in sorted(domain_groups.items())
+            },
+            "suite_domain_independence_groups": {
+                suite: {
+                    domain: len(groups)
+                    for domain, groups in sorted(suite_domain_groups[suite].items())
+                }
+                for suite in suites
             },
             "benchmarks": benchmark_identities,
             "raw_prompt_or_response_used": False,

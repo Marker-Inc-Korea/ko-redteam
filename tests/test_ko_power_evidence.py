@@ -38,6 +38,61 @@ def _input() -> dict:
     }
 
 
+def _stratified_input() -> dict:
+    data = _input()
+    strata = {
+        "paperbench:privacy": 30,
+        "paperbench:safety": 30,
+        "mini_single:korean_quality": 30,
+        "mini_single:overrefusal": 30,
+        "multiturn:prompt_security": 30,
+        "agent_harness:agent_rag": 30,
+    }
+    data["target_strata"] = strata
+    data["pilot_source"] = {
+        "schema": P.PILOT_SOURCE_SCHEMA,
+        "ranking_manifest_sha256": "a" * 64,
+        "ranking_manifest_schema": "ko-redteam.ranking-manifest.v2",
+        "upper_model": "upper",
+        "lower_model": "lower",
+        "upper_model_id": "unit/upper",
+        "lower_model_id": "unit/lower",
+        "upper_revision": "b" * 40,
+        "lower_revision": "c" * 40,
+        "suites": [
+            "paperbench",
+            "mini_single",
+            "multiturn",
+            "agent_harness",
+        ],
+        "benchmark_fingerprints": {
+            "paperbench": "1" * 64,
+            "mini_single": "2" * 64,
+            "multiturn": "3" * 64,
+            "agent_harness": "4" * 64,
+        },
+        "minimum_repeats": 3,
+        "upper_runs": 3,
+        "lower_runs": 3,
+        "temperature": 0.0,
+        "max_tokens": 512,
+        "weight_profile": "balanced",
+        "construction_method": "unit linearized diagnostic influence",
+        "builder_code_sha256": "e" * 64,
+        "evaluator_git_commit": "d" * 40,
+    }
+    data["pilot_clusters"] = [
+        {
+            "id": f"private-{stratum_index}-{value_index}",
+            "stratum": stratum,
+            "difference": float(value + stratum_index),
+        }
+        for stratum_index, stratum in enumerate(strata)
+        for value_index, value in enumerate((-10, -5, 0, 5, 10))
+    ]
+    return data
+
+
 def test_known_two_sided_normal_power():
     value = P._two_sided_normal_power(0.5, 1.0, 32, 0.05)
 
@@ -72,6 +127,30 @@ def test_power_report_rejects_raw_fields_and_degenerate_pilot():
     with pytest.raises(ValueError, match="non-zero variance"):
         P.build_power_report(data)
 
+
+def test_stratified_power_preserves_target_allocation_and_source():
+    report = P.build_power_report(_stratified_input())
+    pilot = report["pilot_summary"]
+
+    assert "fixed-allocation stratified" in report["method"]
+    assert pilot["source"]["schema"] == P.PILOT_SOURCE_SCHEMA
+    assert pilot["target_strata"]["agent_harness:agent_rag"] == 30
+    assert pilot["pilot_stratum_counts"] == {
+        key: 5 for key in _stratified_input()["target_strata"]
+    }
+    assert pilot["standard_deviation"] == pytest.approx(7.905694, abs=1e-6)
+
+
+def test_stratified_power_rejects_sparse_or_mismatched_strata():
+    data = _stratified_input()
+    data["pilot_clusters"] = data["pilot_clusters"][:-1]
+    with pytest.raises(ValueError, match="each target stratum"):
+        P.build_power_report(data)
+
+    data = _stratified_input()
+    data["target_strata"]["agent_harness:agent_rag"] = 29
+    with pytest.raises(ValueError, match="sum to actual"):
+        P.build_power_report(data)
 
 def test_power_report_can_fail_closed_when_sample_is_too_small():
     data = _input()

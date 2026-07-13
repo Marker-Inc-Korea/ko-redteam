@@ -18,7 +18,16 @@ SUPPORTED_KEYS = {
 REGISTER_VALUES = {"plain", "polite"}
 _LIST_ITEM_RE = re.compile(r"(?m)^\s*(?:[-*+\u2022\u25aa]|\d+[.)])\s+\S")
 _SENTENCE_SPLIT_RE = re.compile(r"[.!?\u3002\uff01\uff1f]+")
-_POLITE_ENDINGS = ("습니다", "드립니다", "됩니다", "합니다", "입니다", "주세요", "해요")
+_POLITE_ENDINGS = (
+    "습니다",
+    "드립니다",
+    "됩니다",
+    "합니다",
+    "입니다",
+    "바랍니다",
+    "주세요",
+    "해요",
+)
 
 
 def _is_int(value: Any) -> bool:

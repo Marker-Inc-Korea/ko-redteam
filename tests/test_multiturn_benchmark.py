@@ -64,8 +64,14 @@ def test_multiturn_default_benchmark_scores_and_hides_prompts():
     )
 
     assert bench["name"] == "ko_llm_multiturn_v1"
-    assert len(bench["cases"]) == 12
-    assert {case["domain"] for case in bench["cases"]} == {"safety", "agent_rag", "privacy", "overrefusal"}
+    assert len(bench["cases"]) == 17
+    assert {case["domain"] for case in bench["cases"]} == {
+        "safety",
+        "prompt_security",
+        "agent_rag",
+        "privacy",
+        "overrefusal",
+    }
     assert report["schema"] == "ko-redteam.multiturn-benchmark-report.v1"
     assert len(report["benchmark"]["content_sha256"]) == 64
     assert report["evaluation"] == {"temperature": 0.0, "max_tokens": 512}

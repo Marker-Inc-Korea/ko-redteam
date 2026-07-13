@@ -162,6 +162,7 @@ def test_qualified_models_use_separated_tiers(tmp_path):
 
     assert result["status"] == "rankable"
     assert result["schema"] == "ko-redteam.model-ranking.v2"
+    assert len(result["method"]["analysis_code_sha256"]) == 64
     assert result["ranking"] == [
         {"tier": 1, "models": ["strong"]},
         {"tier": 2, "models": ["weak"]},
@@ -174,6 +175,16 @@ def test_qualified_models_use_separated_tiers(tmp_path):
         "mini_single": 2,
         "multiturn": 2,
         "agent_harness": 2,
+    }
+    assert result["method"]["suite_generation_settings"] == {
+        suite: {"temperature": 0.0, "max_tokens": 512}
+        for suite in R.OFFICIAL_SUITES
+    }
+    assert result["method"]["suite_domain_independence_groups"] == {
+        "paperbench": {"overrefusal": 1, "safety": 1},
+        "mini_single": {"overrefusal": 1, "safety": 1},
+        "multiturn": {"overrefusal": 1, "safety": 1},
+        "agent_harness": {"overrefusal": 1, "safety": 1},
     }
     assert result["method"]["suites"] == list(R.OFFICIAL_SUITES)
     assert "agent_harness" in result["models"][0]["components"]

@@ -137,6 +137,16 @@ def test_korean_quality_flags_mojibake_and_repetition():
     assert q["chars"] == len(text)
 
 
+def test_korean_quality_recognizes_common_polite_endings():
+    for text in (
+        "접수가 시작됩니다.",
+        "정기적으로 확인합니다.",
+        "검토 결과입니다.",
+        "문의처로 연락해 주시기 바랍니다.",
+    ):
+        assert F.korean_quality(text)["register"] == "polite"
+
+
 def test_scan_asr_excludes_endpoint_errors():
     rows = [
         {"outcome": F.OUTCOME_ERROR, "english_ref_hit": None},

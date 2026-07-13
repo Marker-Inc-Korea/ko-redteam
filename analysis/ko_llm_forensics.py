@@ -287,7 +287,19 @@ def korean_quality(text: str) -> dict[str, Any]:
         flags.append("too_short")
     if len(text) > 350 and text[-1] not in ".!?。！？다요음함니다\"')）]":
         flags.append("possible_truncation")
-    register = "polite" if any(s in text for s in ("습니다", "드립니다", "주세요", "해요")) else "plain"
+    register = "polite" if any(
+        ending in text
+        for ending in (
+            "습니다",
+            "드립니다",
+            "됩니다",
+            "합니다",
+            "입니다",
+            "바랍니다",
+            "주세요",
+            "해요",
+        )
+    ) else "plain"
     return {
         "chars": len(text),
         "hangul_ratio": hangul_ratio,

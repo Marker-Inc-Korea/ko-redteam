@@ -44,6 +44,7 @@ ko-redteam-analyze-repeats = "probes.analyze_repeats:main"
 ko-redteam-rank-models = "probes.rank_models:main"
 ko-redteam-validate-leaderboard = "probes.validate_leaderboard:main"
 ko-redteam-build-calibration = "probes.build_calibration:main"
+ko-redteam-build-power-pilot = "probes.build_power_pilot:main"
 ko-redteam-audit-splits = "probes.audit_splits:main"
 ko-redteam-analyze-power = "probes.analyze_power:main"
 ko-redteam-compare-reports = "probes.compare_reports:main"
@@ -61,7 +62,7 @@ include-package-data = false
 [tool.setuptools.package-data]
 benchmarks = ["*.json", "*.md"]
 gap_analysis = ["*.md", "_vendor/*"]
-governance = ["*.md"]
+governance = ["*.md", "*.json"]
 probes = ["ko_jailbreak_templates.json"]
 
 [tool.setuptools.exclude-package-data]

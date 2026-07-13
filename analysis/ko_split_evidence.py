@@ -303,6 +303,29 @@ def build_split_audit(
         official_materials, official_groups
     )
 
+    def suite_domain_counts(
+        suites: dict[str, dict[str, Any]], groups: dict[str, str]
+    ) -> dict[str, dict[str, int]]:
+        values: dict[str, dict[str, set[str]]] = {
+            suite: {} for suite in OFFICIAL_SUITES
+        }
+        for suite in OFFICIAL_SUITES:
+            for case in suites[suite].get("cases") or []:
+                case_id = str(case.get("id") or "")
+                domain = str(case.get("domain") or "")
+                group = groups[f"{suite}:{case_id}"]
+                values[suite].setdefault(domain, set()).add(group)
+        return {
+            suite: {
+                domain: len(group_ids)
+                for domain, group_ids in sorted(values[suite].items())
+            }
+            for suite in OFFICIAL_SUITES
+        }
+
+    practice_suite_domains = suite_domain_counts(practice_suites, _practice_groups)
+    official_suite_domains = suite_domain_counts(official_suites, official_groups)
+
     (
         practice_vectors,
         official_vectors,
@@ -352,6 +375,7 @@ def build_split_audit(
             "suite_fingerprints": practice_fingerprints,
             "suite_case_counts": practice_suite_cases,
             "suite_independence_groups": practice_suite_groups,
+            "suite_domain_independence_groups": practice_suite_domains,
         },
         "official": {
             "cases": len(official_materials),
@@ -362,6 +386,7 @@ def build_split_audit(
             "suite_fingerprints": official_fingerprints,
             "suite_case_counts": official_suite_cases,
             "suite_independence_groups": official_suite_groups,
+            "suite_domain_independence_groups": official_suite_domains,
             "domain_independence_groups": official_domain_groups,
         },
         "audit": {

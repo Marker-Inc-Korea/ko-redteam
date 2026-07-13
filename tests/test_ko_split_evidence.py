@@ -141,6 +141,12 @@ def test_split_audit_is_metadata_only_and_counts_global_groups():
     assert report["official"]["suite_independence_groups"] == {
         suite: 1 for suite in S.OFFICIAL_SUITES
     }
+    assert report["official"]["suite_domain_independence_groups"] == {
+        "paperbench": {"safety": 1},
+        "mini_single": {"overrefusal": 1},
+        "multiturn": {"privacy": 1},
+        "agent_harness": {"agent_rag": 1},
+    }
     assert "official-paperbench-001" not in encoded
     assert "한국어 보안 평가" not in encoded
 
