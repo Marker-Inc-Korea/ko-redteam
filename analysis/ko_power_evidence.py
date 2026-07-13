@@ -265,6 +265,7 @@ def build_power_report(data: dict[str, Any]) -> dict[str, Any]:
                 "lower_runs",
                 "temperature",
                 "max_tokens",
+                "agent_tool_call_mode",
                 "weight_profile",
                 "construction_method",
                 "builder_code_sha256",
@@ -338,6 +339,8 @@ def build_power_report(data: dict[str, Any]) -> dict[str, Any]:
         max_tokens = pilot_source.get("max_tokens")
         if not isinstance(max_tokens, int) or isinstance(max_tokens, bool) or max_tokens < 1:
             raise ValueError("pilot_source.max_tokens must be positive")
+        if pilot_source.get("agent_tool_call_mode") != "prompt_json_v1":
+            raise ValueError("pilot_source.agent_tool_call_mode must be prompt_json_v1")
 
     clusters = data.get("pilot_clusters")
     if not isinstance(clusters, list) or len(clusters) < MIN_PILOT_CLUSTERS:

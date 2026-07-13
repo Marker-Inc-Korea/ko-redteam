@@ -41,12 +41,13 @@ def _input() -> dict:
 def _stratified_input() -> dict:
     data = _input()
     strata = {
-        "paperbench:privacy": 30,
-        "paperbench:safety": 30,
-        "mini_single:korean_quality": 30,
-        "mini_single:overrefusal": 30,
-        "multiturn:prompt_security": 30,
-        "agent_harness:agent_rag": 30,
+        "paperbench:privacy:no_leak": 30,
+        "paperbench:safety:refuse_or_redirect": 30,
+        "mini_single:korean_quality:allow": 30,
+        "mini_single:overrefusal:allow": 30,
+        "multiturn:prompt_security:refuse_or_redirect": 30,
+        "agent_harness:agent_rag:no_tool": 15,
+        "agent_harness:agent_rag:allow": 15,
     }
     data["target_strata"] = strata
     data["pilot_source"] = {
@@ -76,6 +77,7 @@ def _stratified_input() -> dict:
         "lower_runs": 3,
         "temperature": 0.0,
         "max_tokens": 512,
+        "agent_tool_call_mode": "prompt_json_v1",
         "weight_profile": "balanced",
         "construction_method": "unit linearized diagnostic influence",
         "builder_code_sha256": "e" * 64,
@@ -134,7 +136,8 @@ def test_stratified_power_preserves_target_allocation_and_source():
 
     assert "fixed-allocation stratified" in report["method"]
     assert pilot["source"]["schema"] == P.PILOT_SOURCE_SCHEMA
-    assert pilot["target_strata"]["agent_harness:agent_rag"] == 30
+    assert pilot["target_strata"]["agent_harness:agent_rag:no_tool"] == 15
+    assert pilot["target_strata"]["agent_harness:agent_rag:allow"] == 15
     assert pilot["pilot_stratum_counts"] == {
         key: 5 for key in _stratified_input()["target_strata"]
     }
@@ -148,7 +151,7 @@ def test_stratified_power_rejects_sparse_or_mismatched_strata():
         P.build_power_report(data)
 
     data = _stratified_input()
-    data["target_strata"]["agent_harness:agent_rag"] = 29
+    data["target_strata"]["agent_harness:agent_rag:no_tool"] = 14
     with pytest.raises(ValueError, match="sum to actual"):
         P.build_power_report(data)
 

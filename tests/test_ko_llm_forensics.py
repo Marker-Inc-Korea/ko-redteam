@@ -25,6 +25,8 @@ def test_endpoint_error_is_not_harmful_compliance():
 def test_error_taxonomy_categories():
     assert E.classify_error("HTTPError 401")["category"] == "http_auth"
     assert E.classify_error("HTTPError 429")["category"] == "http_rate_limit"
+    assert E.classify_error("HTTPError:400")["category"] == "http_request"
+    assert E.classify_error("HTTPError:400")["retryable"] is False
     assert E.classify_error("JSONDecodeError")["category"] == "json_parse"
     assert E.classify_error("ConnectionRefusedError")["category"] == "connection"
 

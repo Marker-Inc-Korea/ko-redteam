@@ -114,18 +114,23 @@ def _report(
         }
         rows = []
         for domain in suite_domains[suite]:
-            expected = protected_expectations.get(domain, "allow")
-            outcome = protected_outcome if expected != "allow" else "unknown"
-            for index in range(30):
-                case_id = f"{suite}-{domain}-{index:03d}"
-                rows.append(_row(
-                    case_id,
-                    score=score,
-                    expected=expected,
-                    outcome=outcome,
-                    group=case_id,
-                    domain=domain,
-                ))
+            allocations = (
+                [("no_tool", 15), ("allow", 15)]
+                if suite == "agent_harness"
+                else [(protected_expectations.get(domain, "allow"), 30)]
+            )
+            for expected, count in allocations:
+                outcome = protected_outcome if expected != "allow" else "unknown"
+                for index in range(count):
+                    case_id = f"{suite}-{domain}-{expected}-{index:03d}"
+                    rows.append(_row(
+                        case_id,
+                        score=score,
+                        expected=expected,
+                        outcome=outcome,
+                        group=case_id,
+                        domain=domain,
+                    ))
     else:
         rows = [
             _row(
@@ -153,7 +158,11 @@ def _report(
             "path": f"{suite}.json",
             "content_sha256": hashlib.sha256(suite.encode()).hexdigest(),
         },
-        "evaluation": {"temperature": 0.0, "max_tokens": 512},
+        "evaluation": {
+            "temperature": 0.0,
+            "max_tokens": 512,
+            **({"tool_call_mode": "prompt_json_v1"} if suite == "agent_harness" else {}),
+        },
         "model": model,
         "provenance": C.attach_run_context(context, served_model=model),
         "scorecard": {"case_scores": rows},
@@ -283,6 +292,10 @@ def _valid_release(tmp_path: Path) -> Path:
             "suite_domain_independence_groups": {
                 suite: {"safety": 45} for suite in R.SUITES
             },
+            "suite_domain_expected_independence_groups": {
+                suite: {"safety": {"refuse_or_redirect": 45}}
+                for suite in R.SUITES
+            },
         },
         "official": {
             "cases": 180,
@@ -308,6 +321,22 @@ def _valid_release(tmp_path: Path) -> Path:
                 "mini_single": {"korean_quality": 30, "overrefusal": 30},
                 "multiturn": {"prompt_security": 30},
                 "agent_harness": {"agent_rag": 30},
+            },
+            "suite_domain_expected_independence_groups": {
+                "paperbench": {
+                    "privacy": {"no_leak": 30},
+                    "safety": {"refuse_or_redirect": 30},
+                },
+                "mini_single": {
+                    "korean_quality": {"allow": 30},
+                    "overrefusal": {"allow": 30},
+                },
+                "multiturn": {
+                    "prompt_security": {"refuse_or_redirect": 30},
+                },
+                "agent_harness": {
+                    "agent_rag": {"allow": 15, "no_tool": 15},
+                },
             },
             "domain_independence_groups": {domain: 30 for domain in L.REQUIRED_DOMAINS},
         },
@@ -350,7 +379,7 @@ def _valid_release(tmp_path: Path) -> Path:
         "simulation_iterations": 10000,
         "pilot_summary": {
             "dataset_sha256": "9" * 64,
-            "cluster_count": 30,
+            "cluster_count": 35,
             "standard_deviation": 8.0,
             "source": {
                 "schema": L.POWER_PILOT_SOURCE_SCHEMA,
@@ -369,6 +398,7 @@ def _valid_release(tmp_path: Path) -> Path:
                 "lower_runs": 3,
                 "temperature": 0.0,
                 "max_tokens": 512,
+                "agent_tool_call_mode": "prompt_json_v1",
                 "weight_profile": "balanced",
                 "construction_method": (
                     "target-allocation linearized balanced diagnostic influence"
@@ -377,20 +407,22 @@ def _valid_release(tmp_path: Path) -> Path:
                 "evaluator_git_commit": "a" * 40,
             },
             "pilot_stratum_counts": {
-                "paperbench:privacy": 5,
-                "paperbench:safety": 5,
-                "mini_single:korean_quality": 5,
-                "mini_single:overrefusal": 5,
-                "multiturn:prompt_security": 5,
-                "agent_harness:agent_rag": 5,
+                "paperbench:privacy:no_leak": 5,
+                "paperbench:safety:refuse_or_redirect": 5,
+                "mini_single:korean_quality:allow": 5,
+                "mini_single:overrefusal:allow": 5,
+                "multiturn:prompt_security:refuse_or_redirect": 5,
+                "agent_harness:agent_rag:no_tool": 5,
+                "agent_harness:agent_rag:allow": 5,
             },
             "target_strata": {
-                "paperbench:privacy": 30,
-                "paperbench:safety": 30,
-                "mini_single:korean_quality": 30,
-                "mini_single:overrefusal": 30,
-                "multiturn:prompt_security": 30,
-                "agent_harness:agent_rag": 30,
+                "paperbench:privacy:no_leak": 30,
+                "paperbench:safety:refuse_or_redirect": 30,
+                "mini_single:korean_quality:allow": 30,
+                "mini_single:overrefusal:allow": 30,
+                "multiturn:prompt_security:refuse_or_redirect": 30,
+                "agent_harness:agent_rag:no_tool": 15,
+                "agent_harness:agent_rag:allow": 15,
             },
         },
         "assumptions": ["Independent groups are exchangeable within pre-registered strata."],
@@ -466,6 +498,22 @@ def _valid_release(tmp_path: Path) -> Path:
                 "multiturn": {"prompt_security": 30},
                 "agent_harness": {"agent_rag": 30},
             },
+            "suite_domain_expected_independence_groups": {
+                "paperbench": {
+                    "privacy": {"no_leak": 30},
+                    "safety": {"refuse_or_redirect": 30},
+                },
+                "mini_single": {
+                    "korean_quality": {"allow": 30},
+                    "overrefusal": {"allow": 30},
+                },
+                "multiturn": {
+                    "prompt_security": {"refuse_or_redirect": 30},
+                },
+                "agent_harness": {
+                    "agent_rag": {"allow": 15, "no_tool": 15},
+                },
+            },
             "construction": {
                 "new_human_authored_groups": True,
                 "public_practice_prompts_reused": False,
@@ -482,6 +530,7 @@ def _valid_release(tmp_path: Path) -> Path:
             "minimum_repeats": 3,
             "temperature": 0.0,
             "max_tokens": 512,
+            "agent_tool_call_mode": "prompt_json_v1",
             "max_decision_flip_rate": 0.0,
             "maximum_official_submissions_per_model": 2,
             "immutable_model_revision_required": True,
@@ -637,6 +686,7 @@ def test_complete_release_bundle_is_publishable(tmp_path):
     assert power_input["pilot_source"]["suites"] == list(R.SUITES)
     assert power_input["pilot_source"]["temperature"] == 0.0
     assert power_input["pilot_source"]["max_tokens"] == 512
+    assert power_input["pilot_source"]["agent_tool_call_mode"] == "prompt_json_v1"
 
     changed_execution = json.loads(json.dumps(preregistration))
     changed_execution["execution"]["max_tokens"] = 256
@@ -672,6 +722,30 @@ def test_complete_release_bundle_is_publishable(tmp_path):
     }
     assert tampered["status"] == "not_publishable"
     assert "split.ranking_coverage_binding" in failed_ids
+
+
+def test_power_pilot_rejects_endpoint_error_rows(tmp_path):
+    release_path = _valid_release(tmp_path)
+    release = json.loads(release_path.read_text("utf-8"))
+    preregistration = json.loads(
+        (tmp_path / release["artifacts"]["preregistration"]["path"]).read_text("utf-8")
+    )
+    manifest_path = tmp_path / release["artifacts"]["ranking_manifest"]["path"]
+    manifest = json.loads(manifest_path.read_text("utf-8"))
+    artifact = manifest["models"][0]["runs"][0]["agent_harness"]
+    report_path = manifest_path.parent / artifact["path"]
+    report = json.loads(report_path.read_text("utf-8"))
+    report["scorecard"]["case_scores"][0]["outcome"] = "error"
+    _write_json(report_path, report)
+    artifact["sha256"] = _sha_file(report_path)
+    _write_json(manifest_path, manifest)
+
+    with pytest.raises(ValueError, match="rejects endpoint errors"):
+        PP.build_power_pilot_input(
+            manifest_path,
+            preregistration,
+            preregistered_at="2026-06-01T00:00:00+09:00",
+        )
 
 
 def test_release_requires_hashed_preregistration_artifact(tmp_path):

@@ -114,6 +114,7 @@ def test_score_benchmark_rows_balances_expanded_parent_groups():
     assert sc["cluster_overall"] == 75.0
     assert sc["independence_group_count"] == 2
     assert sc["independence_group_scores"] == {"parent-a": 50.0, "parent-b": 100.0}
+    assert sc["outcome_counts"]["error"] == 0
     assert sc["case_scores"][0]["independence_group"] == "parent-a"
     assert sc["case_scores"][0]["variant_type"] == "plain"
 
@@ -260,7 +261,7 @@ def test_benchmark_scan_cli_default_output_uses_cwd(tmp_path):
 
 
 def test_all_benchmark_files_load_and_strip_prompt():
-    for path in sorted((ROOT / "benchmarks").glob("ko_llm_*_v1.json")):
+    for path in sorted((ROOT / "benchmarks").glob("ko_llm_*_v*.json")):
         data = json.loads(path.read_text("utf-8"))
         if data.get("schema") != "ko-redteam.benchmark.v1":
             continue

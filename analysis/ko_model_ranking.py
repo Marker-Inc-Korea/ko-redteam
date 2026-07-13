@@ -187,6 +187,7 @@ def _report_identity(report: dict[str, Any]) -> dict[str, Any]:
         "benchmark_fingerprint": benchmark.get("content_sha256"),
         "temperature": evaluation.get("temperature"),
         "max_tokens": evaluation.get("max_tokens"),
+        "tool_call_mode": evaluation.get("tool_call_mode"),
         "reported_model": report.get("model"),
         "run_context_sha256": provenance.get("context_sha256"),
         "run_id": provenance.get("run_id"),
@@ -316,6 +317,13 @@ def load_ranking_manifest(
                     raise ValueError(
                         f"v2 ranking model name must match report served_model: {name}"
                     )
+                if (
+                    resolved["_identities"]["agent_harness"].get("tool_call_mode")
+                    != "prompt_json_v1"
+                ):
+                    raise ValueError(
+                        f"v2 ranking requires prompt_json_v1 agent transport: {name}"
+                    )
         loaded[name] = resolved_runs
     _validate_case_alignment(
         loaded,
@@ -351,6 +359,7 @@ def _validate_case_alignment(
         model_identity = runs[0]["_identities"]
         if require_disjoint_suite_groups:
             group_suites: dict[str, str] = {}
+            group_expected: dict[tuple[str, str], str] = {}
             for suite in suites:
                 for row in runs[0][suite].values():
                     group = str(row["independence_group"])
@@ -361,6 +370,17 @@ def _validate_case_alignment(
                             f"{model}/{group}"
                         )
                     group_suites[group] = suite
+                    expected_key = (suite, group)
+                    expected = str(row.get("expected") or "")
+                    if (
+                        expected_key in group_expected
+                        and group_expected[expected_key] != expected
+                    ):
+                        raise ValueError(
+                            "v2 ranking independence group mixes expected behavior: "
+                            f"{model}/{suite}/{group}"
+                        )
+                    group_expected[expected_key] = expected
         provenance_presence = [run.get("_provenance") is not None for run in runs]
         if any(provenance_presence) and not all(provenance_presence):
             raise ValueError(f"run provenance must be present for every run: {model}")
@@ -412,7 +432,7 @@ def _validate_identity(left: dict[str, Any], right: dict[str, Any], *, context: 
     for key in ("report_schema", "benchmark_name", "benchmark_version"):
         if left.get(key) != right.get(key):
             raise ValueError(f"report identity mismatch {context}: {key}")
-    for key in ("benchmark_fingerprint", "temperature", "max_tokens"):
+    for key in ("benchmark_fingerprint", "temperature", "max_tokens", "tool_call_mode"):
         values = (left.get(key), right.get(key))
         if any(value is not None for value in values) and values[0] != values[1]:
             raise ValueError(f"report identity mismatch {context}: {key}")
@@ -604,6 +624,13 @@ def _identity_summary(
         "generation_settings_complete": all(
             identity.get("temperature") is not None and identity.get("max_tokens") is not None
             for identity in identities
+        ),
+        "agent_tool_call_mode_complete": (
+            "agent_harness" not in suites
+            or all(
+                run["_identities"]["agent_harness"].get("tool_call_mode")
+                for run in runs
+            )
         ),
         "run_provenance_complete": all(provenance),
         "immutable_model_identity_complete": all(
@@ -882,10 +909,12 @@ def analyze_ranking_manifest(
     case_counts = {}
     domain_groups: dict[str, set[tuple[str, str]]] = {}
     suite_domain_groups: dict[str, dict[str, set[str]]] = {}
+    suite_domain_expected_groups: dict[str, dict[str, dict[str, set[str]]]] = {}
     for suite in suites:
         group_counts[suite] = len({row["independence_group"] for row in baseline[suite].values()})
         case_counts[suite] = len(baseline[suite])
         suite_domain_groups[suite] = {}
+        suite_domain_expected_groups[suite] = {}
         for row in baseline[suite].values():
             domain = str(row.get("domain") or "")
             group = str(row["independence_group"])
@@ -893,6 +922,10 @@ def analyze_ranking_manifest(
                 (suite, group)
             )
             suite_domain_groups[suite].setdefault(domain, set()).add(group)
+            expected = str(row.get("expected") or "")
+            suite_domain_expected_groups[suite].setdefault(domain, {}).setdefault(
+                expected, set()
+            ).add(group)
     benchmark_identities = {
         suite: {
             "name": runs_by_model[diagnostic_order[0]][0]["_identities"][suite].get("benchmark_name"),
@@ -944,6 +977,9 @@ def analyze_ranking_manifest(
                 suite: {
                     "temperature": runs_by_model[diagnostic_order[0]][0]["_identities"][suite].get("temperature"),
                     "max_tokens": runs_by_model[diagnostic_order[0]][0]["_identities"][suite].get("max_tokens"),
+                    **({
+                        "tool_call_mode": runs_by_model[diagnostic_order[0]][0]["_identities"][suite].get("tool_call_mode"),
+                    } if runs_by_model[diagnostic_order[0]][0]["_identities"][suite].get("tool_call_mode") is not None else {}),
                 }
                 for suite in suites
             },
@@ -955,6 +991,18 @@ def analyze_ranking_manifest(
                 suite: {
                     domain: len(groups)
                     for domain, groups in sorted(suite_domain_groups[suite].items())
+                }
+                for suite in suites
+            },
+            "suite_domain_expected_independence_groups": {
+                suite: {
+                    domain: {
+                        expected: len(groups)
+                        for expected, groups in sorted(
+                            suite_domain_expected_groups[suite][domain].items()
+                        )
+                    }
+                    for domain in sorted(suite_domain_expected_groups[suite])
                 }
                 for suite in suites
             },

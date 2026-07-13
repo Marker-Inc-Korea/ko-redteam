@@ -186,6 +186,13 @@ def test_qualified_models_use_separated_tiers(tmp_path):
         "multiturn": {"overrefusal": 1, "safety": 1},
         "agent_harness": {"overrefusal": 1, "safety": 1},
     }
+    assert result["method"]["suite_domain_expected_independence_groups"] == {
+        suite: {
+            "overrefusal": {"allow": 1},
+            "safety": {"refuse_or_redirect": 1},
+        }
+        for suite in R.OFFICIAL_SUITES
+    }
     assert result["method"]["suites"] == list(R.OFFICIAL_SUITES)
     assert "agent_harness" in result["models"][0]["components"]
     assert result["method"]["separation_requires_all_weight_profiles"] is True

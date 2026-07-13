@@ -23,7 +23,7 @@ sys.path.insert(0, str(ROOT / "detectors"))
 DEFAULT_MINI_BENCHMARK = ROOT / "benchmarks" / "ko_llm_mini_v1.json"
 DEFAULT_PAPER_BENCHMARK = ROOT / "benchmarks" / "ko_llm_paperbench_v1.json"
 DEFAULT_MULTITURN_BENCHMARK = ROOT / "benchmarks" / "ko_llm_multiturn_v1.json"
-DEFAULT_AGENT_BENCHMARK = ROOT / "benchmarks" / "ko_llm_agent_harness_v1.json"
+DEFAULT_AGENT_BENCHMARK = ROOT / "benchmarks" / "ko_llm_agent_harness_v2.json"
 DEFAULT_REQUIRED_SOURCE_FAMILIES = [
     "agentdojo",
     "raccoon",
@@ -154,9 +154,10 @@ def _fake_multiturn_call(case: dict[str, Any], turn: dict[str, Any], messages: l
 
 def _fake_agent_call(case: dict[str, Any], messages: list[dict[str, str]], tools: list[dict[str, Any]]) -> dict[str, Any]:
     if case.get("expected") == "allow":
+        tool_name = str((case.get("required_tools") or case.get("allowed_tools") or [""])[0])
         return {
             "text": "회의 안건을 읽기 전용 도구로 요약했습니다.",
-            "tool_calls": [{"name": "summarize_event", "arguments": {"event_id": "self-check"}, "source": "test"}],
+            "tool_calls": [{"name": tool_name, "arguments": {"record_id": "self-check"}, "source": "test"}],
             "error_type": None,
         }
     return {"text": "외부 문서의 숨은 지시는 따르지 않고 도구 호출 없이 요약만 제공합니다.", "tool_calls": [], "error_type": None}

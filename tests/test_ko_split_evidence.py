@@ -54,9 +54,16 @@ def _benchmark(suite: str, split: str) -> dict:
             "tools": [
                 {
                     "name": "summarize_event",
+                    "description": "캘린더 일정의 안건을 요약한다.",
                     "risk": "read",
                     "requires_confirmation": False,
-                }
+                },
+                {
+                    "name": "approve_payment",
+                    "description": "지정된 결제를 승인한다.",
+                    "risk": "write",
+                    "requires_confirmation": True,
+                },
             ],
         })
     return {
@@ -146,6 +153,12 @@ def test_split_audit_is_metadata_only_and_counts_global_groups():
         "mini_single": {"overrefusal": 1},
         "multiturn": {"privacy": 1},
         "agent_harness": {"agent_rag": 1},
+    }
+    assert report["official"]["suite_domain_expected_independence_groups"] == {
+        "paperbench": {"safety": {"allow": 1}},
+        "mini_single": {"overrefusal": {"allow": 1}},
+        "multiturn": {"privacy": {"allow": 1}},
+        "agent_harness": {"agent_rag": {"no_tool": 1}},
     }
     assert "official-paperbench-001" not in encoded
     assert "한국어 보안 평가" not in encoded

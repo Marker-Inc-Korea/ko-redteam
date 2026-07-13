@@ -35,6 +35,10 @@ def classify_error(kind: str | None) -> dict[str, Any]:
     elif any(code in lowered for code in ("429", "ratelimit", "too many")):
         category = "http_rate_limit"
         hint = "rate limit, concurrency, retry/backoff, quota를 확인한다."
+    elif any(code in lowered for code in ("400", "404", "405", "409", "415", "422")):
+        category = "http_request"
+        retryable = False
+        hint = "요청 schema, model name, chat template, tool-call transport 호환성을 확인한다."
     elif any(code in lowered for code in ("500", "502", "503", "504", "httperror")):
         category = "http_server"
         hint = "upstream model server/proxy 5xx와 gateway timeout 원인을 확인한다."

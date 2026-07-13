@@ -78,14 +78,25 @@ def _target_design(
         design.get("suite_domain_independence_groups"),
         "preregistration.official_split_design.suite_domain_independence_groups",
     )
+    expected_matrix = _object(
+        design.get("suite_domain_expected_independence_groups"),
+        "preregistration.official_split_design.suite_domain_expected_independence_groups",
+    )
     if set(matrix) != set(ranking.OFFICIAL_SUITES):
         raise ValueError("target design must contain all four official suites")
+    if set(expected_matrix) != set(ranking.OFFICIAL_SUITES):
+        raise ValueError("target expected design must contain all four official suites")
     target_strata: dict[str, int] = {}
     suite_counts: dict[str, int] = {}
     domains: set[str] = set()
     for suite in ranking.OFFICIAL_SUITES:
         suite_domains = _object(matrix[suite], f"target matrix {suite}")
         suite_counts[suite] = 0
+        suite_expected_domains = _object(
+            expected_matrix[suite], f"target expected matrix {suite}"
+        )
+        if set(suite_expected_domains) != set(suite_domains):
+            raise ValueError(f"target expected domains must match domain allocation: {suite}")
         for domain, count in suite_domains.items():
             if (
                 not isinstance(domain, str)
@@ -95,7 +106,25 @@ def _target_design(
                 or count <= 0
             ):
                 raise ValueError("target stratum names and counts must be valid")
-            target_strata[f"{suite}:{domain}"] = count
+            expected_counts = _object(
+                suite_expected_domains[domain], f"target expected matrix {suite}:{domain}"
+            )
+            if (
+                not expected_counts
+                or not set(expected_counts) <= ranking.PROTECTED | {"allow"}
+                or any(
+                    not isinstance(value, int)
+                    or isinstance(value, bool)
+                    or value <= 0
+                    for value in expected_counts.values()
+                )
+                or sum(expected_counts.values()) != count
+            ):
+                raise ValueError(
+                    f"target expected allocation must be positive and sum to domain count: {suite}:{domain}"
+                )
+            for expected, expected_count in expected_counts.items():
+                target_strata[f"{suite}:{domain}:{expected}"] = expected_count
             suite_counts[suite] += count
             domains.add(domain)
     if domains != PROTECTED_DOMAINS | ALLOW_DOMAINS:
@@ -115,6 +144,7 @@ def _group_influence(
     *,
     suite: str,
     domain: str,
+    expected: str,
     weights: dict[str, float],
     total_groups: int,
     suite_groups: int,
@@ -124,12 +154,14 @@ def _group_influence(
     if {str(row.get("domain") or "") for row in rows} != {domain}:
         raise ValueError(f"pilot independence group mixes domains: {suite}:{domain}")
     expectations = {str(row.get("expected") or "") for row in rows}
+    if expectations != {expected}:
+        raise ValueError(f"pilot independence group mixes expected behavior: {suite}:{domain}:{expected}")
     protected = bool(expectations) and expectations <= ranking.PROTECTED
     allowed = expectations == {"allow"}
-    if domain in PROTECTED_DOMAINS and not protected:
-        raise ValueError(f"protected pilot stratum has non-protected cases: {suite}:{domain}")
-    if domain in ALLOW_DOMAINS and not allowed:
-        raise ValueError(f"allow pilot stratum has non-allow cases: {suite}:{domain}")
+    if expected in ranking.PROTECTED and not protected:
+        raise ValueError(f"protected pilot stratum has non-protected cases: {suite}:{domain}:{expected}")
+    if expected == "allow" and not allowed:
+        raise ValueError(f"allow pilot stratum has non-allow cases: {suite}:{domain}:{expected}")
 
     suite_score = mean(float(row.get("score") or 0.0) for row in rows)
     contribution = weights[SUITE_COMPONENTS[suite]] * suite_score / suite_groups
@@ -167,6 +199,13 @@ def build_power_pilot_input(
         raise ValueError("power pilot requires a v2 hashed ranking manifest")
     if suites != ranking.OFFICIAL_SUITES:
         raise ValueError("power pilot requires all four official suites")
+    for model_name, runs in runs_by_model.items():
+        for run_index, run in enumerate(runs, 1):
+            for suite in suites:
+                if any(row.get("outcome") == "error" for row in run[suite].values()):
+                    raise ValueError(
+                        f"power pilot rejects endpoint errors: {model_name}/run_{run_index}/{suite}"
+                    )
 
     references = _references(preregistration)
     upper_reference = references["upper_anchor"]
@@ -207,12 +246,14 @@ def build_power_pilot_input(
         raise ValueError("power pilot procedure does not match preregistration")
     temperature = execution.get("temperature")
     max_tokens = execution.get("max_tokens")
+    agent_tool_call_mode = execution.get("agent_tool_call_mode")
     if (
         isinstance(temperature, bool)
         or not isinstance(temperature, (int, float))
         or isinstance(max_tokens, bool)
         or not isinstance(max_tokens, int)
         or max_tokens < 1
+        or agent_tool_call_mode != "prompt_json_v1"
     ):
         raise ValueError("pre-registered generation settings are invalid")
 
@@ -243,6 +284,10 @@ def build_power_pilot_input(
                     != frozen_fingerprints.get(suite)
                     or report_identity.get("temperature") != temperature
                     or report_identity.get("max_tokens") != max_tokens
+                    or (
+                        suite == "agent_harness"
+                        and report_identity.get("tool_call_mode") != agent_tool_call_mode
+                    )
                 ):
                     raise ValueError(
                         f"{role} pilot benchmark or generation settings changed: {suite}"
@@ -252,9 +297,8 @@ def build_power_pilot_input(
     target_strata, suite_counts = _target_design(preregistration)
     total_groups = sum(target_strata.values())
     protected_groups = sum(
-        count
-        for key, count in target_strata.items()
-        if key.rsplit(":", 1)[1] in PROTECTED_DOMAINS
+        count for key, count in target_strata.items()
+        if key.rsplit(":", 1)[1] in ranking.PROTECTED
     )
     allow_groups = total_groups - protected_groups
     profiles = _object(statistics.get("weight_profiles"), "statistics.weight_profiles")
@@ -279,13 +323,20 @@ def build_power_pilot_input(
             if len(domains) != 1:
                 raise ValueError(f"pilot group mixes domains: {suite}:{group}")
             domain = next(iter(domains))
-            stratum = f"{suite}:{domain}"
+            expectations = {
+                str(row.get("expected") or "") for row in upper_groups[group]
+            }
+            if len(expectations) != 1:
+                raise ValueError(f"pilot group mixes expected behavior: {suite}:{group}")
+            expected = next(iter(expectations))
+            stratum = f"{suite}:{domain}:{expected}"
             if stratum not in target_strata:
                 continue
             upper_value = _group_influence(
                 upper_groups[group],
                 suite=suite,
                 domain=domain,
+                expected=expected,
                 weights=weights,
                 total_groups=total_groups,
                 suite_groups=suite_counts[suite],
@@ -296,6 +347,7 @@ def build_power_pilot_input(
                 lower_groups[group],
                 suite=suite,
                 domain=domain,
+                expected=expected,
                 weights=weights,
                 total_groups=total_groups,
                 suite_groups=suite_counts[suite],
@@ -343,6 +395,7 @@ def build_power_pilot_input(
         "lower_runs": len(runs_by_model[lower_name]),
         "temperature": float(temperature),
         "max_tokens": max_tokens,
+        "agent_tool_call_mode": agent_tool_call_mode,
         "weight_profile": "balanced",
         "construction_method": CONSTRUCTION_METHOD,
         "builder_code_sha256": builder_code_sha256,
@@ -370,7 +423,7 @@ def build_power_pilot_input(
         "simulation_iterations": simulation_iterations,
         "seed": seed,
         "assumptions": [
-            "Paired reference-group influence values are exchangeable within each frozen suite/domain stratum.",
+            "Paired reference-group influence values are exchangeable within each frozen suite/domain/expected stratum.",
             "The public-practice within-stratum variance is applicable to the newly authored official split.",
             "Official stratum allocation and the balanced diagnostic weights remain fixed for the season.",
         ],

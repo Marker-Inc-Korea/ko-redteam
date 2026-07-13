@@ -73,6 +73,7 @@ def test_package_data_paths_exist():
     assert (ROOT / "benchmarks" / "ko_llm_mini_v1.json").exists()
     assert (ROOT / "benchmarks" / "ko_llm_multiturn_v1.json").exists()
     assert (ROOT / "benchmarks" / "ko_llm_agent_harness_v1.json").exists()
+    assert (ROOT / "benchmarks" / "ko_llm_agent_harness_v2.json").exists()
     assert (ROOT / "probes" / "ko_jailbreak_templates.json").exists()
     assert (ROOT / "LEADERBOARD_PROTOCOL.md").exists()
     assert (ROOT / "governance" / "SEASON_OPERATIONS.md").exists()
@@ -125,7 +126,7 @@ def test_analysis_package_imports_without_flat_pythonpath():
     assert "package-import-ok" in cp.stdout
 
 
-def test_ci_runs_redteam_suite_multiturn_agent_smoke():
+def test_ci_runs_redteam_suite_multiturn_agent_hard_fail_check():
     workflow_path = ROOT.parent / ".github" / "workflows" / "tests.yml"
     if not workflow_path.exists():
         return
@@ -133,8 +134,11 @@ def test_ci_runs_redteam_suite_multiturn_agent_smoke():
     assert "ko-redteam-suite" in workflow
     assert "--multiturn" in workflow
     assert "--agent-harness" in workflow
+    assert "endpoint errors hard-fail" in workflow
+    assert 'report["status"] == "fail"' in workflow
+    assert 'report["summaries"]["measurement_integrity"]' in workflow
     assert "python -m build --sdist --wheel" in workflow
-    assert "suite_ci/suite_manifest.json" in workflow
+    assert "suite_error_ci/suite_manifest.json" in workflow
 
 
 def test_user_facing_docs_keep_external_scanner_references_neutral():

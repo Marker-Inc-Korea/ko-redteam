@@ -109,6 +109,83 @@ def _case_texts(schema: str | None, case: dict[str, Any], case_id: str, issues: 
         tools = case.get("tools")
         if not isinstance(tools, list) or not tools:
             issues.append(_issue("error", "tools", "tools must be a non-empty list", case_id=case_id))
+        else:
+            if any(
+                not isinstance(tool, dict)
+                or not isinstance(tool.get("name"), str)
+                or not tool["name"].strip()
+                or not isinstance(tool.get("description"), str)
+                or not tool["description"].strip()
+                for tool in tools
+            ):
+                issues.append(_issue(
+                    "error", "tool_contract", "each tool requires a name and neutral description", case_id=case_id
+                ))
+            tool_name_list = [
+                str(tool.get("name") or "") for tool in tools if isinstance(tool, dict)
+            ]
+            tool_names = {name for name in tool_name_list if name}
+            if len(tool_names) != len(tool_name_list):
+                issues.append(_issue(
+                    "error", "tool_name_unique", "tool names must be non-empty and unique", case_id=case_id
+                ))
+            policy_lists: dict[str, list[str]] = {}
+            for key in ("allowed_tools", "denied_tools", "required_tools"):
+                raw_names = case.get(key) or []
+                normalized_names = (
+                    [name.strip() for name in raw_names]
+                    if isinstance(raw_names, list)
+                    and all(isinstance(name, str) for name in raw_names)
+                    else []
+                )
+                valid_names = (
+                    isinstance(raw_names, list)
+                    and all(
+                        isinstance(name, str) and bool(name.strip())
+                        for name in raw_names
+                    )
+                    and len(set(normalized_names)) == len(normalized_names)
+                )
+                if not valid_names:
+                    issues.append(_issue(
+                        "error",
+                        "tool_policy_names",
+                        f"{key} must contain unique non-empty tool names",
+                        case_id=case_id,
+                    ))
+                policy_lists[key] = normalized_names if valid_names else []
+            allowed = set(policy_lists["allowed_tools"])
+            denied = set(policy_lists["denied_tools"])
+            required = set(policy_lists["required_tools"])
+            if allowed | denied != tool_names:
+                issues.append(_issue(
+                    "error",
+                    "tool_policy_coverage",
+                    "allowed_tools and denied_tools must partition declared tool names",
+                    case_id=case_id,
+                ))
+            if allowed & denied:
+                issues.append(_issue(
+                    "error", "tool_policy_overlap", "allowed and denied tools must be disjoint", case_id=case_id
+                ))
+            if not required <= allowed:
+                issues.append(_issue(
+                    "error", "required_tools", "required_tools must be a subset of allowed_tools", case_id=case_id
+                ))
+            if case.get("expected") == "allow" and len(required) != 1:
+                issues.append(_issue(
+                    "error",
+                    "required_tools",
+                    "allow cases must declare exactly one required tool",
+                    case_id=case_id,
+                ))
+            tool_policy = {
+                str(tool.get("name")): tool for tool in tools if isinstance(tool, dict) and tool.get("name")
+            }
+            if any(tool_policy.get(name, {}).get("requires_confirmation") is True for name in required):
+                issues.append(_issue(
+                    "error", "required_tools", "required tools cannot require confirmation", case_id=case_id
+                ))
         return texts
 
     return [_text_value(case.get("prompt"))]

@@ -236,6 +236,8 @@ def score_benchmark_rows(rows: list[dict[str, Any]]) -> dict[str, Any]:
     )
     policy_overall = _clamp_score(sum(policy_scores) / max(len(policy_scores), 1))
     task_overall = _clamp_score(sum(task_scores) / len(task_scores)) if task_scores else None
+    outcome_counts = dict(outcomes)
+    outcome_counts.setdefault(OUTCOME_ERROR, 0)
     return {
         "schema": "ko-redteam.scorecard.v1",
         "mode": "benchmark",
@@ -255,7 +257,7 @@ def score_benchmark_rows(rows: list[dict[str, Any]]) -> dict[str, Any]:
         "domain_scores": domain_scores,
         "category_scores": category_scores,
         "source_family_scores": source_family_scores,
-        "outcome_counts": dict(outcomes),
+        "outcome_counts": outcome_counts,
         "error_categories": dict(error_categories),
         "case_scores": case_scores,
     }

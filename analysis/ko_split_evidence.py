@@ -80,6 +80,7 @@ def _case_material(schema: str, case: dict[str, Any]) -> str:
             json.dumps(tool_contract, ensure_ascii=False, sort_keys=True),
             json.dumps(case.get("allowed_tools") or [], ensure_ascii=False, sort_keys=True),
             json.dumps(case.get("denied_tools") or [], ensure_ascii=False, sort_keys=True),
+            json.dumps(case.get("required_tools") or [], ensure_ascii=False, sort_keys=True),
         ])
     raise ValueError(f"unsupported benchmark schema: {schema}")
 
@@ -95,6 +96,7 @@ def _collect_split(
     hashes: dict[str, str] = {}
     groups: dict[str, str] = {}
     group_domains: dict[str, str] = {}
+    group_expected: dict[str, str] = {}
     group_suites: dict[str, str] = {}
     suite_fingerprints: dict[str, str] = {}
     for suite in OFFICIAL_SUITES:
@@ -139,6 +141,12 @@ def _collect_split(
                     f"independence group spans multiple domains: {group}"
                 )
             group_domains[group] = domain
+            expected = str(case.get("expected") or "")
+            if group in group_expected and group_expected[group] != expected:
+                raise ValueError(
+                    f"independence group spans multiple expected behaviors: {group}"
+                )
+            group_expected[group] = expected
             group_suites[group] = suite
             groups[public_id] = group
     duplicate_hashes = [
@@ -326,6 +334,37 @@ def build_split_audit(
     practice_suite_domains = suite_domain_counts(practice_suites, _practice_groups)
     official_suite_domains = suite_domain_counts(official_suites, official_groups)
 
+    def suite_domain_expected_counts(
+        suites: dict[str, dict[str, Any]], groups: dict[str, str]
+    ) -> dict[str, dict[str, dict[str, int]]]:
+        values: dict[str, dict[str, dict[str, set[str]]]] = {
+            suite: {} for suite in OFFICIAL_SUITES
+        }
+        for suite in OFFICIAL_SUITES:
+            for case in suites[suite].get("cases") or []:
+                case_id = str(case.get("id") or "")
+                domain = str(case.get("domain") or "")
+                expected = str(case.get("expected") or "")
+                group = groups[f"{suite}:{case_id}"]
+                values[suite].setdefault(domain, {}).setdefault(expected, set()).add(group)
+        return {
+            suite: {
+                domain: {
+                    expected: len(group_ids)
+                    for expected, group_ids in sorted(values[suite][domain].items())
+                }
+                for domain in sorted(values[suite])
+            }
+            for suite in OFFICIAL_SUITES
+        }
+
+    practice_suite_domain_expected = suite_domain_expected_counts(
+        practice_suites, _practice_groups
+    )
+    official_suite_domain_expected = suite_domain_expected_counts(
+        official_suites, official_groups
+    )
+
     (
         practice_vectors,
         official_vectors,
@@ -376,6 +415,7 @@ def build_split_audit(
             "suite_case_counts": practice_suite_cases,
             "suite_independence_groups": practice_suite_groups,
             "suite_domain_independence_groups": practice_suite_domains,
+            "suite_domain_expected_independence_groups": practice_suite_domain_expected,
         },
         "official": {
             "cases": len(official_materials),
@@ -387,6 +427,7 @@ def build_split_audit(
             "suite_case_counts": official_suite_cases,
             "suite_independence_groups": official_suite_groups,
             "suite_domain_independence_groups": official_suite_domains,
+            "suite_domain_expected_independence_groups": official_suite_domain_expected,
             "domain_independence_groups": official_domain_groups,
         },
         "audit": {

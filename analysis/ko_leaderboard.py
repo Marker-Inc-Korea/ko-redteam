@@ -38,15 +38,17 @@ REQUIRED_DOMAINS = {
     "overrefusal",
     "korean_quality",
 }
+REQUIRED_EXPECTED = {"allow", "no_leak", "no_tool", "refuse_or_redirect"}
 SUITES = OFFICIAL_SUITES
 CONFUSION_KEYS = ("tp", "fp", "tn", "fn")
 REQUIRED_POWER_STRATA = {
-    "paperbench:privacy",
-    "paperbench:safety",
-    "mini_single:korean_quality",
-    "mini_single:overrefusal",
-    "multiturn:prompt_security",
-    "agent_harness:agent_rag",
+    "paperbench:privacy:no_leak",
+    "paperbench:safety:refuse_or_redirect",
+    "mini_single:korean_quality:allow",
+    "mini_single:overrefusal:allow",
+    "multiturn:prompt_security:refuse_or_redirect",
+    "agent_harness:agent_rag:no_tool",
+    "agent_harness:agent_rag:allow",
 }
 
 PUBLIC_REQUIREMENTS = {
@@ -444,6 +446,11 @@ def _audit_ranking(audit: _Audit, ranking: dict[str, Any], ranking_manifest: dic
         if isinstance(method.get("suite_domain_independence_groups"), dict)
         else {}
     )
+    suite_domain_expected_counts = (
+        method.get("suite_domain_expected_independence_groups")
+        if isinstance(method.get("suite_domain_expected_independence_groups"), dict)
+        else {}
+    )
     suite_group_total = (
         sum(suite_group_counts.values())
         if set(suite_group_counts) == set(SUITES)
@@ -467,6 +474,31 @@ def _audit_ranking(audit: _Audit, ranking: dict[str, Any], ranking_manifest: dic
             )
             and sum(suite_domain_counts[suite].values())
             == suite_group_counts.get(suite)
+            for suite in SUITES
+        )
+    )
+    suite_domain_expected_valid = (
+        set(suite_domain_expected_counts) == set(SUITES)
+        and suite_domain_valid
+        and all(
+            isinstance(suite_domain_expected_counts[suite], dict)
+            and set(suite_domain_expected_counts[suite])
+            == set(suite_domain_counts[suite])
+            and all(
+                isinstance(suite_domain_expected_counts[suite][domain], dict)
+                and bool(suite_domain_expected_counts[suite][domain])
+                and set(suite_domain_expected_counts[suite][domain])
+                <= REQUIRED_EXPECTED
+                and all(
+                    isinstance(value, int)
+                    and not isinstance(value, bool)
+                    and value > 0
+                    for value in suite_domain_expected_counts[suite][domain].values()
+                )
+                and sum(suite_domain_expected_counts[suite][domain].values())
+                == suite_domain_counts[suite][domain]
+                for domain in suite_domain_counts[suite]
+            )
             for suite in SUITES
         )
     )
@@ -505,6 +537,7 @@ def _audit_ranking(audit: _Audit, ranking: dict[str, Any], ranking_manifest: dic
         )
         and sum(domain_group_counts.values()) == suite_group_total
         and suite_domain_valid
+        and suite_domain_expected_valid
         and matrix_domain_totals == domain_group_counts,
         "official ranking reports must contain the six declared domains at the minimum independent-group coverage",
     )
@@ -1149,6 +1182,16 @@ def _audit_split(audit: _Audit, split: dict[str, Any], ranking: dict[str, Any] |
         if isinstance(official.get("suite_domain_independence_groups"), dict)
         else {}
     )
+    practice_suite_domain_expected = (
+        practice.get("suite_domain_expected_independence_groups")
+        if isinstance(practice.get("suite_domain_expected_independence_groups"), dict)
+        else {}
+    )
+    official_suite_domain_expected = (
+        official.get("suite_domain_expected_independence_groups")
+        if isinstance(official.get("suite_domain_expected_independence_groups"), dict)
+        else {}
+    )
     ranking_method = (
         ranking.get("method")
         if isinstance(ranking, dict) and isinstance(ranking.get("method"), dict)
@@ -1172,6 +1215,11 @@ def _audit_split(audit: _Audit, split: dict[str, Any], ranking: dict[str, Any] |
     ranking_suite_domains = (
         ranking_method.get("suite_domain_independence_groups")
         if isinstance(ranking_method.get("suite_domain_independence_groups"), dict)
+        else {}
+    )
+    ranking_suite_domain_expected = (
+        ranking_method.get("suite_domain_expected_independence_groups")
+        if isinstance(ranking_method.get("suite_domain_expected_independence_groups"), dict)
         else {}
     )
 
@@ -1211,6 +1259,33 @@ def _audit_split(audit: _Audit, split: dict[str, Any], ranking: dict[str, Any] |
             )
         )
 
+    def valid_suite_domain_expected(
+        expected_matrix: dict[str, Any], domain_matrix: dict[str, Any]
+    ) -> bool:
+        return (
+            set(expected_matrix) == set(SUITES)
+            and set(domain_matrix) == set(SUITES)
+            and all(
+                isinstance(expected_matrix[suite], dict)
+                and set(expected_matrix[suite]) == set(domain_matrix[suite])
+                and all(
+                    isinstance(expected_matrix[suite][domain], dict)
+                    and bool(expected_matrix[suite][domain])
+                    and set(expected_matrix[suite][domain]) <= REQUIRED_EXPECTED
+                    and all(
+                        isinstance(value, int)
+                        and not isinstance(value, bool)
+                        and value > 0
+                        for value in expected_matrix[suite][domain].values()
+                    )
+                    and sum(expected_matrix[suite][domain].values())
+                    == domain_matrix[suite][domain]
+                    for domain in domain_matrix[suite]
+                )
+                for suite in SUITES
+            )
+        )
+
     official_matrix_domain_totals = {
         domain: sum(
             official_suite_domains[suite].get(domain, 0) for suite in SUITES
@@ -1223,6 +1298,12 @@ def _audit_split(audit: _Audit, split: dict[str, Any], ranking: dict[str, Any] |
         and valid_suite_counts(official_suite_cases, official_suite_groups)
         and valid_suite_domains(practice_suite_domains, practice_suite_groups)
         and valid_suite_domains(official_suite_domains, official_suite_groups)
+        and valid_suite_domain_expected(
+            practice_suite_domain_expected, practice_suite_domains
+        )
+        and valid_suite_domain_expected(
+            official_suite_domain_expected, official_suite_domains
+        )
         and sum(practice_suite_cases.values()) == practice_cases
         and sum(official_suite_cases.values()) == official_cases
         and sum(official_suite_groups.values()) == group_total
@@ -1230,6 +1311,7 @@ def _audit_split(audit: _Audit, split: dict[str, Any], ranking: dict[str, Any] |
         and official_suite_groups == ranking_suite_groups
         and domain_groups == ranking_domain_groups
         and official_suite_domains == ranking_suite_domains
+        and official_suite_domain_expected == ranking_suite_domain_expected
         and official_matrix_domain_totals == domain_groups
     )
     audit.check(
@@ -1350,6 +1432,7 @@ def _audit_power(audit: _Audit, power: dict[str, Any]) -> None:
         and isinstance(pilot_source.get("max_tokens"), int)
         and not isinstance(pilot_source.get("max_tokens"), bool)
         and pilot_source.get("max_tokens") > 0
+        and pilot_source.get("agent_tool_call_mode") == "prompt_json_v1"
         and pilot_source.get("upper_model") != pilot_source.get("lower_model")
         and all(
             isinstance(pilot_source.get(key), str)
@@ -1508,6 +1591,11 @@ def _audit_preregistration(
         if isinstance(design.get("suite_domain_independence_groups"), dict)
         else {}
     )
+    expected_matrix = (
+        design.get("suite_domain_expected_independence_groups")
+        if isinstance(design.get("suite_domain_expected_independence_groups"), dict)
+        else {}
+    )
     matrix_valid = (
         set(matrix) == set(SUITES)
         and all(
@@ -1527,6 +1615,29 @@ def _audit_preregistration(
         domain: sum(matrix[suite].get(domain, 0) for suite in SUITES)
         for domain in REQUIRED_DOMAINS
     } if matrix_valid else {}
+    expected_matrix_valid = (
+        matrix_valid
+        and set(expected_matrix) == set(SUITES)
+        and all(
+            isinstance(expected_matrix[suite], dict)
+            and set(expected_matrix[suite]) == set(matrix[suite])
+            and all(
+                isinstance(expected_matrix[suite][domain], dict)
+                and bool(expected_matrix[suite][domain])
+                and set(expected_matrix[suite][domain]) <= REQUIRED_EXPECTED
+                and all(
+                    isinstance(value, int)
+                    and not isinstance(value, bool)
+                    and value > 0
+                    for value in expected_matrix[suite][domain].values()
+                )
+                and sum(expected_matrix[suite][domain].values())
+                == matrix[suite][domain]
+                for domain in matrix[suite]
+            )
+            for suite in SUITES
+        )
+    )
     construction = (
         design.get("construction")
         if isinstance(design.get("construction"), dict)
@@ -1539,6 +1650,7 @@ def _audit_preregistration(
         and all(isinstance(domain, str) for domain in declared_domains)
         and set(declared_domains) == REQUIRED_DOMAINS
         and matrix_valid
+        and expected_matrix_valid
         and all(
             matrix_domains.get(domain, 0)
             >= PUBLIC_REQUIREMENTS["minimum_groups_per_domain"]
@@ -1571,8 +1683,10 @@ def _audit_preregistration(
         "benchmark_integrity",
         design_valid
         and official.get("suite_domain_independence_groups") == matrix
+        and official.get("suite_domain_expected_independence_groups")
+        == expected_matrix
         and official.get("domain_independence_groups") == matrix_domains,
-        "official split suite/domain group allocation must exactly match the frozen design",
+        "official split suite/domain/expected group allocation must exactly match the frozen design",
     )
 
     execution = (
@@ -1593,6 +1707,7 @@ def _audit_preregistration(
     )
     frozen_temperature = _number(execution.get("temperature"))
     frozen_max_tokens = execution.get("max_tokens")
+    frozen_agent_tool_call_mode = execution.get("agent_tool_call_mode")
     generation_settings_valid = (
         set(suite_generation_settings) == set(SUITES)
         and frozen_temperature is not None
@@ -1605,6 +1720,11 @@ def _audit_preregistration(
             == frozen_temperature
             and suite_generation_settings[suite].get("max_tokens")
             == frozen_max_tokens
+            and (
+                suite != "agent_harness"
+                or suite_generation_settings[suite].get("tool_call_mode")
+                == frozen_agent_tool_call_mode
+            )
             for suite in SUITES
         )
     )
@@ -1619,6 +1739,7 @@ def _audit_preregistration(
         == governance.get("max_official_submissions_per_model")
         and execution.get("immutable_model_revision_required") is True
         and execution.get("clean_evaluator_commit_required") is True
+        and frozen_agent_tool_call_mode == "prompt_json_v1"
         and generation_settings_valid,
         "ranking suites, generation settings, repeats, provenance, and submission limits must match preregistration",
     )
@@ -1799,10 +1920,12 @@ def _audit_preregistration(
         else {}
     )
     frozen_target_strata = {
-        f"{suite}:{domain}": count
-        for suite, domains in matrix.items()
+        f"{suite}:{domain}:{expected}": count
+        for suite, domains in expected_matrix.items()
         if isinstance(domains, dict)
-        for domain, count in domains.items()
+        for domain, expected_counts in domains.items()
+        if isinstance(expected_counts, dict)
+        for expected, count in expected_counts.items()
     }
     pilot_minimum = power_pilot_design.get("minimum_groups_per_stratum")
     pilot_repeats = power_pilot_design.get("minimum_repeats")
@@ -1836,6 +1959,8 @@ def _audit_preregistration(
         and frozen_pilot_temperature is not None
         and pilot_temperature == frozen_pilot_temperature
         and power_pilot_source.get("max_tokens") == execution.get("max_tokens")
+        and power_pilot_source.get("agent_tool_call_mode")
+        == execution.get("agent_tool_call_mode")
         and power_pilot_source.get("weight_profile")
         == power_pilot_design.get("weight_profile")
         and power_pilot_source.get("construction_method")

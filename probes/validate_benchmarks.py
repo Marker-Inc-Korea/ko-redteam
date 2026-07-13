@@ -22,12 +22,12 @@ def _is_supported_benchmark(path: Path) -> bool:
 
 
 def _default_paths() -> list[Path]:
-    return [p for p in sorted((ROOT / "benchmarks").glob("ko_llm_*_v1.json")) if _is_supported_benchmark(p)]
+    return [p for p in sorted((ROOT / "benchmarks").glob("ko_llm_*_v*.json")) if _is_supported_benchmark(p)]
 
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("paths", nargs="*", help="benchmark JSON paths. 기본: benchmarks/ko_llm_*_v1.json 중 지원 schema 전체")
+    ap.add_argument("paths", nargs="*", help="benchmark JSON paths. 기본: benchmarks/ko_llm_*_v*.json 중 지원 schema 전체")
     ap.add_argument("--output", default=None, help="optional JSON audit path")
     ap.add_argument("--markdown-output", default=None, help="optional Markdown audit path")
     ap.add_argument("--fail-on-warnings", action="store_true", help="warnings도 non-zero exit으로 처리")
