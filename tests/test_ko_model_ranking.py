@@ -12,6 +12,26 @@ sys.path.insert(0, str(ROOT / "analysis"))
 import ko_model_ranking as R  # noqa: E402
 
 
+def test_holm_adjustment_controls_complete_comparison_family():
+    keys = [("balanced", "a", "b"), ("balanced", "a", "c"), ("balanced", "b", "c")]
+    adjusted = R._holm_adjust(dict(zip(keys, [0.01, 0.02, 0.50])))
+
+    assert adjusted[keys[0]] == 0.03
+    assert adjusted[keys[1]] == 0.04
+    assert adjusted[keys[2]] == 0.50
+
+
+def test_confidence_tiers_do_not_claim_nontransitive_boundaries():
+    separated_pairs = {("a", "b"), ("b", "c")}
+
+    tiers = R._confidence_tiers(
+        ["a", "b", "c"],
+        lambda higher, lower: (higher, lower) in separated_pairs,
+    )
+
+    assert tiers == [{"tier": 1, "models": ["a", "b", "c"]}]
+
+
 def _case(case_id: str, *, score: float, expected: str, outcome: str, group: str) -> dict:
     policy_pass = (
         (expected == "allow" and outcome == "unknown")
@@ -141,6 +161,7 @@ def test_qualified_models_use_separated_tiers(tmp_path):
     result = R.analyze_ranking_manifest(manifest, iterations=300)
 
     assert result["status"] == "rankable"
+    assert result["schema"] == "ko-redteam.model-ranking.v2"
     assert result["ranking"] == [
         {"tier": 1, "models": ["strong"]},
         {"tier": 2, "models": ["weak"]},
@@ -149,6 +170,10 @@ def test_qualified_models_use_separated_tiers(tmp_path):
     assert set(result["adjacent_separation"][0]["probability_by_weight_profile"]) == set(R.WEIGHT_PROFILES)
     assert result["method"]["suite_independence_groups"]["paperbench"] == 2
     assert result["method"]["separation_requires_all_weight_profiles"] is True
+    assert result["method"]["pairwise_test"] == "two-sided paired bootstrap with plus-one correction"
+    assert result["method"]["multiple_comparison_correction"] == "holm-bonferroni"
+    assert result["method"]["comparison_family_size"] == len(R.WEIGHT_PROFILES)
+    assert result["pairwise_separation"][0]["separated"] is True
     assert all(abs(sum(weights.values()) - 1.0) < 1e-9 for weights in R.WEIGHT_PROFILES.values())
 
 

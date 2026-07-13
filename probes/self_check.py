@@ -44,16 +44,19 @@ REQUIRED_MODULES = [
     "ko_benchmark_coverage",
     "ko_benchmark_identity",
     "ko_llm_forensics",
+    "ko_leaderboard",
     "ko_public_hygiene",
     "ko_report",
     "ko_report_doctor",
     "ko_model_ranking",
+    "ko_run_context",
     "ko_response_contract",
     "ko_scorecard",
     "ko_refusal",
     "merge_benchmarks",
     "multiturn_benchmark",
     "run_suite",
+    "validate_leaderboard",
 ]
 
 
@@ -183,6 +186,7 @@ def run_self_check(
     agent_mod = modules["agent_harness"]
     suite_mod = modules["run_suite"]
     hygiene_mod = modules["ko_public_hygiene"]
+    leaderboard_mod = modules["ko_leaderboard"]
 
     hygiene_reports = [hygiene_mod.scan_public_hygiene(path) for path in _public_hygiene_roots()]
     hygiene_issues = sum(report["summary"]["issues"] for report in hygiene_reports)
@@ -192,6 +196,20 @@ def run_self_check(
         hygiene_issues == 0,
         files_scanned=hygiene_files,
         issues=hygiene_issues,
+    ))
+
+    with tempfile.TemporaryDirectory(prefix="ko-redteam-release-check-") as td:
+        release_path = Path(td) / "incomplete_release.json"
+        release_path.write_text(json.dumps({
+            "schema": "ko-redteam.leaderboard-release.v1",
+            "release": {"id": "self-check-incomplete"},
+        }), "utf-8")
+        release_audit = leaderboard_mod.audit_leaderboard_release(release_path)
+    checks.append(_check(
+        "leaderboard_fail_closed",
+        release_audit["status"] == "not_publishable"
+        and release_audit["summary"]["failed"] > 0,
+        failed=release_audit["summary"]["failed"],
     ))
 
     audit = audit_mod.audit_benchmark_paths([

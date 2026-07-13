@@ -177,6 +177,19 @@ def _metadata_section(report: dict[str, Any]) -> str:
         if source_families:
             ids = [s.get("id", "-") for s in source_families if isinstance(s, dict)]
             lines.append(f"- Source families: {', '.join(ids)}")
+    provenance = report.get("provenance") or {}
+    if provenance:
+        declared_model = provenance.get("model") or {}
+        runtime = provenance.get("runtime") or {}
+        evaluation = provenance.get("evaluation") or {}
+        lines.extend([
+            f"- Run ID: `{provenance.get('run_id', '-')}`",
+            f"- Run context SHA-256: `{provenance.get('context_sha256', '-')}`",
+            f"- Model revision: `{declared_model.get('model_id', '-')}@{declared_model.get('revision', '-')}`",
+            f"- Tokenizer revision: `{declared_model.get('tokenizer_revision', '-')}`",
+            f"- Runtime: `{runtime.get('engine', '-')} {runtime.get('engine_version', '-')} / {runtime.get('precision', '-')}`",
+            f"- Evaluator: `{evaluation.get('evaluator_git_commit', '-')} / protocol {evaluation.get('protocol_version', '-')}`",
+        ])
     return "\n".join(lines)
 
 

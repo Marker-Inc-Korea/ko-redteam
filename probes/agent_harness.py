@@ -17,10 +17,12 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
 sys.path.insert(0, str(ROOT / "analysis"))
 
+from ko_benchmark_identity import benchmark_content_sha256  # noqa: E402
 from ko_diagnostics import diagnose  # noqa: E402
 from ko_error_taxonomy import classify_error  # noqa: E402
 from ko_llm_forensics import OUTCOME_ERROR, korean_quality, sanitize_text  # noqa: E402
 from ko_report import render_markdown  # noqa: E402
+from ko_run_context import attach_run_context, load_run_context  # noqa: E402
 from ko_scorecard import evaluate_expected, score_benchmark_rows  # noqa: E402
 
 DEFAULT_BENCHMARK = ROOT / "benchmarks" / "ko_llm_agent_harness_v1.json"
@@ -348,6 +350,7 @@ def run_agent_harness(
     timeout: int = 120,
     max_tokens: int = 512,
     call_fn: CallFn | None = None,
+    run_context: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     bench = load_benchmark(benchmark_path)
     rows = []
@@ -385,21 +388,27 @@ def run_agent_harness(
         "executed_tool_calls": sum(r["gateway"]["executed"] for r in rows),
         "blocked_cases": sum(1 for r in rows if r["gateway"]["status"] == "blocked"),
     }
-    return {
+    report = {
         "schema": "ko-redteam.agent-harness-report.v1",
         "benchmark": {
             "name": bench["name"],
             "version": bench.get("version"),
             "description": bench.get("description"),
-            "path": str(benchmark_path),
+            "path": Path(benchmark_path).name if run_context is not None else str(benchmark_path),
             "source_families": bench.get("source_families", []),
+            "content_sha256": benchmark_content_sha256(bench),
         },
+        "evaluation": {"temperature": 0.0, "max_tokens": max_tokens},
         "model": model,
         "scorecard": scorecard,
         "gateway_summary": gateway_summary,
         "findings": _findings(rows),
         "detail": rows,
     }
+    provenance = attach_run_context(run_context, served_model=model)
+    if provenance is not None:
+        report["provenance"] = provenance
+    return report
 
 
 def main() -> None:
@@ -411,11 +420,14 @@ def main() -> None:
     ap.add_argument("--max-tokens", type=int, default=512)
     ap.add_argument("--include-raw", action="store_true",
                     help="raw assistant text를 로컬 report에 포함한다. 기본은 sanitized only.")
+    ap.add_argument("--run-context",
+                    help="immutable model/runtime provenance JSON for official evaluations")
     ap.add_argument("--output", default=None,
                     help="report path. 기본: ./agent_<benchmark-name>_report.json")
     ap.add_argument("--markdown-output", default=None,
                     help="optional Markdown summary path. 예: agent_ko_llm_agent_harness_v1_report.md")
     args = ap.parse_args()
+    run_context = load_run_context(args.run_context) if args.run_context else None
     report = run_agent_harness(
         args.endpoint,
         args.model,
@@ -423,6 +435,7 @@ def main() -> None:
         include_raw=args.include_raw,
         timeout=args.timeout,
         max_tokens=args.max_tokens,
+        run_context=run_context,
     )
     out = Path(args.output) if args.output else Path.cwd() / f"agent_{report['benchmark']['name']}_report.json"
     out.write_text(json.dumps(report, ensure_ascii=False, indent=1), "utf-8")

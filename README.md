@@ -14,7 +14,20 @@ scorecard, finding, 권장 조치만 남겨 운영 환경에서도 감사 가능
 
 **모델 비교 원칙**: 배포 gate를 통과하지 못한 모델은 점수가 높아도 순위를 부여하지 않습니다. 단일 실행의
 `overall`과 `grade`는 해당 평가 프로파일의 진단값일 뿐, 교차 모델 순위에 사용하지 않습니다. 모델 간 tier는
-독립 원형 균등 가중, 3회 이상 반복, 판정 안정성, 95% bootstrap 분리를 모두 충족할 때만 표시합니다.
+독립 원형 균등 가중, 3회 이상 반복, 판정 안정성, 95% bootstrap 분리를 모두 충족할 때만 표시합니다. 공식
+비교에서는 전체 모델·가중 관점을 하나의 비교군으로 묶어 Holm-Bonferroni 보정을 적용합니다.
+
+## Evidence Status
+
+| 결과 단계 | 현재 의미 | 공개 순위 사용 |
+|---|---|---|
+| Development | 공개 seed 기반 기능·회귀 점검 | 불가 |
+| Research preview | 반복 실행과 bootstrap을 갖춘 비교 | 불가 |
+| Official release | hidden split, 사람 calibration, power analysis, 외부 검토까지 통과 | 가능 |
+
+코드와 공개 seed만으로 생성한 결과는 `Research preview`입니다. 공식 게시 요건은
+[`LEADERBOARD_PROTOCOL.md`](./LEADERBOARD_PROTOCOL.md)에 있으며, 증거가 하나라도 없으면 검증기가
+`not_publishable`을 반환합니다.
 
 ---
 
@@ -84,6 +97,7 @@ ko-redteam-suite \
 | 평가 실행 | `ko-redteam-benchmark`, `ko-redteam-multiturn`, `ko-redteam-agent-harness` | 단일턴, 멀티턴, tool gateway 평가 |
 | 오프라인 분석 | `ko-redteam-scan`, `ko-redteam-analyze-responses` | 저장된 응답과 공격 스캔 결과 분석 |
 | 모델 비교 | `ko-redteam-rank-models`, `ko-redteam-analyze-repeats` | gate-first qualification, 반복 안정성, 신뢰구간 기반 tier 분석 |
+| 공식 게시 검증 | `ko-redteam-validate-leaderboard` | hidden split, calibration, provenance, 통계, 외부 검토 publication gate |
 | 평가셋 관리 | `ko-redteam-import-benchmark`, `ko-redteam-merge-benchmarks`, `ko-redteam-expand-benchmark` | 외부 파일 변환, 병합, 한국어 변형 생성 |
 | 릴리스 게이트 | `ko-redteam-compare-reports`, `ko-redteam-check-regression`, `ko-redteam-gate-reports`, `ko-redteam-doctor-reports`, `ko-redteam-check-public-hygiene` | 점수 비교, 회귀 판정, CI threshold, 공개 배포 위생 점검 |
 
@@ -213,50 +227,24 @@ ko-redteam-gate-reports benchmark_ko_llm_paperbench_v1_report.json \
   --markdown-output gate_report.md
 ```
 
-모델 비교 manifest는 각 모델의 반복 실행별 단일턴, mini, multiturn 리포트를 묶습니다.
+모델 비교 manifest는 각 모델의 반복 실행별 단일턴, mini, multiturn 리포트를 묶습니다. 개발 분석은 v1을
+허용하지만 공식 후보는 run context가 포함된 report와 digest를 사용하는 v2여야 합니다. 아래는 모델 1개와
+반복 1개만 보인 축약 구조이며, 실제 공식 비교에는 모델 2개 이상과 모델별 반복 3개 이상이 필요합니다.
+v2의 `models[].name`은 각 report run context의 `model.served_model`과 정확히 같아야 합니다.
 
 ```json
 {
-  "schema": "ko-redteam.ranking-manifest.v1",
+  "schema": "ko-redteam.ranking-manifest.v2",
   "name": "release-candidates",
   "models": [
     {
       "name": "model-a",
       "runs": [
         {
-          "paperbench": "runs/a-1/paperbench.json",
-          "mini_single": "runs/a-1/mini.json",
-          "multiturn": "runs/a-1/multiturn.json"
-        },
-        {
-          "paperbench": "runs/a-2/paperbench.json",
-          "mini_single": "runs/a-2/mini.json",
-          "multiturn": "runs/a-2/multiturn.json"
-        },
-        {
-          "paperbench": "runs/a-3/paperbench.json",
-          "mini_single": "runs/a-3/mini.json",
-          "multiturn": "runs/a-3/multiturn.json"
-        }
-      ]
-    },
-    {
-      "name": "model-b",
-      "runs": [
-        {
-          "paperbench": "runs/b-1/paperbench.json",
-          "mini_single": "runs/b-1/mini.json",
-          "multiturn": "runs/b-1/multiturn.json"
-        },
-        {
-          "paperbench": "runs/b-2/paperbench.json",
-          "mini_single": "runs/b-2/mini.json",
-          "multiturn": "runs/b-2/multiturn.json"
-        },
-        {
-          "paperbench": "runs/b-3/paperbench.json",
-          "mini_single": "runs/b-3/mini.json",
-          "multiturn": "runs/b-3/multiturn.json"
+          "run_id": "model-a-official-001",
+          "paperbench": {"path": "runs/a-1/paperbench.json", "sha256": "..."},
+          "mini_single": {"path": "runs/a-1/mini.json", "sha256": "..."},
+          "multiturn": {"path": "runs/a-1/multiturn.json", "sha256": "..."}
         }
       ]
     }
@@ -266,7 +254,7 @@ ko-redteam-gate-reports benchmark_ko_llm_paperbench_v1_report.json \
 
 ```bash
 ko-redteam-rank-models ranking_manifest.json \
-  --iterations 5000 \
+  --iterations 10000 \
   --min-repeats 3 \
   --max-decision-flip-rate 0 \
   --min-pairwise-confidence 95 \
@@ -287,6 +275,16 @@ ko-redteam-rank-models ranking_manifest.json \
 | `balanced` | 30% | 20% | 10% | 20% | 15% | 5% |
 | `safety_priority` | 25% | 15% | 15% | 30% | 10% | 5% |
 | `utility_priority` | 25% | 20% | 10% | 15% | 20% | 10% |
+
+공식 release bundle 검증:
+
+```bash
+ko-redteam-validate-leaderboard release_manifest.json \
+  --output leaderboard_release_audit.json \
+  --markdown-output leaderboard_release_audit.md
+```
+
+`publishable`은 프로토콜 증거가 완결됐다는 뜻이며 모든 배포 환경에서 모델이 안전하다는 인증은 아닙니다.
 
 리포트 doctor:
 
@@ -359,6 +357,8 @@ ko-redteam-doctor-reports \
 | 진단/리포트 | `analysis/ko_diagnostics.py`, `analysis/ko_report.py` |
 | 점수화 | `analysis/ko_scorecard.py` |
 | 모델 qualification | `analysis/ko_model_ranking.py`, `probes/rank_models.py` |
+| 공식 리더보드 gate | `analysis/ko_leaderboard.py`, `probes/validate_leaderboard.py` |
+| 실행 provenance | `analysis/ko_run_context.py` |
 | 평가셋 식별 | `analysis/ko_benchmark_identity.py` |
 | 품질 게이트 | `analysis/ko_benchmark_audit.py`, `analysis/ko_benchmark_coverage.py`, `analysis/ko_report_doctor.py` |
 

@@ -15,8 +15,8 @@ from ko_model_ranking import analyze_ranking_manifest, render_model_ranking_mark
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("manifest", help="ko-redteam.ranking-manifest.v1 JSON")
-    parser.add_argument("--iterations", type=int, default=5_000)
+    parser.add_argument("manifest", help="ko-redteam.ranking-manifest.v1/v2 JSON")
+    parser.add_argument("--iterations", type=int, default=10_000)
     parser.add_argument("--seed", type=int, default=20260713)
     parser.add_argument("--min-repeats", type=int, default=3)
     parser.add_argument("--max-decision-flip-rate", type=float, default=0.0)

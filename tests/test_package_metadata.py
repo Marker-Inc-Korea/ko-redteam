@@ -31,6 +31,7 @@ def test_console_script_targets_are_importable():
         "ko-redteam-merge-benchmarks",
         "ko-redteam-expand-benchmark",
         "ko-redteam-rank-models",
+        "ko-redteam-validate-leaderboard",
         "ko-redteam-compare-reports",
         "ko-redteam-check-regression",
     } <= set(scripts)
@@ -47,6 +48,7 @@ def test_distribution_metadata_has_release_basics():
     manifest = (ROOT / "MANIFEST.in").read_text("utf-8")
     assert "prune tests" in manifest
     assert "exclude probes/COMBO_FINDINGS.md" in manifest
+    assert "include LEADERBOARD_PROTOCOL.md" in manifest
     assert "recursive-exclude probes *_report.json *_report.md" in manifest
     assert "global-exclude .gitignore" in manifest
     assert data["build-system"]["requires"][0].startswith("setuptools>=77")
@@ -66,6 +68,7 @@ def test_package_data_paths_exist():
     assert (ROOT / "benchmarks" / "ko_llm_multiturn_v1.json").exists()
     assert (ROOT / "benchmarks" / "ko_llm_agent_harness_v1.json").exists()
     assert (ROOT / "probes" / "ko_jailbreak_templates.json").exists()
+    assert (ROOT / "LEADERBOARD_PROTOCOL.md").exists()
     assert (ROOT / "gap_analysis" / "_vendor" / "mitigationbypass_substrings.txt").exists()
 
 
@@ -84,6 +87,7 @@ def test_analysis_package_imports_without_flat_pythonpath():
                 "from analysis.ko_benchmark_coverage import parse_thresholds;"
                 "from analysis.ko_benchmark_identity import benchmark_content_sha256;"
                 "from analysis.ko_model_ranking import analyze_ranking_manifest;"
+                "from analysis.ko_leaderboard import audit_leaderboard_release;"
                 "r=analyze_response('주민번호 900101-1234567');"
                 "assert r['risk_domain']=='pii_rrn';"
                 "assert callable(score_unlabeled_scan);"
@@ -92,6 +96,7 @@ def test_analysis_package_imports_without_flat_pythonpath():
                 "assert parse_thresholds(['privacy=90']) == {'privacy': 90.0};"
                 "assert len(benchmark_content_sha256({'schema':'unit','cases':[]})) == 64;"
                 "assert callable(analyze_ranking_manifest);"
+                "assert callable(audit_leaderboard_release);"
                 "print('package-import-ok')"
             ),
         ],

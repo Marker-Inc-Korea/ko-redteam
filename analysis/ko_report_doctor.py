@@ -22,6 +22,17 @@ KNOWN_SCHEMAS = PRIMARY_REPORT_SCHEMAS | {
     "ko-redteam.suite-manifest.v1",
     "ko-redteam.benchmark-audit.v1",
     "ko-redteam.report-doctor.v1",
+    "ko-redteam.model-ranking.v2",
+    "ko-redteam.model-ranking.v1",
+    "ko-redteam.ranking-manifest.v2",
+    "ko-redteam.ranking-manifest.v1",
+    "ko-redteam.leaderboard-release.v1",
+    "ko-redteam.leaderboard-release-audit.v1",
+    "ko-redteam.evaluator-calibration.v1",
+    "ko-redteam.benchmark-split-audit.v1",
+    "ko-redteam.power-analysis.v1",
+    "ko-redteam.external-review.v1",
+    "ko-redteam.run-context.v1",
 }
 
 SECRET_LIKE_RE = re.compile(

@@ -21,6 +21,7 @@ from ko_llm_forensics import analyze_response  # noqa: E402
 from ko_diagnostics import diagnose  # noqa: E402
 from ko_report import render_markdown  # noqa: E402
 from ko_response_contract import response_contract_errors  # noqa: E402
+from ko_run_context import attach_run_context, load_run_context  # noqa: E402
 from ko_scorecard import evaluate_expected, score_benchmark_rows  # noqa: E402
 
 DEFAULT_BENCHMARK = ROOT / "benchmarks" / "ko_llm_mini_v1.json"
@@ -106,6 +107,7 @@ def run_benchmark(
     timeout: int = 120,
     max_tokens: int = 512,
     call_fn: Callable[[dict[str, Any]], dict[str, Any]] | None = None,
+    run_context: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     bench = load_benchmark(benchmark_path)
     rows: list[dict[str, Any]] = []
@@ -137,13 +139,13 @@ def run_benchmark(
         print(f"  {case['id']:<24} outcome={assessment['outcome']:<19} score={ev['score']:5.1f}",
               flush=True)
     scorecard = score_benchmark_rows(rows)
-    return {
+    report = {
         "schema": "ko-redteam.benchmark-report.v1",
         "benchmark": {
             "name": bench["name"],
             "version": bench.get("version"),
             "description": bench.get("description"),
-            "path": str(benchmark_path),
+            "path": Path(benchmark_path).name if run_context is not None else str(benchmark_path),
             "source_families": bench.get("source_families", []),
             "taxonomy": bench.get("taxonomy", {}),
             "content_sha256": benchmark_content_sha256(bench),
@@ -154,6 +156,10 @@ def run_benchmark(
         "findings": _benchmark_findings(rows),
         "detail": rows,
     }
+    provenance = attach_run_context(run_context, served_model=model)
+    if provenance is not None:
+        report["provenance"] = provenance
+    return report
 
 def main() -> None:
     ap = argparse.ArgumentParser()
@@ -164,14 +170,17 @@ def main() -> None:
     ap.add_argument("--max-tokens", type=int, default=512)
     ap.add_argument("--include-raw", action="store_true",
                     help="raw prompt/response 를 로컬 report 에 포함한다. 기본은 sanitized only.")
+    ap.add_argument("--run-context",
+                    help="immutable model/runtime provenance JSON for official evaluations")
     ap.add_argument("--output", default=None,
                     help="report path. 기본: ./benchmark_<benchmark-name>_report.json")
     ap.add_argument("--markdown-output", default=None,
                     help="optional Markdown summary path. 예: benchmark_ko_llm_mini_v1_report.md")
     args = ap.parse_args()
+    run_context = load_run_context(args.run_context) if args.run_context else None
     report = run_benchmark(args.endpoint, args.model, benchmark_path=args.benchmark,
                            include_raw=args.include_raw, timeout=args.timeout,
-                           max_tokens=args.max_tokens)
+                           max_tokens=args.max_tokens, run_context=run_context)
     out = Path(args.output) if args.output else Path.cwd() / f"benchmark_{report['benchmark']['name']}_report.json"
     out.write_text(json.dumps(report, ensure_ascii=False, indent=1), "utf-8")
     sc = report["scorecard"]

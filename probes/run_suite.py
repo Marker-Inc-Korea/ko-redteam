@@ -37,6 +37,7 @@ from ko_benchmark_coverage import (  # noqa: E402
 from ko_gate import evaluate_reports, parse_thresholds as parse_score_thresholds, render_gate_markdown  # noqa: E402
 from ko_report import render_markdown  # noqa: E402
 from ko_report_doctor import doctor_reports, render_doctor_markdown  # noqa: E402
+from ko_run_context import canonical_sha256, load_run_context  # noqa: E402
 from multiturn_benchmark import DEFAULT_BENCHMARK as DEFAULT_MULTITURN_BENCHMARK  # noqa: E402
 from multiturn_benchmark import run_multiturn_benchmark  # noqa: E402
 
@@ -527,6 +528,7 @@ def run_suite(
     max_rates: dict[str, float] | None = None,
     max_findings: int | None = None,
     max_critical_high: int | None = None,
+    run_context: dict[str, Any] | None = None,
     call_fn: Callable[[dict[str, Any]], dict[str, Any]] | None = None,
     multiturn_call_fn: Callable[[dict[str, Any], dict[str, Any], list[dict[str, str]]], dict[str, Any]] | None = None,
     agent_call_fn: Callable[[dict[str, Any], list[dict[str, str]], list[dict[str, Any]]], dict[str, Any]] | None = None,
@@ -589,6 +591,11 @@ def run_suite(
         max_findings=max_findings,
         max_critical_high=max_critical_high,
     )
+    if run_context is not None:
+        manifest["run_context"] = {
+            "run_id": run_context.get("run_id"),
+            "context_sha256": canonical_sha256(run_context),
+        }
 
     source_audit_json = out_dir / ("source_benchmark_audit.json" if expand else "benchmark_audit.json")
     source_audit_md = out_dir / ("source_benchmark_audit.md" if expand else "benchmark_audit.md")
@@ -737,6 +744,7 @@ def run_suite(
             timeout=timeout,
             max_tokens=max_tokens,
             call_fn=call_fn,
+            run_context=run_context,
         )
     except Exception as e:  # noqa: BLE001
         _add_step(manifest, "benchmark_scan", "fail", error=f"{type(e).__name__}: {e}")
@@ -764,6 +772,7 @@ def run_suite(
                 timeout=timeout,
                 max_tokens=max_tokens,
                 call_fn=multiturn_call_fn,
+                run_context=run_context,
             )
         except Exception as e:  # noqa: BLE001
             _add_step(manifest, "multiturn_benchmark", "fail", error=f"{type(e).__name__}: {e}")
@@ -792,6 +801,7 @@ def run_suite(
                 timeout=timeout,
                 max_tokens=max_tokens,
                 call_fn=agent_call_fn,
+                run_context=run_context,
             )
         except Exception as e:  # noqa: BLE001
             _add_step(manifest, "agent_harness", "fail", error=f"{type(e).__name__}: {e}")
@@ -883,6 +893,8 @@ def main() -> None:
     ap.add_argument("--max-tokens", type=int, default=512)
     ap.add_argument("--include-raw", action="store_true",
                     help="raw prompt/response 를 benchmark report에 포함한다. 기본은 sanitized only.")
+    ap.add_argument("--run-context",
+                    help="immutable model/runtime provenance JSON for official evaluations")
     ap.add_argument("--expand", action="store_true", help="benchmark를 난독/프레이밍 변형으로 확장해 실행")
     ap.add_argument("--obfuscation", action="append", default=None,
                     help="expansion obfuscation. 반복 가능. 기본: jamo_split, zero_width")
@@ -934,6 +946,7 @@ def main() -> None:
     ap.add_argument("--max-critical-high", type=int, default=None)
     args = ap.parse_args()
 
+    run_context = load_run_context(args.run_context) if args.run_context else None
     manifest = run_suite(
         args.endpoint,
         args.model,
@@ -976,6 +989,7 @@ def main() -> None:
         max_rates=parse_score_thresholds(args.max_rate),
         max_findings=args.max_findings,
         max_critical_high=args.max_critical_high,
+        run_context=run_context,
     )
     summary = manifest.get("summaries", {}).get("benchmark") or {}
     print(

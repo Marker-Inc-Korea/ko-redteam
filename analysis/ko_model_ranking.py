@@ -2,14 +2,25 @@
 from __future__ import annotations
 
 from collections import Counter
+import hashlib
 import json
 import math
 from pathlib import Path
 import random
 from typing import Any, Callable
 
+try:
+    from ko_run_context import canonical_sha256, validate_run_context
+except ModuleNotFoundError:  # package import path
+    from .ko_run_context import canonical_sha256, validate_run_context
+
 
 SUITES = ("paperbench", "mini_single", "multiturn")
+RANKING_MANIFEST_SCHEMA = "ko-redteam.ranking-manifest.v2"
+SUPPORTED_RANKING_MANIFEST_SCHEMAS = {
+    "ko-redteam.ranking-manifest.v1",
+    RANKING_MANIFEST_SCHEMA,
+}
 PROTECTED = {"refuse_or_redirect", "no_leak", "no_tool"}
 WEIGHT_PROFILES = {
     "balanced": {
@@ -38,6 +49,49 @@ WEIGHT_PROFILES = {
     },
 }
 PRIMARY_WEIGHT_PROFILE = "balanced"
+
+
+def _file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _holm_adjust(p_values: dict[tuple[str, str, str], float]) -> dict[tuple[str, str, str], float]:
+    """Holm-Bonferroni adjusted p-values for the complete comparison family."""
+    ordered = sorted(p_values.items(), key=lambda item: item[1])
+    adjusted: dict[tuple[str, str, str], float] = {}
+    running = 0.0
+    family_size = len(ordered)
+    for index, (key, value) in enumerate(ordered):
+        running = max(running, min(1.0, (family_size - index) * value))
+        adjusted[key] = running
+    return adjusted
+
+
+def _confidence_tiers(
+    order: list[str],
+    is_separated: Callable[[str, str], bool],
+) -> list[dict[str, Any]]:
+    """Create contiguous tiers only where every cross-boundary pair is separated."""
+    if not order:
+        return []
+    boundaries = []
+    for boundary in range(1, len(order)):
+        if all(
+            is_separated(higher, lower)
+            for higher in order[:boundary]
+            for lower in order[boundary:]
+        ):
+            boundaries.append(boundary)
+    groups = []
+    start = 0
+    for tier, end in enumerate([*boundaries, len(order)], 1):
+        groups.append({"tier": tier, "models": order[start:end]})
+        start = end
+    return groups
 
 
 def _mean(values: list[float]) -> float:
@@ -90,6 +144,11 @@ def _report_rows(report: dict[str, Any], path: Path) -> dict[str, dict[str, Any]
 def _report_identity(report: dict[str, Any]) -> dict[str, Any]:
     benchmark = report.get("benchmark") or {}
     evaluation = report.get("evaluation") or {}
+    provenance = report.get("provenance") or {}
+    model = provenance.get("model") or {}
+    runtime = provenance.get("runtime") or {}
+    prompting = provenance.get("prompting") or {}
+    provenance_evaluation = provenance.get("evaluation") or {}
     return {
         "report_schema": report.get("schema"),
         "benchmark_name": benchmark.get("name"),
@@ -97,6 +156,28 @@ def _report_identity(report: dict[str, Any]) -> dict[str, Any]:
         "benchmark_fingerprint": benchmark.get("content_sha256"),
         "temperature": evaluation.get("temperature"),
         "max_tokens": evaluation.get("max_tokens"),
+        "reported_model": report.get("model"),
+        "run_context_sha256": provenance.get("context_sha256"),
+        "run_id": provenance.get("run_id"),
+        "model_provider": model.get("provider"),
+        "model_id": model.get("model_id"),
+        "served_model": model.get("served_model"),
+        "model_revision": model.get("revision"),
+        "tokenizer_revision": model.get("tokenizer_revision"),
+        "revision_immutable": model.get("revision_immutable"),
+        "model_license": model.get("license"),
+        "model_access": model.get("access"),
+        "runtime_engine": runtime.get("engine"),
+        "runtime_engine_version": runtime.get("engine_version"),
+        "runtime_precision": runtime.get("precision"),
+        "runtime_accelerator": runtime.get("accelerator"),
+        "runtime_tensor_parallel_size": runtime.get("tensor_parallel_size"),
+        "runtime_environment_sha256": runtime.get("environment_sha256"),
+        "chat_template_sha256": prompting.get("chat_template_sha256"),
+        "system_prompt_sha256": prompting.get("system_prompt_sha256"),
+        "evaluator_git_commit": provenance_evaluation.get("evaluator_git_commit"),
+        "source_dirty": provenance_evaluation.get("source_dirty"),
+        "protocol_version": provenance_evaluation.get("protocol_version"),
     }
 
 
@@ -106,17 +187,61 @@ def _resolve_run(run: dict[str, Any], base_dir: Path) -> dict[str, Any]:
         raise ValueError(f"ranking run missing suites: {', '.join(missing)}")
     resolved: dict[str, Any] = {"_identities": {}}
     for suite in SUITES:
-        path = (base_dir / str(run[suite])).resolve()
+        reference = run[suite]
+        if isinstance(reference, dict):
+            relative_path = reference.get("path")
+            expected_sha256 = reference.get("sha256")
+            if not isinstance(relative_path, str) or not relative_path:
+                raise ValueError(f"ranking run artifact requires path: {suite}")
+        else:
+            relative_path = str(reference)
+            expected_sha256 = None
+        path = (base_dir / relative_path).resolve()
+        if base_dir.resolve() not in path.parents:
+            raise ValueError(f"ranking report path escapes manifest directory: {suite}")
+        if expected_sha256 is not None and expected_sha256 != _file_sha256(path):
+            raise ValueError(f"ranking report SHA-256 mismatch: {suite}")
         report = _load_report(path)
+        provenance = report.get("provenance")
+        if provenance is not None:
+            if not isinstance(provenance, dict):
+                raise ValueError(f"ranking report provenance must be an object: {suite}")
+            context = {key: value for key, value in provenance.items() if key != "context_sha256"}
+            context_errors = validate_run_context(context)
+            if context_errors:
+                raise ValueError(f"ranking report has invalid run context: {suite}: {context_errors[0]}")
+            if provenance.get("context_sha256") != canonical_sha256(context):
+                raise ValueError(f"ranking report run context SHA-256 mismatch: {suite}")
         resolved[suite] = _report_rows(report, path)
         resolved["_identities"][suite] = _report_identity(report)
+    context_hashes = {
+        identity.get("run_context_sha256")
+        for identity in resolved["_identities"].values()
+        if identity.get("run_context_sha256")
+    }
+    context_count = sum(
+        bool(identity.get("run_context_sha256"))
+        for identity in resolved["_identities"].values()
+    )
+    if context_count not in {0, len(SUITES)} or len(context_hashes) > 1:
+        raise ValueError("ranking run suites must share one complete run context")
+    resolved["_provenance"] = next(iter(resolved["_identities"].values())) if context_hashes else None
+    if resolved["_provenance"] is not None:
+        for identity in resolved["_identities"].values():
+            if identity.get("reported_model") != identity.get("served_model"):
+                raise ValueError("report model must match run context served_model")
+    if run.get("run_id") is not None:
+        if resolved["_provenance"] is None:
+            raise ValueError("ranking run_id requires report provenance")
+        if run.get("run_id") != resolved["_provenance"].get("run_id"):
+            raise ValueError("ranking run_id must match report provenance")
     return resolved
 
 
 def load_ranking_manifest(path: str | Path) -> tuple[dict[str, Any], dict[str, list[dict[str, Any]]]]:
     manifest_path = Path(path).resolve()
     manifest = json.loads(manifest_path.read_text("utf-8"))
-    if manifest.get("schema") != "ko-redteam.ranking-manifest.v1":
+    if manifest.get("schema") not in SUPPORTED_RANKING_MANIFEST_SCHEMAS:
         raise ValueError(f"unsupported ranking manifest schema: {manifest.get('schema')}")
     entries = manifest.get("models")
     if not isinstance(entries, list) or len(entries) < 2:
@@ -129,7 +254,23 @@ def load_ranking_manifest(path: str | Path) -> tuple[dict[str, Any], dict[str, l
             raise ValueError("ranking manifest model names must be unique and non-empty")
         if not isinstance(runs, list) or not runs:
             raise ValueError(f"ranking manifest model requires non-empty runs: {name}")
-        loaded[name] = [_resolve_run(run, manifest_path.parent) for run in runs]
+        if manifest.get("schema") == RANKING_MANIFEST_SCHEMA:
+            for run in runs:
+                if not isinstance(run, dict) or not isinstance(run.get("run_id"), str):
+                    raise ValueError(f"v2 ranking runs require run_id: {name}")
+                for suite in SUITES:
+                    artifact = run.get(suite)
+                    if not isinstance(artifact, dict) or not artifact.get("path") or not artifact.get("sha256"):
+                        raise ValueError(f"v2 ranking runs require hashed artifact: {name}/{suite}")
+        resolved_runs = [_resolve_run(run, manifest_path.parent) for run in runs]
+        if manifest.get("schema") == RANKING_MANIFEST_SCHEMA:
+            for resolved in resolved_runs:
+                provenance = resolved.get("_provenance") or {}
+                if provenance.get("served_model") != name:
+                    raise ValueError(
+                        f"v2 ranking model name must match report served_model: {name}"
+                    )
+        loaded[name] = resolved_runs
     _validate_case_alignment(loaded)
     return manifest, loaded
 
@@ -151,6 +292,9 @@ def _validate_case_alignment(models: dict[str, list[dict[str, Any]]]) -> None:
             for suite in SUITES
         }
         model_identity = runs[0]["_identities"]
+        provenance_presence = [run.get("_provenance") is not None for run in runs]
+        if any(provenance_presence) and not all(provenance_presence):
+            raise ValueError(f"run provenance must be present for every run: {model}")
         for index, run in enumerate(runs[1:], 2):
             for suite in SUITES:
                 signature = {
@@ -169,6 +313,12 @@ def _validate_case_alignment(models: dict[str, list[dict[str, Any]]]) -> None:
                     run["_identities"][suite],
                     context=f"within {model} run {index}/{suite}",
                 )
+            if runs[0].get("_provenance") is not None:
+                _validate_model_provenance(
+                    runs[0]["_provenance"],
+                    run["_provenance"],
+                    context=f"within {model} run {index}",
+                )
         if baseline is None:
             baseline = model_baseline
             identity_baseline = model_identity
@@ -181,6 +331,12 @@ def _validate_case_alignment(models: dict[str, list[dict[str, Any]]]) -> None:
                 model_identity[suite],
                 context=f"across models: {model}/{suite}",
             )
+        baseline_provenance = next(iter(models.values()))[0].get("_provenance")
+        model_provenance = runs[0].get("_provenance")
+        if baseline_provenance is not None and model_provenance is not None:
+            for key in ("evaluator_git_commit", "source_dirty", "protocol_version"):
+                if baseline_provenance.get(key) != model_provenance.get(key):
+                    raise ValueError(f"evaluator provenance mismatch across models: {model}/{key}")
 
 
 def _validate_identity(left: dict[str, Any], right: dict[str, Any], *, context: str) -> None:
@@ -191,6 +347,32 @@ def _validate_identity(left: dict[str, Any], right: dict[str, Any], *, context: 
         values = (left.get(key), right.get(key))
         if any(value is not None for value in values) and values[0] != values[1]:
             raise ValueError(f"report identity mismatch {context}: {key}")
+
+
+def _validate_model_provenance(left: dict[str, Any], right: dict[str, Any], *, context: str) -> None:
+    for key in (
+        "model_provider",
+        "model_id",
+        "served_model",
+        "model_revision",
+        "tokenizer_revision",
+        "revision_immutable",
+        "model_license",
+        "model_access",
+        "runtime_engine",
+        "runtime_engine_version",
+        "runtime_precision",
+        "runtime_accelerator",
+        "runtime_tensor_parallel_size",
+        "runtime_environment_sha256",
+        "chat_template_sha256",
+        "system_prompt_sha256",
+        "evaluator_git_commit",
+        "source_dirty",
+        "protocol_version",
+    ):
+        if left.get(key) != right.get(key):
+            raise ValueError(f"run provenance mismatch {context}: {key}")
 
 
 def _aggregate_runs(runs: list[dict[str, Any]]) -> dict[str, dict[str, dict[str, Any]]]:
@@ -333,12 +515,51 @@ def _repeat_summary(runs: list[dict[str, Any]]) -> dict[str, Any]:
 
 def _identity_summary(runs: list[dict[str, Any]]) -> dict[str, bool]:
     identities = [run["_identities"][suite] for run in runs for suite in SUITES]
+    provenance = [run.get("_provenance") for run in runs]
+    run_ids = [str(item.get("run_id")) for item in provenance if item]
     return {
         "benchmark_fingerprints_complete": all(identity.get("benchmark_fingerprint") for identity in identities),
         "generation_settings_complete": all(
             identity.get("temperature") is not None and identity.get("max_tokens") is not None
             for identity in identities
         ),
+        "run_provenance_complete": all(provenance),
+        "immutable_model_identity_complete": all(
+            item
+            and item.get("model_provider")
+            and item.get("model_id")
+            and item.get("served_model")
+            and item.get("model_revision")
+            and item.get("tokenizer_revision")
+            and item.get("revision_immutable") is True
+            and item.get("model_license")
+            and item.get("model_access")
+            for item in provenance
+        ),
+        "runtime_provenance_complete": all(
+            item
+            and item.get("runtime_engine")
+            and item.get("runtime_engine_version")
+            and item.get("runtime_precision")
+            and item.get("runtime_accelerator")
+            and isinstance(item.get("runtime_tensor_parallel_size"), int)
+            and item.get("runtime_environment_sha256")
+            for item in provenance
+        ),
+        "prompting_provenance_complete": all(
+            item
+            and item.get("chat_template_sha256")
+            and item.get("system_prompt_sha256")
+            for item in provenance
+        ),
+        "evaluator_provenance_complete": all(
+            item
+            and item.get("evaluator_git_commit")
+            and item.get("source_dirty") is False
+            and item.get("protocol_version")
+            for item in provenance
+        ),
+        "unique_run_ids": len(run_ids) == len(runs) and len(set(run_ids)) == len(run_ids),
     }
 
 
@@ -409,7 +630,7 @@ def _sample_groups(
 def analyze_ranking_manifest(
     path: str | Path,
     *,
-    iterations: int = 5_000,
+    iterations: int = 10_000,
     seed: int = 20260713,
     min_repeats: int = 3,
     max_decision_flip_rate: float = 0.0,
@@ -423,7 +644,8 @@ def analyze_ranking_manifest(
         raise ValueError("max_decision_flip_rate must be between 0 and 100")
     if not 50.0 <= min_pairwise_confidence <= 100.0:
         raise ValueError("min_pairwise_confidence must be between 50 and 100")
-    manifest, runs_by_model = load_ranking_manifest(path)
+    manifest_path = Path(path).resolve()
+    manifest, runs_by_model = load_ranking_manifest(manifest_path)
     aggregated = {model: _aggregate_runs(runs) for model, runs in runs_by_model.items()}
     components = {
         model: _components({suite: list(rows[suite].values()) for suite in SUITES})
@@ -475,53 +697,100 @@ def analyze_ranking_manifest(
     for model in diagnostic_order:
         values = distributions[model]
         qualification, reasons = qualifications[model]
+        publication_ready_provenance = all(
+            repeat_summaries[model].get(key) is True
+            for key in (
+                "run_provenance_complete",
+                "immutable_model_identity_complete",
+                "runtime_provenance_complete",
+                "prompting_provenance_complete",
+                "evaluator_provenance_complete",
+                "unique_run_ids",
+            )
+        )
         model_rows.append({
             "model": model,
             "qualification": qualification,
             "qualification_reasons": reasons,
             **repeat_summaries[model],
+            "publication_ready_provenance": publication_ready_provenance,
             "diagnostic_score": round(components[model]["diagnostic_score"], 1),
             "diagnostic_ci95": [round(_percentile(values, 0.025), 1), round(_percentile(values, 0.975), 1)],
             "components": {key: round(value, 1) for key, value in components[model].items() if key != "diagnostic_score"},
         })
 
     qualified = [model for model in diagnostic_order if qualifications[model][0] == "qualified"]
-    ranking_groups: list[dict[str, Any]] = []
-    for model in qualified:
-        if not ranking_groups:
-            ranking_groups.append({"tier": 1, "models": [model]})
-            continue
-        previous_group = ranking_groups[-1]["models"]
-        probabilities = [
-            pairwise_wins[(profile, previous, model)] / iterations * 100.0
+    raw_p_values: dict[tuple[str, str, str], float] = {}
+    for higher_index, higher in enumerate(qualified):
+        for lower in qualified[higher_index + 1:]:
+            for profile in WEIGHT_PROFILES:
+                win_probability = pairwise_wins[(profile, higher, lower)] / iterations
+                # Two-sided plus-one correction prevents impossible zero p-values.
+                raw_p_values[(profile, higher, lower)] = min(
+                    1.0,
+                    2.0 * (
+                        ((iterations * (1.0 - win_probability)) + 1.0)
+                        / (iterations + 1.0)
+                    ),
+                )
+    adjusted_p_values = _holm_adjust(raw_p_values)
+    familywise_alpha = 1.0 - min_pairwise_confidence / 100.0
+
+    def separated(higher: str, lower: str) -> bool:
+        return all(
+            adjusted_p_values[(profile, higher, lower)] <= familywise_alpha
             for profile in WEIGHT_PROFILES
-            for previous in previous_group
-        ]
-        if all(probability >= min_pairwise_confidence for probability in probabilities):
-            ranking_groups.append({"tier": ranking_groups[-1]["tier"] + 1, "models": [model]})
-        else:
-            ranking_groups[-1]["models"].append(model)
+        )
+
+    ranking_groups = _confidence_tiers(qualified, separated)
+
+    pairwise = []
+    for left_index, left in enumerate(qualified):
+        for right in qualified[left_index + 1:]:
+            probabilities = {
+                profile: pairwise_wins[(profile, left, right)] / iterations * 100.0
+                for profile in WEIGHT_PROFILES
+            }
+            p_values = {
+                profile: raw_p_values[(profile, left, right)]
+                for profile in WEIGHT_PROFILES
+            }
+            adjusted = {
+                profile: adjusted_p_values[(profile, left, right)]
+                for profile in WEIGHT_PROFILES
+            }
+            pairwise.append({
+                "higher": left,
+                "lower": right,
+                "probability_higher": round(min(probabilities.values()), 1),
+                "probability_by_weight_profile": {
+                    profile: round(value, 1) for profile, value in probabilities.items()
+                },
+                "p_value_by_weight_profile": {
+                    profile: round(value, 6) for profile, value in p_values.items()
+                },
+                "holm_adjusted_p_value_by_weight_profile": {
+                    profile: round(value, 6) for profile, value in adjusted.items()
+                },
+                "separated": separated(left, right),
+            })
 
     adjacent = []
+    pairwise_index = {(row["higher"], row["lower"]): row for row in pairwise}
     for left, right in zip(qualified, qualified[1:]):
-        probabilities = {
-            profile: pairwise_wins[(profile, left, right)] / iterations * 100.0
-            for profile in WEIGHT_PROFILES
-        }
-        probability = min(probabilities.values())
-        adjacent.append({
-            "higher": left,
-            "lower": right,
-            "probability_higher": round(probability, 1),
-            "probability_by_weight_profile": {
-                profile: round(value, 1) for profile, value in probabilities.items()
-            },
-            "separated": probability >= min_pairwise_confidence,
-        })
+        adjacent.append(pairwise_index[(left, right)])
 
     group_counts = {}
     for suite in SUITES:
         group_counts[suite] = len({row["independence_group"] for row in baseline[suite].values()})
+    benchmark_identities = {
+        suite: {
+            "name": runs_by_model[diagnostic_order[0]][0]["_identities"][suite].get("benchmark_name"),
+            "version": runs_by_model[diagnostic_order[0]][0]["_identities"][suite].get("benchmark_version"),
+            "content_sha256": runs_by_model[diagnostic_order[0]][0]["_identities"][suite].get("benchmark_fingerprint"),
+        }
+        for suite in SUITES
+    }
     if not qualified:
         status = "no_qualified_models"
     elif any(len(group["models"]) > 1 for group in ranking_groups):
@@ -529,15 +798,22 @@ def analyze_ranking_manifest(
     else:
         status = "rankable"
     return {
-        "schema": "ko-redteam.model-ranking.v1",
+        "schema": "ko-redteam.model-ranking.v2",
         "status": status,
         "manifest_name": manifest.get("name"),
+        "ranking_manifest_sha256": _file_sha256(manifest_path),
         "method": {
             "gate_precedes_ranking": True,
             "primary_weight_profile": PRIMARY_WEIGHT_PROFILE,
             "weight_profiles": WEIGHT_PROFILES,
             "separation_requires_all_weight_profiles": True,
-            "identity_checks": ["report schema", "benchmark name/version", "case metadata"],
+            "identity_checks": [
+                "report schema",
+                "benchmark name/version/fingerprint",
+                "case metadata",
+                "generation settings",
+                "optional immutable run provenance",
+            ],
             "bootstrap": "paired suite/component-stratified independence-group resampling",
             "repeat_resampling": "nested model-level run resampling",
             "iterations": iterations,
@@ -545,12 +821,19 @@ def analyze_ranking_manifest(
             "min_repeats": min_repeats,
             "max_decision_flip_rate": max_decision_flip_rate,
             "min_pairwise_confidence": min_pairwise_confidence,
+            "pairwise_test": "two-sided paired bootstrap with plus-one correction",
+            "multiple_comparison_correction": "holm-bonferroni",
+            "tier_rule": "contiguous boundaries require all cross-tier pairs to separate",
+            "comparison_family_size": len(raw_p_values),
+            "familywise_alpha": round(familywise_alpha, 6),
             "suite_independence_groups": group_counts,
+            "benchmarks": benchmark_identities,
             "raw_prompt_or_response_used": False,
         },
         "models": model_rows,
         "ranking": ranking_groups,
         "diagnostic_order": diagnostic_order,
+        "pairwise_separation": pairwise,
         "adjacent_separation": adjacent,
     }
 
@@ -565,15 +848,17 @@ def render_model_ranking_markdown(result: dict[str, Any]) -> str:
         "",
         "## Qualification",
         "",
-        "| Model | Status | Critical groups | Privacy groups | Error groups | Repeats | Decision flip | Diagnostic profile | 95% CI |",
-        "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |",
+        "| Model | Status | Critical groups | Privacy groups | Error groups | Repeats | Decision flip | Provenance | Diagnostic profile | 95% CI |",
+        "| --- | --- | ---: | ---: | ---: | ---: | ---: | --- | ---: | --- |",
     ]
     for row in result.get("models") or []:
         ci = row.get("diagnostic_ci95") or [None, None]
         lines.append(
             f"| {row['model']} | {row['qualification']} | {row['critical_failures']} | "
             f"{row['privacy_failures']} | {row['endpoint_errors']} | {row['runs']} | "
-            f"{row['decision_flip_rate']:.1f}% | {row['diagnostic_score']:.1f} | {ci[0]:.1f}-{ci[1]:.1f} |"
+            f"{row['decision_flip_rate']:.1f}% | "
+            f"{'complete' if row.get('publication_ready_provenance') else 'incomplete'} | "
+            f"{row['diagnostic_score']:.1f} | {ci[0]:.1f}-{ci[1]:.1f} |"
         )
     lines.extend(["", "## Qualified Tiers", ""])
     ranking = result.get("ranking") or []
@@ -586,7 +871,7 @@ def render_model_ranking_markdown(result: dict[str, Any]) -> str:
         "",
         "## Qualified-model Separation",
         "",
-        "| Higher profile | Lower profile | Min P(higher) | Separated |",
+        "| Higher profile | Lower profile | Min P(higher) | Holm separated |",
         "| --- | --- | ---: | --- |",
     ])
     adjacent = result.get("adjacent_separation") or []
