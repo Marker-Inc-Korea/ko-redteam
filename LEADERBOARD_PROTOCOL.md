@@ -40,6 +40,12 @@
 - `practice`: 방법론 검토와 시스템 개발을 위해 공개한다. 공식 점수에 사용하지 않는다.
 - `official`: 시즌 중 prompt를 비공개로 유지한다. 첫 제출 전에 동결하고 SHA-256만 공개한다.
 - 두 split은 exact prompt hash와 의미 기반 near-duplicate가 모두 0이어야 한다.
+- official 내부에서도 서로 다른 `independence_group` 간 의미 기반 near-duplicate가 0이어야 한다. 같은 원형의
+  허용된 변형은 동일 group 안에서만 유지한다.
+- semantic vector 입력은 immutable model revision과 tokenizer/pooling/environment 설정 digest를 포함하고,
+  각 vector를 정규화 prompt SHA-256과 결합한다. ID 누락이나 commitment 불일치는 감사 실패다.
+- `independence_group` ID는 네 suite 전체에서 재사용하지 않는다. 상관된 변형은 한 suite 안에서 같은 group에
+  묶고, suite 간 중복 시나리오는 official 표본에서 제거한다.
 - 시즌 종료 후 official 문항을 공개할 수 있지만, 공개 즉시 해당 split은 다음 시즌 공식 평가에서 은퇴한다.
 
 ### 3.2 Coverage
@@ -87,11 +93,16 @@ report에는 confusion matrix, 영역별 수치, 불확실 사례, 알려진 한
 정수와 비공개 label matrix·adjudication log의 SHA-256 commitment를 포함한다. release validator는 confusion
 matrix의 합계가 표본 수와 일치하는지 확인하고 macro F1, 치명 응답 recall, 정상 응답 specificity를 직접
 재계산한다. JSON에 자체 기입한 성능값만으로는 publication gate를 통과할 수 없다.
+비공개 입력은 rater가 모델 이름에 blinded됐음을 명시하고, 모든 불일치 item에 adjudication decision과
+rationale code를 포함한다. 공개 report에는 개별 기록을 싣지 않고 label matrix와 실제 adjudication record의
+commitment만 남긴다. 생성 명령은 `ko-redteam-build-calibration`이다.
 
 ## 5. Execution Protocol
 
-공식 실행은 모델별 최소 3회 반복한다. 각 반복은 다음 `ko-redteam.run-context.v1` 정보를 세 suite report에
-동일하게 결합한다.
+공식 실행은 모델별 최소 3회 반복한다. 각 반복은 `paperbench`, `mini_single`, `multiturn`,
+`agent_harness` 네 suite를 모두 실행하고 다음 `ko-redteam.run-context.v1` 정보를 네 report에 동일하게
+결합한다. 공개 v1 연구 manifest는 과거 호환을 위해 agent가 없는 3-suite 분석을 허용하지만 공식 v2에는
+사용할 수 없다.
 
 - 고정 모델 ID와 immutable revision
 - tokenizer revision, license, weights/API access 유형
@@ -104,6 +115,8 @@ matrix의 합계가 표본 수와 일치하는지 확인하고 macro F1, 치명 
 
 공식 실행 report는 raw prompt/response와 내부 endpoint, 절대경로를 공개하지 않는다. 원본 응답이 사람
 adjudication에 필요하면 접근 통제된 별도 저장소에 보존하고 공개 artifact에는 digest와 판정 근거만 남긴다.
+ranking report의 suite별 case 수와 독립 그룹 수는 split audit의 동일 집계와 정확히 일치해야 한다. 일부
+문항만 실행한 report는 benchmark fingerprint를 기입했더라도 publication gate를 통과할 수 없다.
 
 ## 6. Statistics And Ranking
 
@@ -133,6 +146,9 @@ adherence, benign utility를 공개한다. 모델 크기나 일반 능력과 보
 power analysis 요구량보다 작으면 게시를 중단한다.
 Calibration report의 control separation은 release manifest에 지정한 서로 다른 upper/lower 모델명을 직접
 참조해야 한다.
+기본 `ko-redteam-analyze-power` 구현은 사전 정의한 estimand의 paired independence-group 파일럿 차이에서
+표준편차를 추정하고, 양측 normal approximation으로 필요 표본 수를 계산한 뒤 최소 10,000회 Monte Carlo로
+실제 표본의 power를 검증한다. 이 분포·교환가능성 가정과 파일럿 dataset commitment를 공개 report에 남긴다.
 
 ## 8. Governance
 
@@ -149,6 +165,10 @@ Calibration report의 control separation은 release manifest에 지정한 서로
 동의한 검토자 이름·소속·이해상충 진술·검토 시각과 attestation commitment, 독립 기관명과 검토 보고서
 commitment를 기록한다. 단순한 검토자 수 자체 기입은 외부 검토 증거로 인정하지 않는다.
 
+공개 절차는 [`governance/README.md`](./governance/README.md), 시즌 실행 순서는
+[`governance/SEASON_OPERATIONS.md`](./governance/SEASON_OPERATIONS.md)에 둔다. 특정 시즌의 이해상충 진술,
+appeal 기록과 외부 attestation은 공통 정책 문서만으로 대체할 수 없다.
+
 공식 tier는 특정 배포 환경의 안전 인증이 아니다. 한국의 인공지능·개인정보 관련 법률 준수 여부는 별도
 법률·영향평가 절차에서 판단해야 한다.
 
@@ -156,7 +176,7 @@ commitment를 기록한다. 단순한 검토자 수 자체 기입은 외부 검�
 
 공식 bundle은 `ko-redteam.leaderboard-release.v1` manifest와 다음 hashed JSON artifact를 포함한다.
 
-- `ranking_manifest`: 각 run의 세 report path와 SHA-256
+- `ranking_manifest`: 각 run의 네 suite report path와 SHA-256
 - `ranking_report`: 10,000회 이상 bootstrap 및 Holm 보정 결과
 - `calibration_report`: 사람 라벨 및 판정기 성능
 - `split_audit`: practice/official 중복, 비공개 상태, 영역별 독립 원형 수
@@ -171,12 +191,26 @@ ko-redteam-validate-leaderboard release_manifest.json \
   --markdown-output leaderboard_release_audit.md
 ```
 
+사전 증거 생성 명령:
+
+```bash
+ko-redteam-build-calibration private/calibration_labels.json \
+  --output release/calibration_report.json
+ko-redteam-analyze-power private/power_input.json \
+  --output release/power_analysis.json
+ko-redteam-audit-splits --help
+```
+
+비공개 입력 구조는 [`governance/EVIDENCE_INPUTS.md`](./governance/EVIDENCE_INPUTS.md)에 정의한다. 생성된
+JSON이 존재하는 것만으로 충분하지 않으며, release manifest가 각 상대경로와 SHA-256을 결합해야 한다.
+
 종료 코드 `0`과 `status=publishable`이 함께 확인되어야 한다. 파일이 존재한다는 사실, self-report된 점수,
 부분 checksum만으로는 통과하지 않는다.
 
 split audit은 중복 검사 코드·정규화 규칙·semantic model revision·threshold를 digest로 고정한다. power
 analysis는 코드와 입력 commitment, 사전등록 시각, 최소 10,000회 simulation을 기록한다. 검증기는 power가
-선언한 실제 표본 수와 official split의 독립 원형 합계를 대조하고, `power 사전등록 -> split 감사/동결 ->
+선언한 실제 표본 수, official split의 영역·suite별 독립 원형 합계와 ranking report의 실제 case/group 수를
+대조하고, `power 사전등록 -> split 감사/동결 ->
 첫 제출 -> 모델 실행 -> 외부 검토 -> release 동결`의 timezone 포함 시각 순서를 확인한다.
 
 ## 10. Methodology Basis

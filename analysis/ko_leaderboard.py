@@ -11,10 +11,10 @@ import re
 from typing import Any
 
 try:
-    from ko_model_ranking import analyze_ranking_manifest
+    from ko_model_ranking import OFFICIAL_SUITES, analyze_ranking_manifest
     from ko_run_context import canonical_sha256, validate_run_context
 except ModuleNotFoundError:  # package import path
-    from .ko_model_ranking import analyze_ranking_manifest
+    from .ko_model_ranking import OFFICIAL_SUITES, analyze_ranking_manifest
     from .ko_run_context import canonical_sha256, validate_run_context
 
 
@@ -34,7 +34,7 @@ REQUIRED_DOMAINS = {
     "overrefusal",
     "korean_quality",
 }
-SUITES = ("paperbench", "mini_single", "multiturn")
+SUITES = OFFICIAL_SUITES
 CONFUSION_KEYS = ("tp", "fp", "tn", "fn")
 
 PUBLIC_REQUIREMENTS = {
@@ -406,6 +406,60 @@ def _audit_ranking(audit: _Audit, ranking: dict[str, Any], ranking_manifest: dic
     )
 
     method = ranking.get("method") if isinstance(ranking.get("method"), dict) else {}
+    suite_case_counts = (
+        method.get("suite_case_counts")
+        if isinstance(method.get("suite_case_counts"), dict)
+        else {}
+    )
+    suite_group_counts = (
+        method.get("suite_independence_groups")
+        if isinstance(method.get("suite_independence_groups"), dict)
+        else {}
+    )
+    domain_group_counts = (
+        method.get("domain_independence_groups")
+        if isinstance(method.get("domain_independence_groups"), dict)
+        else {}
+    )
+    suite_group_total = (
+        sum(suite_group_counts.values())
+        if set(suite_group_counts) == set(SUITES)
+        and all(
+            isinstance(value, int) and not isinstance(value, bool)
+            for value in suite_group_counts.values()
+        )
+        else -1
+    )
+    audit.check(
+        "ranking.official_suite_coverage",
+        "benchmark_integrity",
+        method.get("suites") == list(SUITES)
+        and set(suite_case_counts) == set(SUITES)
+        and set(suite_group_counts) == set(SUITES)
+        and all(
+            isinstance(suite_case_counts[suite], int)
+            and not isinstance(suite_case_counts[suite], bool)
+            and isinstance(suite_group_counts[suite], int)
+            and not isinstance(suite_group_counts[suite], bool)
+            and suite_case_counts[suite] >= suite_group_counts[suite] > 0
+            for suite in SUITES
+        ),
+        "official ranking must evaluate all four suites with positive, internally consistent case and independence-group counts",
+    )
+    audit.check(
+        "ranking.official_domain_coverage",
+        "benchmark_integrity",
+        set(domain_group_counts) == REQUIRED_DOMAINS
+        and all(
+            isinstance(domain_group_counts[domain], int)
+            and not isinstance(domain_group_counts[domain], bool)
+            and domain_group_counts[domain]
+            >= PUBLIC_REQUIREMENTS["minimum_groups_per_domain"]
+            for domain in REQUIRED_DOMAINS
+        )
+        and sum(domain_group_counts.values()) == suite_group_total,
+        "official ranking reports must contain the six declared domains at the minimum independent-group coverage",
+    )
     iterations = method.get("iterations")
     audit.check(
         "ranking.bootstrap_iterations",
@@ -644,7 +698,7 @@ def _audit_run_provenance(
         "provenance.run_artifacts",
         "provenance",
         total_runs > 0 and artifact_errors == 0,
-        "every run must bind three hashed reports to one valid run context",
+        "every run must bind four hashed suite reports to one valid run context",
         actual={"runs": total_runs, "errors": artifact_errors},
     )
     audit.check(
@@ -761,6 +815,12 @@ def _audit_calibration(
         "annotation disagreements must have a documented adjudication process",
     )
     audit.check(
+        "calibration.blinding",
+        "construct_validity",
+        annotation.get("blinded_to_model_identity") is True,
+        "human raters must be blinded to model identity",
+    )
+    audit.check(
         "calibration.annotation_commitments",
         "artifact_integrity",
         all(
@@ -860,6 +920,7 @@ def _audit_calibration(
     )
     control = calibration.get("control_separation") if isinstance(calibration.get("control_separation"), dict) else {}
     control_confidence = _number(control.get("confidence"))
+    control_p_value = _number(control.get("p_value"))
     audit.check(
         "calibration.control_separation",
         "construct_validity",
@@ -868,6 +929,23 @@ def _audit_calibration(
         and 95.0 <= control_confidence <= 100.0,
         "pre-registered upper and lower controls must separate at 95% confidence",
         actual=control_confidence,
+    )
+    audit.check(
+        "calibration.control_reproducibility",
+        "artifact_integrity",
+        control_p_value is not None
+        and 0.0 <= control_p_value <= 0.05
+        and bool(SHA256_RE.fullmatch(str(control.get("dataset_sha256") or "")))
+        and bool(SHA256_RE.fullmatch(str(control.get("input_sha256") or "")))
+        and isinstance(control.get("sample_count"), int)
+        and not isinstance(control.get("sample_count"), bool)
+        and control.get("sample_count") >= 20
+        and isinstance(control.get("iterations"), int)
+        and not isinstance(control.get("iterations"), bool)
+        and control.get("iterations") >= 1_000
+        and isinstance(control.get("method"), str)
+        and bool(control.get("method", "").strip()),
+        "control separation must bind its dataset and paired inputs with reproducible resampling evidence",
     )
     limitations = calibration.get("limitations")
     audit.check(
@@ -882,6 +960,18 @@ def _audit_split(audit: _Audit, split: dict[str, Any], ranking: dict[str, Any] |
     audit.check("split.schema", "benchmark_integrity", split.get("schema") == SPLIT_AUDIT_SCHEMA, f"split audit schema must be {SPLIT_AUDIT_SCHEMA}")
     practice = split.get("practice") if isinstance(split.get("practice"), dict) else {}
     official = split.get("official") if isinstance(split.get("official"), dict) else {}
+    practice_cases = (
+        practice.get("cases")
+        if isinstance(practice.get("cases"), int)
+        and not isinstance(practice.get("cases"), bool)
+        else -1
+    )
+    official_cases = (
+        official.get("cases")
+        if isinstance(official.get("cases"), int)
+        and not isinstance(official.get("cases"), bool)
+        else -1
+    )
     audit.check(
         "split.fingerprints",
         "benchmark_integrity",
@@ -925,9 +1015,13 @@ def _audit_split(audit: _Audit, split: dict[str, Any], ranking: dict[str, Any] |
             isinstance(split.get(key), int)
             and not isinstance(split.get(key), bool)
             and split.get(key) == 0
-            for key in ("prompt_hash_overlap", "near_duplicate_overlap")
+            for key in (
+                "prompt_hash_overlap",
+                "near_duplicate_overlap",
+                "official_cross_group_near_duplicate_overlap",
+            )
         ),
-        "practice and official splits must have zero exact and near-duplicate overlap",
+        "practice/official and official cross-group splits must have zero exact or near-duplicate overlap",
     )
     audit.check(
         "split.freeze",
@@ -941,7 +1035,7 @@ def _audit_split(audit: _Audit, split: dict[str, Any], ranking: dict[str, Any] |
     audit.check(
         "split.domain_groups",
         "benchmark_integrity",
-        REQUIRED_DOMAINS <= set(domain_groups)
+        REQUIRED_DOMAINS == set(domain_groups)
         and all(isinstance(domain_groups.get(domain), int) and domain_groups[domain] >= PUBLIC_REQUIREMENTS["minimum_groups_per_domain"] for domain in REQUIRED_DOMAINS),
         f"official split needs at least {PUBLIC_REQUIREMENTS['minimum_groups_per_domain']} independent groups per domain",
         actual={domain: domain_groups.get(domain, 0) for domain in sorted(REQUIRED_DOMAINS)},
@@ -963,6 +1057,79 @@ def _audit_split(audit: _Audit, split: dict[str, Any], ranking: dict[str, Any] |
         "declared split case counts must be positive and official cases must cover all independent groups",
         actual={"practice": practice.get("cases"), "official": official.get("cases"), "groups": group_total},
     )
+    practice_suite_cases = (
+        practice.get("suite_case_counts")
+        if isinstance(practice.get("suite_case_counts"), dict)
+        else {}
+    )
+    practice_suite_groups = (
+        practice.get("suite_independence_groups")
+        if isinstance(practice.get("suite_independence_groups"), dict)
+        else {}
+    )
+    official_suite_cases = (
+        official.get("suite_case_counts")
+        if isinstance(official.get("suite_case_counts"), dict)
+        else {}
+    )
+    official_suite_groups = (
+        official.get("suite_independence_groups")
+        if isinstance(official.get("suite_independence_groups"), dict)
+        else {}
+    )
+    ranking_method = (
+        ranking.get("method")
+        if isinstance(ranking, dict) and isinstance(ranking.get("method"), dict)
+        else {}
+    )
+    ranking_suite_cases = (
+        ranking_method.get("suite_case_counts")
+        if isinstance(ranking_method.get("suite_case_counts"), dict)
+        else {}
+    )
+    ranking_suite_groups = (
+        ranking_method.get("suite_independence_groups")
+        if isinstance(ranking_method.get("suite_independence_groups"), dict)
+        else {}
+    )
+    ranking_domain_groups = (
+        ranking_method.get("domain_independence_groups")
+        if isinstance(ranking_method.get("domain_independence_groups"), dict)
+        else {}
+    )
+
+    def valid_suite_counts(
+        case_counts: dict[str, Any], group_counts: dict[str, Any]
+    ) -> bool:
+        return (
+            set(case_counts) == set(SUITES)
+            and set(group_counts) == set(SUITES)
+            and all(
+                isinstance(case_counts[suite], int)
+                and not isinstance(case_counts[suite], bool)
+                and isinstance(group_counts[suite], int)
+                and not isinstance(group_counts[suite], bool)
+                and case_counts[suite] >= group_counts[suite] > 0
+                for suite in SUITES
+            )
+        )
+
+    suite_coverage_valid = (
+        valid_suite_counts(practice_suite_cases, practice_suite_groups)
+        and valid_suite_counts(official_suite_cases, official_suite_groups)
+        and sum(practice_suite_cases.values()) == practice_cases
+        and sum(official_suite_cases.values()) == official_cases
+        and sum(official_suite_groups.values()) == group_total
+        and official_suite_cases == ranking_suite_cases
+        and official_suite_groups == ranking_suite_groups
+        and domain_groups == ranking_domain_groups
+    )
+    audit.check(
+        "split.ranking_coverage_binding",
+        "artifact_integrity",
+        suite_coverage_valid,
+        "split suite case/group counts must partition both splits and exactly match the ranking reports",
+    )
     split_audit = split.get("audit") if isinstance(split.get("audit"), dict) else {}
     threshold = _number(split_audit.get("near_duplicate_threshold"))
     audit.check(
@@ -973,10 +1140,29 @@ def _audit_split(audit: _Audit, split: dict[str, Any], ranking: dict[str, Any] |
         and isinstance(split_audit.get("semantic_model"), str)
         and bool(split_audit.get("semantic_model", "").strip())
         and bool(SHA256_RE.fullmatch(str(split_audit.get("semantic_model_revision") or "")))
+        and bool(SHA256_RE.fullmatch(str(split_audit.get("semantic_configuration_sha256") or "")))
+        and bool(SHA256_RE.fullmatch(str(split_audit.get("semantic_input_sha256") or "")))
+        and isinstance(split_audit.get("semantic_dimension"), int)
+        and not isinstance(split_audit.get("semantic_dimension"), bool)
+        and split_audit.get("semantic_dimension") >= 2
+        and isinstance(split_audit.get("semantic_comparisons"), int)
+        and not isinstance(split_audit.get("semantic_comparisons"), bool)
+        and practice_cases > 0
+        and official_cases > 0
+        and split_audit.get("semantic_comparisons")
+        == practice_cases * official_cases
+        and isinstance(
+            split_audit.get("official_cross_group_semantic_comparisons"), int
+        )
+        and not isinstance(
+            split_audit.get("official_cross_group_semantic_comparisons"), bool
+        )
+        and 0 <= split_audit.get("official_cross_group_semantic_comparisons")
+        <= official_cases * max(official_cases - 1, 0) // 2
         and threshold is not None
         and 0.0 < threshold < 1.0
         and _iso_with_timezone(split_audit.get("audited_at")),
-        "split overlap audit must bind code, normalization, immutable semantic model, threshold, and audit time",
+        "split overlap audit must bind code, normalization, immutable semantic configuration, all comparisons, threshold, and audit time",
     )
 
 
@@ -988,6 +1174,21 @@ def _audit_power(audit: _Audit, power: dict[str, Any]) -> None:
     effect = _number(power.get("minimum_detectable_effect"))
     required = power.get("required_independence_groups")
     actual = power.get("actual_independence_groups")
+    estimand = power.get("estimand")
+    pilot = power.get("pilot_summary") if isinstance(power.get("pilot_summary"), dict) else {}
+    audit.check(
+        "power.estimand",
+        "statistics",
+        isinstance(estimand, str)
+        and bool(estimand.strip())
+        and bool(SHA256_RE.fullmatch(str(pilot.get("dataset_sha256") or "")))
+        and isinstance(pilot.get("cluster_count"), int)
+        and not isinstance(pilot.get("cluster_count"), bool)
+        and pilot.get("cluster_count") >= 10
+        and _number(pilot.get("standard_deviation")) is not None
+        and float(pilot.get("standard_deviation")) > 0,
+        "power analysis must define its estimand and bind a non-degenerate paired-cluster pilot dataset",
+    )
     audit.check("power.alpha", "statistics", alpha is not None and 0 < alpha <= PUBLIC_REQUIREMENTS["maximum_alpha"], f"power analysis alpha must be at most {PUBLIC_REQUIREMENTS['maximum_alpha']}", actual=alpha)
     audit.check("power.target", "statistics", target is not None and PUBLIC_REQUIREMENTS["minimum_power"] <= target <= 1.0, f"target power must be between {PUBLIC_REQUIREMENTS['minimum_power']} and 1.0", actual=target)
     audit.check("power.achieved", "statistics", achieved is not None and PUBLIC_REQUIREMENTS["minimum_power"] <= achieved <= 1.0, f"achieved power must be between {PUBLIC_REQUIREMENTS['minimum_power']} and 1.0", actual=achieved)

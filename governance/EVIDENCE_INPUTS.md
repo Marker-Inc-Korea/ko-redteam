@@ -1,0 +1,105 @@
+# Private Evidence Input Contracts
+
+이 문서는 evidence CLI에 전달하는 비공개 JSON의 축약 구조를 설명한다. 예시의 digest와 표본 수는
+placeholder이며 공식 기준을 충족하지 않는다. 입력 파일에는 raw prompt, response, message 또는 credential을
+넣지 않는다.
+
+## Evaluator Calibration
+
+`ko-redteam-build-calibration`은 `ko-redteam.calibration-input.v1`을 받는다. 실제 공식 입력은 300개 이상,
+각 영역 30개 이상이어야 한다. `adjudication_records`는 rater label이 갈린 모든 item을 정확히 한 번씩
+포함해야 한다.
+
+```json
+{
+  "schema": "ko-redteam.calibration-input.v1",
+  "dataset": {"split": "held_out", "content_sha256": "<sha256>"},
+  "annotation": {
+    "blinded_to_model_identity": true,
+    "adjudication": "Two blinded experts resolve disagreements.",
+    "raters": [
+      {"id": "rater-01", "expert": true},
+      {"id": "rater-02", "expert": true},
+      {"id": "rater-03", "expert": false}
+    ],
+    "items": [
+      {
+        "id": "private-item-001",
+        "domain": "safety",
+        "ratings": {"rater-01": "critical", "rater-02": "critical", "rater-03": "benign"},
+        "adjudicated_label": "critical",
+        "evaluator_label": "critical"
+      }
+    ],
+    "adjudication_records": [
+      {"id": "private-item-001", "adjudicated_label": "critical", "rationale_code": "expert-consensus"}
+    ]
+  },
+  "evaluator": {"evaluator_git_commit": "<40-char-commit>", "protocol_version": "1.0.0"},
+  "controls": {
+    "upper_model": "upper-anchor",
+    "lower_model": "lower-anchor",
+    "dataset_sha256": "<sha256>",
+    "paired_scores": [{"id": "control-group-001", "upper": 90.0, "lower": 30.0}],
+    "iterations": 10000,
+    "seed": 20260713
+  },
+  "limitations": ["The held-out labels do not cover every deployment context."]
+}
+```
+
+## Statistical Power
+
+`difference`는 `estimand`에 적은 동일한 paired independence-group 단위의 파일럿 차이다. 최소 10개 그룹과
+10,000회 simulation이 필요하다. 실제 official group 수는 split audit의 여섯 영역 합계와 같아야 한다.
+
+```json
+{
+  "schema": "ko-redteam.power-input.v1",
+  "preregistered_at": "2026-06-01T09:00:00+09:00",
+  "alpha": 0.05,
+  "target_power": 0.80,
+  "estimand": "paired balanced diagnostic profile score difference",
+  "minimum_detectable_effect": 5.0,
+  "actual_independence_groups": 180,
+  "pilot_dataset_sha256": "<sha256>",
+  "pilot_clusters": [{"id": "pilot-group-001", "difference": 4.2}],
+  "simulation_iterations": 10000,
+  "seed": 20260713,
+  "assumptions": ["Paired group differences are exchangeable across the frozen strata."]
+}
+```
+
+## Semantic Overlap
+
+`ko-redteam-audit-splits`은 별도 `ko-redteam.semantic-overlap.v1` 벡터 파일을 받는다. `practice`와 `official`
+map의 key는 각각 네 suite의 `suite:case_id` 전체 집합과 정확히 같아야 한다. 각 record의
+`normalized_prompt_sha256`은 감사 코드가 계산한 값과 일치해야 한다.
+
+```json
+{
+  "schema": "ko-redteam.semantic-overlap.v1",
+  "model": {
+    "id": "organization/embedding-model",
+    "revision": "<immutable-revision-sha256>",
+    "configuration_sha256": "<tokenizer-pooling-environment-sha256>"
+  },
+  "vectors": {
+    "practice": {
+      "paperbench:practice-001": {
+        "normalized_prompt_sha256": "<sha256>",
+        "values": [0.1, 0.2, 0.3]
+      }
+    },
+    "official": {
+      "paperbench:official-001": {
+        "normalized_prompt_sha256": "<sha256>",
+        "values": [0.2, 0.1, 0.4]
+      }
+    }
+  }
+}
+```
+
+공개 report는 item ID, 개별 label, cluster ID와 vector를 제거하고 집계값과 입력 commitment만 남긴다.
+외부 검토자는 공개 report의 digest와 접근 통제된 원본 입력을 대조해야 한다.

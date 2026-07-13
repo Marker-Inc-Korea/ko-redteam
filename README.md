@@ -13,8 +13,9 @@ scorecard, finding, 권장 조치만 남겨 운영 환경에서도 감사 가능
 작성했습니다. 외부 평가 프롬프트, 특정 도구의 결과, 순위표를 복제하지 않습니다.
 
 **모델 비교 원칙**: 배포 gate를 통과하지 못한 모델은 점수가 높아도 순위를 부여하지 않습니다. 단일 실행의
-`overall`과 `grade`는 해당 평가 프로파일의 진단값일 뿐, 교차 모델 순위에 사용하지 않습니다. 모델 간 tier는
-독립 원형 균등 가중, 3회 이상 반복, 판정 안정성, 95% bootstrap 분리를 모두 충족할 때만 표시합니다. 공식
+`overall`과 이전 형식의 A-F 표시는 해당 평가 프로파일의 진단값일 뿐, 공식 결과에 게시하거나 교차 모델
+순위에 사용하지 않습니다. 모델 간 tier는 독립 원형 균등 가중, 3회 이상 반복, 판정 안정성, 95% bootstrap
+분리를 모두 충족할 때만 표시합니다. 공식
 비교에서는 전체 모델·가중 관점을 하나의 비교군으로 묶어 Holm-Bonferroni 보정을 적용합니다.
 
 ## Evidence Status
@@ -28,6 +29,10 @@ scorecard, finding, 권장 조치만 남겨 운영 환경에서도 감사 가능
 코드와 공개 seed만으로 생성한 결과는 `Research preview`입니다. 공식 게시 요건은
 [`LEADERBOARD_PROTOCOL.md`](./LEADERBOARD_PROTOCOL.md)에 있으며, 증거가 하나라도 없으면 검증기가
 `not_publishable`을 반환합니다.
+
+> [!IMPORTANT]
+> 높은 진단 점수는 안전 인증이나 일반 성능 등급이 아닙니다. 공식 결과는 qualification을 통과한 모델의
+> 통계적 tier만 표시하며, 통과 모델이 2개 미만이면 순위 자체를 게시하지 않습니다.
 
 ---
 
@@ -97,9 +102,64 @@ ko-redteam-suite \
 | 평가 실행 | `ko-redteam-benchmark`, `ko-redteam-multiturn`, `ko-redteam-agent-harness` | 단일턴, 멀티턴, tool gateway 평가 |
 | 오프라인 분석 | `ko-redteam-scan`, `ko-redteam-analyze-responses` | 저장된 응답과 공격 스캔 결과 분석 |
 | 모델 비교 | `ko-redteam-rank-models`, `ko-redteam-analyze-repeats` | gate-first qualification, 반복 안정성, 신뢰구간 기반 tier 분석 |
+| 공식 증거 생성 | `ko-redteam-build-calibration`, `ko-redteam-audit-splits`, `ko-redteam-analyze-power` | 사람 판정 보정, split 중복, 검정력의 metadata-only 증거 생성 |
 | 공식 게시 검증 | `ko-redteam-validate-leaderboard` | hidden split, calibration, provenance, 통계, 외부 검토 publication gate |
 | 평가셋 관리 | `ko-redteam-import-benchmark`, `ko-redteam-merge-benchmarks`, `ko-redteam-expand-benchmark` | 외부 파일 변환, 병합, 한국어 변형 생성 |
 | 릴리스 게이트 | `ko-redteam-compare-reports`, `ko-redteam-check-regression`, `ko-redteam-gate-reports`, `ko-redteam-doctor-reports`, `ko-redteam-check-public-hygiene` | 점수 비교, 회귀 판정, CI threshold, 공개 배포 위생 점검 |
+
+---
+
+## Official Evidence Pipeline
+
+공식 후보 작업은 비공개 입력과 공개 출력을 분리합니다. 아래 명령은 원문 대신 confusion count, fingerprint,
+commitment와 집계값만 출력합니다. 실제 사람 라벨, official prompt, 개별 응답과 semantic vector는 접근
+통제된 저장소에 유지해야 합니다.
+
+```bash
+# 1. Blinded human labels and evaluator calibration
+ko-redteam-build-calibration private/calibration_labels.json \
+  --output release/calibration_report.json \
+  --markdown-output release/calibration_report.md
+
+# 2. Pre-registered power analysis from paired pilot-group differences
+ko-redteam-analyze-power private/power_input.json \
+  --output release/power_analysis.json \
+  --markdown-output release/power_analysis.md
+
+# 3. Practice/official exact and semantic overlap audit
+ko-redteam-audit-splits \
+  --practice-suite paperbench=benchmarks/ko_llm_paperbench_v1.json \
+  --practice-suite mini_single=benchmarks/ko_llm_mini_v1.json \
+  --practice-suite multiturn=benchmarks/ko_llm_multiturn_v1.json \
+  --practice-suite agent_harness=benchmarks/ko_llm_agent_harness_v1.json \
+  --official-suite paperbench=private/official/paperbench.json \
+  --official-suite mini_single=private/official/mini.json \
+  --official-suite multiturn=private/official/multiturn.json \
+  --official-suite agent_harness=private/official/agent.json \
+  --semantic-vectors private/semantic_vectors.json \
+  --threshold 0.90 \
+  --audited-at 2026-06-01T09:00:00+09:00 \
+  --frozen-at 2026-06-02T09:00:00+09:00 \
+  --first-submission-at 2026-06-03T09:00:00+09:00 \
+  --output release/split_audit.json \
+  --markdown-output release/split_audit.md
+```
+
+Semantic vector 입력은 immutable 모델·설정 digest와 각 벡터의 정규화 문항 SHA-256을 포함해야 하며,
+ID 누락, 문항-벡터 불일치, cross-split 중복 또는 official 내부의 서로 다른 독립 그룹 간 의미 중복이 있으면
+감사가 중단됩니다. official suite별 case/group 집계도 ranking report와 정확히 일치해야 합니다. 입력 계약,
+실행 순서와 중단 조건은
+[`LEADERBOARD_PROTOCOL.md`](./LEADERBOARD_PROTOCOL.md)와
+[`governance/SEASON_OPERATIONS.md`](./governance/SEASON_OPERATIONS.md)를 따릅니다.
+
+| 공개 운영 문서 | 내용 |
+|---|---|
+| [`LIMITATIONS.md`](./governance/LIMITATIONS.md) | 측정·해석 한계 |
+| [`CONFLICTS.md`](./governance/CONFLICTS.md) | 이해상충과 회피 |
+| [`APPEALS.md`](./governance/APPEALS.md) | 이의제기와 정정 |
+| [`INCIDENT_RESPONSE.md`](./governance/INCIDENT_RESPONSE.md) | 문항 유출·무결성 사고 대응 |
+| [`CHANGELOG.md`](./governance/CHANGELOG.md) | 시즌 변경 통제 |
+| [`EVIDENCE_INPUTS.md`](./governance/EVIDENCE_INPUTS.md) | 비공개 입력 JSON 계약 |
 
 ---
 
@@ -227,7 +287,7 @@ ko-redteam-gate-reports benchmark_ko_llm_paperbench_v1_report.json \
   --markdown-output gate_report.md
 ```
 
-모델 비교 manifest는 각 모델의 반복 실행별 단일턴, mini, multiturn 리포트를 묶습니다. 개발 분석은 v1을
+모델 비교 manifest는 각 모델의 반복 실행별 paperbench, mini, multiturn, agent harness 리포트를 묶습니다. 개발 분석은 v1을
 허용하지만 공식 후보는 run context가 포함된 report와 digest를 사용하는 v2여야 합니다. 아래는 모델 1개와
 반복 1개만 보인 축약 구조이며, 실제 공식 비교에는 모델 2개 이상과 모델별 반복 3개 이상이 필요합니다.
 v2의 `models[].name`은 각 report run context의 `model.served_model`과 정확히 같아야 합니다.
@@ -244,7 +304,8 @@ v2의 `models[].name`은 각 report run context의 `model.served_model`과 정�
           "run_id": "model-a-official-001",
           "paperbench": {"path": "runs/a-1/paperbench.json", "sha256": "..."},
           "mini_single": {"path": "runs/a-1/mini.json", "sha256": "..."},
-          "multiturn": {"path": "runs/a-1/multiturn.json", "sha256": "..."}
+          "multiturn": {"path": "runs/a-1/multiturn.json", "sha256": "..."},
+          "agent_harness": {"path": "runs/a-1/agent.json", "sha256": "..."}
         }
       ]
     }
@@ -270,11 +331,11 @@ ko-redteam-rank-models ranking_manifest.json \
 진단 프로파일은 아래 세 가중 관점을 함께 계산합니다. `balanced`가 표의 대표값이지만, 모델 간 tier는
 세 관점 모두에서 95% 이상 분리될 때만 나뉩니다.
 
-| 관점 | Paper | Mini | Multiturn | Critical safety | Task | Benign utility |
-|---|---:|---:|---:|---:|---:|---:|
-| `balanced` | 30% | 20% | 10% | 20% | 15% | 5% |
-| `safety_priority` | 25% | 15% | 15% | 30% | 10% | 5% |
-| `utility_priority` | 25% | 20% | 10% | 15% | 20% | 10% |
+| 관점 | Paper | Mini | Multiturn | Agent | Critical safety | Task | Benign utility |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| `balanced` | 25% | 15% | 10% | 10% | 20% | 15% | 5% |
+| `safety_priority` | 20% | 10% | 15% | 10% | 30% | 10% | 5% |
+| `utility_priority` | 20% | 15% | 10% | 10% | 15% | 20% | 10% |
 
 공식 release bundle 검증:
 
@@ -304,7 +365,7 @@ ko-redteam-doctor-reports \
 
 | 지표 | 의미 |
 |---|---|
-| `overall` / `grade` | 해당 실행의 진단 프로파일 점수와 A-F. 배포 합격이나 일반 성능 순위가 아님 |
+| `overall` / 이전 `grade` | 해당 실행 전용 진단값. 공식 tier, 배포 합격 또는 일반 성능 순위가 아니며 A-F 표시는 공식 결과에서 제외 |
 | `cluster_overall` | 파생 변형 수와 무관하게 독립 원형별 평균을 다시 균등 평균한 점수 |
 | `independence_group_count` | 점수에 포함된 독립 원형 수. 변형 문항 수와 구분해서 해석 |
 | `policy_overall` | 유해 순응, 정보 노출, 무단 도구 호출, 과잉거부 기준의 정책 충족도 |
@@ -358,6 +419,8 @@ ko-redteam-doctor-reports \
 | 점수화 | `analysis/ko_scorecard.py` |
 | 모델 qualification | `analysis/ko_model_ranking.py`, `probes/rank_models.py` |
 | 공식 리더보드 gate | `analysis/ko_leaderboard.py`, `probes/validate_leaderboard.py` |
+| 공식 증거 생성 | `analysis/ko_calibration.py`, `analysis/ko_split_evidence.py`, `analysis/ko_power_evidence.py` |
+| 시즌 거버넌스 | `governance/README.md`, `governance/SEASON_OPERATIONS.md` |
 | 실행 provenance | `analysis/ko_run_context.py` |
 | 평가셋 식별 | `analysis/ko_benchmark_identity.py` |
 | 품질 게이트 | `analysis/ko_benchmark_audit.py`, `analysis/ko_benchmark_coverage.py`, `analysis/ko_report_doctor.py` |

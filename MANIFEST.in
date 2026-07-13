@@ -7,6 +7,7 @@ graft analysis
 graft benchmarks
 graft detectors
 graft gap_analysis
+graft governance
 graft probes
 
 prune tests

@@ -1,0 +1,19 @@
+# Leaderboard Governance
+
+이 디렉터리는 `ko-redteam` 공식 qualification tier를 운영할 때 필요한 공개 절차를 정의한다. 문서가
+존재한다는 사실만으로 리더보드가 공식 상태가 되지는 않는다. 릴리스별 증거를 SHA-256으로 결합하고
+`ko-redteam-validate-leaderboard`가 `publishable`을 반환해야 한다.
+
+| 문서 | 역할 |
+|---|---|
+| [`LIMITATIONS.md`](./LIMITATIONS.md) | 측정 범위와 해석 한계 |
+| [`CONFLICTS.md`](./CONFLICTS.md) | 이해상충 공개와 회피 절차 |
+| [`APPEALS.md`](./APPEALS.md) | 결과 이의제기와 정정 절차 |
+| [`INCIDENT_RESPONSE.md`](./INCIDENT_RESPONSE.md) | 문항 유출·개인정보·무결성 사고 대응 |
+| [`CHANGELOG.md`](./CHANGELOG.md) | 프로토콜 및 시즌 변경 이력 |
+| [`SEASON_OPERATIONS.md`](./SEASON_OPERATIONS.md) | 시즌 준비부터 게시까지의 실행 순서 |
+| [`EVIDENCE_INPUTS.md`](./EVIDENCE_INPUTS.md) | 비공개 evidence JSON 입력 계약 |
+
+현재 저장소의 공개 seed 및 비교 결과는 연구용 진단 자료다. 비공개 official split, 사람 라벨 기반
+calibration, 사전 power analysis, 불변 실행 provenance, 독립 외부 검토가 없는 결과에는 공식 순위 표현을
+사용하지 않는다.

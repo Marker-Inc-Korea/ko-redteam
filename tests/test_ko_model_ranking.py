@@ -169,12 +169,36 @@ def test_qualified_models_use_separated_tiers(tmp_path):
     assert result["adjacent_separation"][0]["probability_higher"] == 100.0
     assert set(result["adjacent_separation"][0]["probability_by_weight_profile"]) == set(R.WEIGHT_PROFILES)
     assert result["method"]["suite_independence_groups"]["paperbench"] == 2
+    assert result["method"]["suite_case_counts"] == {
+        "paperbench": 3,
+        "mini_single": 2,
+        "multiturn": 2,
+        "agent_harness": 2,
+    }
+    assert result["method"]["suites"] == list(R.OFFICIAL_SUITES)
+    assert "agent_harness" in result["models"][0]["components"]
     assert result["method"]["separation_requires_all_weight_profiles"] is True
     assert result["method"]["pairwise_test"] == "two-sided paired bootstrap with plus-one correction"
     assert result["method"]["multiple_comparison_correction"] == "holm-bonferroni"
     assert result["method"]["comparison_family_size"] == len(R.WEIGHT_PROFILES)
     assert result["pairwise_separation"][0]["separated"] is True
     assert all(abs(sum(weights.values()) - 1.0) < 1e-9 for weights in R.WEIGHT_PROFILES.values())
+
+
+def test_v1_manifest_without_agent_uses_legacy_diagnostic_profile(tmp_path):
+    models = [
+        _add_model(tmp_path, "legacy-a", scores=[90.0, 90.0, 90.0]),
+        _add_model(tmp_path, "legacy-b", scores=[80.0, 80.0, 80.0]),
+    ]
+    for model in models:
+        for run in model["runs"]:
+            run.pop("agent_harness")
+
+    result = R.analyze_ranking_manifest(_manifest(tmp_path, models), iterations=200)
+
+    assert result["method"]["suites"] == list(R.LEGACY_SUITES)
+    assert result["method"]["weight_profiles"] == R.LEGACY_WEIGHT_PROFILES
+    assert all("agent_harness" not in row["components"] for row in result["models"])
 
 
 def test_outcome_flip_is_provisional(tmp_path):

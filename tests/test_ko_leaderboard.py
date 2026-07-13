@@ -63,12 +63,20 @@ def _context(model: str, run: int) -> dict:
     }
 
 
-def _row(case_id: str, *, score: float, expected: str, outcome: str, group: str) -> dict:
+def _row(
+    case_id: str,
+    *,
+    score: float,
+    expected: str,
+    outcome: str,
+    group: str,
+    domain: str,
+) -> dict:
     protected = expected != "allow"
     passed = (protected and outcome == "refused") or (not protected and outcome == "unknown" and score >= 70)
     return {
         "id": case_id,
-        "domain": "safety" if protected else "overrefusal",
+        "domain": domain,
         "category": "unit",
         "expected": expected,
         "outcome": outcome,
@@ -81,12 +89,61 @@ def _row(case_id: str, *, score: float, expected: str, outcome: str, group: str)
     }
 
 
-def _report(model: str, suite: str, score: float, context: dict) -> dict:
+def _report(
+    model: str,
+    suite: str,
+    score: float,
+    context: dict,
+    *,
+    full_official: bool,
+) -> dict:
     protected_outcome = "refused" if score >= 70 else "unknown"
-    rows = [
-        _row(f"{suite}-protected", score=score, expected="refuse_or_redirect", outcome=protected_outcome, group=f"{suite}-protected"),
-        _row(f"{suite}-allow", score=score, expected="allow", outcome="unknown", group=f"{suite}-allow"),
-    ]
+    if full_official:
+        suite_domains = {
+            "paperbench": ("safety", "privacy"),
+            "mini_single": ("overrefusal", "korean_quality"),
+            "multiturn": ("prompt_security",),
+            "agent_harness": ("agent_rag",),
+        }
+        protected_expectations = {
+            "safety": "refuse_or_redirect",
+            "privacy": "no_leak",
+            "prompt_security": "refuse_or_redirect",
+            "agent_rag": "no_tool",
+        }
+        rows = []
+        for domain in suite_domains[suite]:
+            expected = protected_expectations.get(domain, "allow")
+            outcome = protected_outcome if expected != "allow" else "unknown"
+            for index in range(30):
+                case_id = f"{suite}-{domain}-{index:03d}"
+                rows.append(_row(
+                    case_id,
+                    score=score,
+                    expected=expected,
+                    outcome=outcome,
+                    group=case_id,
+                    domain=domain,
+                ))
+    else:
+        rows = [
+            _row(
+                f"{suite}-protected",
+                score=score,
+                expected="refuse_or_redirect",
+                outcome=protected_outcome,
+                group=f"{suite}-protected",
+                domain="safety",
+            ),
+            _row(
+                f"{suite}-allow",
+                score=score,
+                expected="allow",
+                outcome="unknown",
+                group=f"{suite}-allow",
+                domain="overrefusal",
+            ),
+        ]
     return {
         "schema": "ko-redteam.benchmark-report.v1",
         "benchmark": {
@@ -103,7 +160,9 @@ def _report(model: str, suite: str, score: float, context: dict) -> dict:
     }
 
 
-def _ranking_bundle(root: Path) -> tuple[Path, Path, dict]:
+def _ranking_bundle(
+    root: Path, *, full_official: bool = False
+) -> tuple[Path, Path, dict]:
     entries = []
     for model, score in (("upper-model", 100.0), ("lower-model", 10.0)):
         runs = []
@@ -112,7 +171,16 @@ def _ranking_bundle(root: Path) -> tuple[Path, Path, dict]:
             run = {"run_id": context["run_id"]}
             for suite in R.SUITES:
                 report_path = root / "runs" / model / f"run-{run_index}" / f"{suite}.json"
-                _write_json(report_path, _report(model, suite, score, context))
+                _write_json(
+                    report_path,
+                    _report(
+                        model,
+                        suite,
+                        score,
+                        context,
+                        full_official=full_official,
+                    ),
+                )
                 run[suite] = {
                     "path": str(report_path.relative_to(root)),
                     "sha256": _sha_file(report_path),
@@ -137,7 +205,9 @@ def _artifact(path: Path, root: Path) -> dict:
 
 
 def _valid_release(tmp_path: Path) -> Path:
-    ranking_manifest_path, ranking_path, ranking = _ranking_bundle(tmp_path / "ranking")
+    ranking_manifest_path, ranking_path, ranking = _ranking_bundle(
+        tmp_path / "ranking", full_official=True
+    )
     domains = {domain: 50 for domain in L.REQUIRED_DOMAINS}
     domain_confusion = {"tp": 24, "fp": 1, "tn": 24, "fn": 1}
     per_domain = {
@@ -156,6 +226,7 @@ def _valid_release(tmp_path: Path) -> Path:
         "annotation": {
             "rater_count": 3,
             "expert_rater_count": 2,
+            "blinded_to_model_identity": True,
             "adjudication": "Two experts adjudicate disagreements before the evaluator is frozen.",
             "agreement": {"metric": "krippendorff_alpha", "value": 0.85},
             "label_matrix_sha256": "e" * 64,
@@ -173,8 +244,14 @@ def _valid_release(tmp_path: Path) -> Path:
         "control_separation": {
             "status": "pass",
             "confidence": 99.0,
+            "p_value": 0.01,
             "upper_model": "upper-model",
             "lower_model": "lower-model",
+            "dataset_sha256": "3" * 64,
+            "input_sha256": "4" * 64,
+            "sample_count": 30,
+            "iterations": 1000,
+            "method": "one-sided paired bootstrap with plus-one correction",
         },
         "limitations": ["Synthetic integration fixture; not empirical evidence."],
     })
@@ -186,7 +263,12 @@ def _valid_release(tmp_path: Path) -> Path:
     split_path = tmp_path / "split_audit.json"
     _write_json(split_path, {
         "schema": L.SPLIT_AUDIT_SCHEMA,
-        "practice": {"cases": 180, "content_sha256": "c" * 64},
+        "practice": {
+            "cases": 180,
+            "content_sha256": "c" * 64,
+            "suite_case_counts": {suite: 45 for suite in R.SUITES},
+            "suite_independence_groups": {suite: 45 for suite in R.SUITES},
+        },
         "official": {
             "cases": 180,
             "content_sha256": "d" * 64,
@@ -194,6 +276,18 @@ def _valid_release(tmp_path: Path) -> Path:
             "frozen_at": "2026-06-05T00:00:00+09:00",
             "first_submission_at": "2026-06-06T00:00:00+09:00",
             "suite_fingerprints": suite_fingerprints,
+            "suite_case_counts": {
+                "paperbench": 60,
+                "mini_single": 60,
+                "multiturn": 30,
+                "agent_harness": 30,
+            },
+            "suite_independence_groups": {
+                "paperbench": 60,
+                "mini_single": 60,
+                "multiturn": 30,
+                "agent_harness": 30,
+            },
             "domain_independence_groups": {domain: 30 for domain in L.REQUIRED_DOMAINS},
         },
         "audit": {
@@ -201,11 +295,17 @@ def _valid_release(tmp_path: Path) -> Path:
             "normalization_sha256": "5" * 64,
             "semantic_model": "unit/semantic-auditor",
             "semantic_model_revision": "6" * 64,
+            "semantic_configuration_sha256": "9" * 64,
+            "semantic_input_sha256": "0" * 64,
+            "semantic_dimension": 8,
+            "semantic_comparisons": 180 * 180,
+            "official_cross_group_semantic_comparisons": 180 * 179 // 2,
             "near_duplicate_threshold": 0.90,
             "audited_at": "2026-06-04T00:00:00+09:00",
         },
         "prompt_hash_overlap": 0,
         "near_duplicate_overlap": 0,
+        "official_cross_group_near_duplicate_overlap": 0,
         "frozen_before_first_submission": True,
     })
 
@@ -215,6 +315,7 @@ def _valid_release(tmp_path: Path) -> Path:
         "method": "paired cluster bootstrap simulation",
         "alpha": 0.05,
         "target_power": 0.8,
+        "estimand": "paired balanced diagnostic profile score difference",
         "achieved_power": 0.85,
         "minimum_detectable_effect": 5.0,
         "required_independence_groups": 180,
@@ -223,6 +324,11 @@ def _valid_release(tmp_path: Path) -> Path:
         "input_sha256": "8" * 64,
         "preregistered_at": "2026-06-01T00:00:00+09:00",
         "simulation_iterations": 10000,
+        "pilot_summary": {
+            "dataset_sha256": "9" * 64,
+            "cluster_count": 30,
+            "standard_deviation": 8.0,
+        },
         "assumptions": ["Independent groups are exchangeable within pre-registered strata."],
     })
 
@@ -314,12 +420,29 @@ def _valid_release(tmp_path: Path) -> Path:
 
 
 def test_complete_release_bundle_is_publishable(tmp_path):
-    result = L.audit_leaderboard_release(_valid_release(tmp_path))
+    release_path = _valid_release(tmp_path)
+    result = L.audit_leaderboard_release(release_path)
 
     failed = [check for check in result["checks"] if check["status"] == "fail"]
     assert result["status"] == "publishable", failed
     assert result["summary"]["failed"] == 0
     assert result["summary"]["models"] == 2
+
+    manifest = json.loads(release_path.read_text("utf-8"))
+    split_reference = manifest["artifacts"]["split_audit"]
+    split_path = tmp_path / split_reference["path"]
+    split = json.loads(split_path.read_text("utf-8"))
+    split["official"]["suite_case_counts"]["paperbench"] -= 1
+    _write_json(split_path, split)
+    split_reference["sha256"] = _sha_file(split_path)
+    _write_json(release_path, manifest)
+
+    tampered = L.audit_leaderboard_release(release_path)
+    failed_ids = {
+        check["id"] for check in tampered["checks"] if check["status"] == "fail"
+    }
+    assert tampered["status"] == "not_publishable"
+    assert "split.ranking_coverage_binding" in failed_ids
 
 
 def test_v2_ranking_rejects_relabeling_and_tampered_context(tmp_path):
@@ -342,6 +465,25 @@ def test_v2_ranking_rejects_relabeling_and_tampered_context(tmp_path):
     _write_json(ranking_manifest_path, manifest)
 
     with pytest.raises(ValueError, match="run context SHA-256 mismatch"):
+        R.analyze_ranking_manifest(ranking_manifest_path, iterations=100)
+
+
+def test_v2_ranking_rejects_cross_suite_independence_group_reuse(tmp_path):
+    ranking_manifest_path, _, _ = _ranking_bundle(tmp_path)
+    manifest = json.loads(ranking_manifest_path.read_text("utf-8"))
+    for model in manifest["models"]:
+        for run in model["runs"]:
+            reference = run["mini_single"]
+            report_path = tmp_path / reference["path"]
+            report = json.loads(report_path.read_text("utf-8"))
+            report["scorecard"]["case_scores"][0]["independence_group"] = (
+                "paperbench-protected"
+            )
+            _write_json(report_path, report)
+            reference["sha256"] = _sha_file(report_path)
+    _write_json(ranking_manifest_path, manifest)
+
+    with pytest.raises(ValueError, match="reused across suites"):
         R.analyze_ranking_manifest(ranking_manifest_path, iterations=100)
 
 
