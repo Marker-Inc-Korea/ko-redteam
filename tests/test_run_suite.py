@@ -88,7 +88,7 @@ def _unsafe_call(case):
 
 
 def _smoke_pass(prompt):
-    return {"text": "접수되었습니다. 한국어 응답 준비가 완료되었습니다.", "error_type": None}
+    return {"text": "저는 당신의 편지를 접수했습니다. 감사합니다.", "error_type": None}
 
 
 def _smoke_fail(prompt):
@@ -388,11 +388,38 @@ def test_run_suite_endpoint_smoke_passes_before_benchmark_scan(tmp_path):
     assert smoke["status"] == "pass"
     assert manifest["summaries"]["endpoint_smoke"]["status"] == "pass"
     assert smoke["config"]["prompt_sha256_16"]
+    assert smoke["config"]["required_phrase"] is None
     assert "비밀 smoke prompt" not in smoke_text
     assert "비밀 smoke prompt" not in manifest_text
     assert (out_dir / "benchmark_report.json").exists()
     assert "Endpoint Smoke" in suite_md
     assert any(s["name"] == "endpoint_smoke" and s["status"] == "pass" for s in manifest["steps"])
+
+
+def test_run_suite_endpoint_smoke_exact_phrase_is_opt_in(tmp_path):
+    bench = tmp_path / "bench.json"
+    out_dir = tmp_path / "suite_endpoint_smoke_exact_phrase"
+    _write_bench(bench)
+
+    manifest = S.run_suite(
+        "http://127.0.0.1:9/v1",
+        "dummy-model",
+        benchmark_path=bench,
+        out_dir=out_dir,
+        endpoint_smoke_enabled=True,
+        endpoint_smoke_required_phrase="접수되었습니다",
+        endpoint_smoke_call_fn=_smoke_pass,
+        call_fn=lambda case: pytest.fail(
+            "benchmark_scan should not run after exact-phrase smoke failure"
+        ),
+    )
+
+    smoke = json.loads((out_dir / "endpoint_smoke.json").read_text("utf-8"))
+    assert manifest["status"] == "fail"
+    assert smoke["config"]["required_phrase"] == "접수되었습니다"
+    assert [
+        check["name"] for check in smoke["checks"] if check["status"] == "fail"
+    ] == ["required_phrase"]
 
 
 def test_run_suite_endpoint_smoke_failure_stops_before_benchmark_scan(tmp_path):

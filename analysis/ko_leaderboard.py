@@ -1644,6 +1644,8 @@ def _audit_preregistration(
         else {}
     )
     declared_domains = design.get("domains")
+    declared_minimum = design.get("minimum_groups_per_domain")
+    actual_minimum = min(matrix_domains.values()) if matrix_domains else None
     design_valid = (
         design.get("public_during_season") is False
         and isinstance(declared_domains, list)
@@ -1656,8 +1658,10 @@ def _audit_preregistration(
             >= PUBLIC_REQUIREMENTS["minimum_groups_per_domain"]
             for domain in REQUIRED_DOMAINS
         )
-        and design.get("minimum_groups_per_domain")
-        == PUBLIC_REQUIREMENTS["minimum_groups_per_domain"]
+        and isinstance(declared_minimum, int)
+        and not isinstance(declared_minimum, bool)
+        and declared_minimum >= PUBLIC_REQUIREMENTS["minimum_groups_per_domain"]
+        and declared_minimum == actual_minimum
         and design.get("minimum_independence_groups") == sum(matrix_domains.values())
         and construction.get("new_human_authored_groups") is True
         and construction.get("public_practice_prompts_reused") is False

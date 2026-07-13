@@ -97,6 +97,7 @@ def _report(
     context: dict,
     *,
     full_official: bool,
+    groups_per_domain: int = 30,
 ) -> dict:
     protected_outcome = "refused" if score >= 70 else "unknown"
     if full_official:
@@ -115,9 +116,9 @@ def _report(
         rows = []
         for domain in suite_domains[suite]:
             allocations = (
-                [("no_tool", 15), ("allow", 15)]
+                [("no_tool", groups_per_domain // 2), ("allow", groups_per_domain // 2)]
                 if suite == "agent_harness"
-                else [(protected_expectations.get(domain, "allow"), 30)]
+                else [(protected_expectations.get(domain, "allow"), groups_per_domain)]
             )
             for expected, count in allocations:
                 outcome = protected_outcome if expected != "allow" else "unknown"
@@ -171,7 +172,7 @@ def _report(
 
 
 def _ranking_bundle(
-    root: Path, *, full_official: bool = False
+    root: Path, *, full_official: bool = False, groups_per_domain: int = 30
 ) -> tuple[Path, Path, dict]:
     entries = []
     for model, score in (("upper-model", 100.0), ("lower-model", 10.0)):
@@ -189,6 +190,7 @@ def _ranking_bundle(
                         score,
                         context,
                         full_official=full_official,
+                        groups_per_domain=groups_per_domain,
                     ),
                 )
                 run[suite] = {
@@ -214,9 +216,21 @@ def _artifact(path: Path, root: Path) -> dict:
     return {"path": str(path.relative_to(root)), "sha256": _sha_file(path)}
 
 
-def _valid_release(tmp_path: Path) -> Path:
+def _valid_release(tmp_path: Path, *, groups_per_domain: int = 30) -> Path:
+    assert groups_per_domain >= L.PUBLIC_REQUIREMENTS["minimum_groups_per_domain"]
+    assert groups_per_domain % 2 == 0
+    total_groups = groups_per_domain * len(L.REQUIRED_DOMAINS)
+    agent_half = groups_per_domain // 2
+    official_suite_counts = {
+        "paperbench": groups_per_domain * 2,
+        "mini_single": groups_per_domain * 2,
+        "multiturn": groups_per_domain,
+        "agent_harness": groups_per_domain,
+    }
     ranking_manifest_path, ranking_path, ranking = _ranking_bundle(
-        tmp_path / "ranking", full_official=True
+        tmp_path / "ranking",
+        full_official=True,
+        groups_per_domain=groups_per_domain,
     )
     domains = {domain: 50 for domain in L.REQUIRED_DOMAINS}
     domain_confusion = {"tp": 24, "fp": 1, "tn": 24, "fn": 1}
@@ -298,47 +312,45 @@ def _valid_release(tmp_path: Path) -> Path:
             },
         },
         "official": {
-            "cases": 180,
+            "cases": total_groups,
             "content_sha256": "d" * 64,
             "public": False,
             "frozen_at": "2026-06-05T00:00:00+09:00",
             "first_submission_at": "2026-06-06T00:00:00+09:00",
             "suite_fingerprints": suite_fingerprints,
-            "suite_case_counts": {
-                "paperbench": 60,
-                "mini_single": 60,
-                "multiturn": 30,
-                "agent_harness": 30,
-            },
-            "suite_independence_groups": {
-                "paperbench": 60,
-                "mini_single": 60,
-                "multiturn": 30,
-                "agent_harness": 30,
-            },
+            "suite_case_counts": official_suite_counts,
+            "suite_independence_groups": official_suite_counts,
             "suite_domain_independence_groups": {
-                "paperbench": {"privacy": 30, "safety": 30},
-                "mini_single": {"korean_quality": 30, "overrefusal": 30},
-                "multiturn": {"prompt_security": 30},
-                "agent_harness": {"agent_rag": 30},
+                "paperbench": {
+                    "privacy": groups_per_domain,
+                    "safety": groups_per_domain,
+                },
+                "mini_single": {
+                    "korean_quality": groups_per_domain,
+                    "overrefusal": groups_per_domain,
+                },
+                "multiturn": {"prompt_security": groups_per_domain},
+                "agent_harness": {"agent_rag": groups_per_domain},
             },
             "suite_domain_expected_independence_groups": {
                 "paperbench": {
-                    "privacy": {"no_leak": 30},
-                    "safety": {"refuse_or_redirect": 30},
+                    "privacy": {"no_leak": groups_per_domain},
+                    "safety": {"refuse_or_redirect": groups_per_domain},
                 },
                 "mini_single": {
-                    "korean_quality": {"allow": 30},
-                    "overrefusal": {"allow": 30},
+                    "korean_quality": {"allow": groups_per_domain},
+                    "overrefusal": {"allow": groups_per_domain},
                 },
                 "multiturn": {
-                    "prompt_security": {"refuse_or_redirect": 30},
+                    "prompt_security": {"refuse_or_redirect": groups_per_domain},
                 },
                 "agent_harness": {
-                    "agent_rag": {"allow": 15, "no_tool": 15},
+                    "agent_rag": {"allow": agent_half, "no_tool": agent_half},
                 },
             },
-            "domain_independence_groups": {domain: 30 for domain in L.REQUIRED_DOMAINS},
+            "domain_independence_groups": {
+                domain: groups_per_domain for domain in L.REQUIRED_DOMAINS
+            },
         },
         "audit": {
             "code_sha256": "4" * 64,
@@ -348,8 +360,10 @@ def _valid_release(tmp_path: Path) -> Path:
             "semantic_configuration_sha256": "9" * 64,
             "semantic_input_sha256": "0" * 64,
             "semantic_dimension": 8,
-            "semantic_comparisons": 180 * 180,
-            "official_cross_group_semantic_comparisons": 180 * 179 // 2,
+            "semantic_comparisons": 180 * total_groups,
+            "official_cross_group_semantic_comparisons": (
+                total_groups * (total_groups - 1) // 2
+            ),
             "near_duplicate_threshold": 0.90,
             "audited_at": "2026-06-04T00:00:00+09:00",
         },
@@ -371,8 +385,8 @@ def _valid_release(tmp_path: Path) -> Path:
         "estimand": "paired balanced diagnostic profile score difference",
         "achieved_power": 0.85,
         "minimum_detectable_effect": 5.0,
-        "required_independence_groups": 180,
-        "actual_independence_groups": 180,
+        "required_independence_groups": total_groups,
+        "actual_independence_groups": total_groups,
         "analysis_code_sha256": "7" * 64,
         "input_sha256": "8" * 64,
         "preregistered_at": "2026-06-01T00:00:00+09:00",
@@ -416,13 +430,13 @@ def _valid_release(tmp_path: Path) -> Path:
                 "agent_harness:agent_rag:allow": 5,
             },
             "target_strata": {
-                "paperbench:privacy:no_leak": 30,
-                "paperbench:safety:refuse_or_redirect": 30,
-                "mini_single:korean_quality:allow": 30,
-                "mini_single:overrefusal:allow": 30,
-                "multiturn:prompt_security:refuse_or_redirect": 30,
-                "agent_harness:agent_rag:no_tool": 15,
-                "agent_harness:agent_rag:allow": 15,
+                "paperbench:privacy:no_leak": groups_per_domain,
+                "paperbench:safety:refuse_or_redirect": groups_per_domain,
+                "mini_single:korean_quality:allow": groups_per_domain,
+                "mini_single:overrefusal:allow": groups_per_domain,
+                "multiturn:prompt_security:refuse_or_redirect": groups_per_domain,
+                "agent_harness:agent_rag:no_tool": agent_half,
+                "agent_harness:agent_rag:allow": agent_half,
             },
         },
         "assumptions": ["Independent groups are exchangeable within pre-registered strata."],
@@ -489,29 +503,35 @@ def _valid_release(tmp_path: Path) -> Path:
         },
         "official_split_design": {
             "public_during_season": False,
-            "minimum_independence_groups": 180,
-            "minimum_groups_per_domain": 30,
+            "minimum_independence_groups": total_groups,
+            "minimum_groups_per_domain": groups_per_domain,
             "domains": sorted(L.REQUIRED_DOMAINS),
             "suite_domain_independence_groups": {
-                "paperbench": {"privacy": 30, "safety": 30},
-                "mini_single": {"korean_quality": 30, "overrefusal": 30},
-                "multiturn": {"prompt_security": 30},
-                "agent_harness": {"agent_rag": 30},
+                "paperbench": {
+                    "privacy": groups_per_domain,
+                    "safety": groups_per_domain,
+                },
+                "mini_single": {
+                    "korean_quality": groups_per_domain,
+                    "overrefusal": groups_per_domain,
+                },
+                "multiturn": {"prompt_security": groups_per_domain},
+                "agent_harness": {"agent_rag": groups_per_domain},
             },
             "suite_domain_expected_independence_groups": {
                 "paperbench": {
-                    "privacy": {"no_leak": 30},
-                    "safety": {"refuse_or_redirect": 30},
+                    "privacy": {"no_leak": groups_per_domain},
+                    "safety": {"refuse_or_redirect": groups_per_domain},
                 },
                 "mini_single": {
-                    "korean_quality": {"allow": 30},
-                    "overrefusal": {"allow": 30},
+                    "korean_quality": {"allow": groups_per_domain},
+                    "overrefusal": {"allow": groups_per_domain},
                 },
                 "multiturn": {
-                    "prompt_security": {"refuse_or_redirect": 30},
+                    "prompt_security": {"refuse_or_redirect": groups_per_domain},
                 },
                 "agent_harness": {
-                    "agent_rag": {"allow": 15, "no_tool": 15},
+                    "agent_rag": {"allow": agent_half, "no_tool": agent_half},
                 },
             },
             "construction": {
@@ -722,6 +742,33 @@ def test_complete_release_bundle_is_publishable(tmp_path):
     }
     assert tampered["status"] == "not_publishable"
     assert "split.ranking_coverage_binding" in failed_ids
+
+
+def test_power_derived_design_above_protocol_floor_is_publishable(tmp_path):
+    release_path = _valid_release(tmp_path, groups_per_domain=54)
+    manifest = json.loads(release_path.read_text("utf-8"))
+
+    result = L.audit_leaderboard_release(release_path)
+    failed = [check for check in result["checks"] if check["status"] == "fail"]
+    assert result["status"] == "publishable", failed
+
+    preregistration_reference = manifest["artifacts"]["preregistration"]
+    preregistration_path = tmp_path / preregistration_reference["path"]
+    preregistration = json.loads(preregistration_path.read_text("utf-8"))
+    assert preregistration["official_split_design"]["minimum_groups_per_domain"] == 54
+    assert preregistration["official_split_design"]["minimum_independence_groups"] == 324
+
+    preregistration["official_split_design"]["minimum_groups_per_domain"] = 30
+    _write_json(preregistration_path, preregistration)
+    preregistration_reference["sha256"] = _sha_file(preregistration_path)
+    _write_json(release_path, manifest)
+
+    mismatched = L.audit_leaderboard_release(release_path)
+    failed_ids = {
+        check["id"] for check in mismatched["checks"] if check["status"] == "fail"
+    }
+    assert mismatched["status"] == "not_publishable"
+    assert "preregistration.split_design" in failed_ids
 
 
 def test_power_pilot_rejects_endpoint_error_rows(tmp_path):

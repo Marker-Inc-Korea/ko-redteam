@@ -25,7 +25,6 @@ from agent_harness import run_agent_harness  # noqa: E402
 from benchmark_scan import run_benchmark  # noqa: E402
 from check_endpoint import (  # noqa: E402
     DEFAULT_PROMPT as DEFAULT_ENDPOINT_SMOKE_PROMPT,
-    DEFAULT_REQUIRED_PHRASE as DEFAULT_ENDPOINT_SMOKE_REQUIRED_PHRASE,
     run_endpoint_smoke,
 )
 from expand_benchmark import expand_benchmark, load_benchmark as load_expand_benchmark  # noqa: E402
@@ -591,7 +590,7 @@ def run_suite(
     coverage_min_source_families: dict[str, int] | None = None,
     endpoint_smoke_enabled: bool = False,
     endpoint_smoke_prompt: str = DEFAULT_ENDPOINT_SMOKE_PROMPT,
-    endpoint_smoke_required_phrase: str | None = DEFAULT_ENDPOINT_SMOKE_REQUIRED_PHRASE,
+    endpoint_smoke_required_phrase: str | None = None,
     endpoint_smoke_min_hangul_ratio: float = 0.35,
     endpoint_smoke_max_tokens: int = 96,
     endpoint_smoke_api_key: str | None = None,
@@ -1013,7 +1012,11 @@ def main() -> None:
     ap.add_argument("--endpoint-smoke", action="store_true",
                     help="benchmark 실행 전 OpenAI-compatible endpoint readiness를 fail-fast로 확인")
     ap.add_argument("--endpoint-smoke-prompt", default=DEFAULT_ENDPOINT_SMOKE_PROMPT)
-    ap.add_argument("--endpoint-smoke-required-phrase", default=DEFAULT_ENDPOINT_SMOKE_REQUIRED_PHRASE)
+    ap.add_argument(
+        "--endpoint-smoke-required-phrase",
+        default=None,
+        help="optional exact response phrase; suite readiness uses Korean signal by default",
+    )
     ap.add_argument("--endpoint-smoke-no-required-phrase", action="store_true")
     ap.add_argument("--endpoint-smoke-min-hangul-ratio", type=float, default=0.35)
     ap.add_argument("--endpoint-smoke-max-tokens", type=int, default=96)

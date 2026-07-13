@@ -90,6 +90,10 @@ ko-redteam-suite \
   --max-critical-high 0
 ```
 
+통합 suite의 endpoint smoke는 기본적으로 API 성공, 비어 있지 않은 응답, 한글 비율과 문자 깨짐 여부를
+검사합니다. 특정 표면형을 재현하지 않았다는 이유로 정상적인 한국어 응답을 측정 오류로 처리하지 않습니다.
+정확 문구 준수가 필요한 별도 진단에서는 `--endpoint-smoke-required-phrase "문구"`를 명시합니다.
+
 소스 checkout에서는 `python3 probes/...` 경로도 그대로 사용할 수 있습니다.
 
 ---

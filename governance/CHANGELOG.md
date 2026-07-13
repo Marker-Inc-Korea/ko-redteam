@@ -41,6 +41,10 @@
 - endpoint 오류 0건 hard gate와 Agent transport·expected allocation commitment를 추가했다.
 - 점수 계산을 바꾸지 않고 Agent `no_tool` 내부 식별자의 의미를 "비인가·denylist 도구 미실행"으로
   명시했다. allowlist의 저위험 조회 도구 실행은 허용하며 `allow` case는 required tool 실행을 요구한다.
+- protocol 최저치 30개보다 큰 power-derived 영역별 그룹 수를 validator가 허용하되, 선언 최소값이 frozen
+  suite/domain matrix의 실제 최소값과 정확히 일치하도록 수정했다.
+- 통합 suite endpoint smoke의 exact-phrase 검사를 opt-in으로 바꿨다. 기본 readiness gate는 API 성공,
+  비어 있지 않은 응답, 한글 신호와 문자 깨짐 여부를 유지한다.
 
 ## Change Control
 
