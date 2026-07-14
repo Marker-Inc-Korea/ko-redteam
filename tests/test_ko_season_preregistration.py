@@ -123,6 +123,7 @@ def test_season_spec_accepts_only_preexecution_immutable_policy():
     protocol_paths = S.protocol_source_tree_paths(ROOT)
     assert "probes/ko_jailbreak_templates.json" in protocol_paths
     assert "gap_analysis/_vendor/mitigationbypass_substrings.txt" in protocol_paths
+    assert "governance/PRACTICE_REVIEW_WORKFLOW.md" in protocol_paths
 
 
 @pytest.mark.parametrize(

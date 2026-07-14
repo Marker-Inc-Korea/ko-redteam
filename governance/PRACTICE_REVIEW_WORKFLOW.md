@@ -7,7 +7,10 @@ packet 생성기는 사람의 승인값을 채우지 않으며 모든 응답 tem
 ## 1. Freeze A Private Workspace
 
 검토자 ID는 3-64자의 가명 ID를 사용한다. 실제 신원·소속 기록과 서명 문서는 접근 통제 위치에 두고 SHA-256만
-attestation JSON에 기록한다. workspace와 개별 응답은 공개 Git에 커밋하지 않는다.
+attestation JSON에 기록한다. workspace와 개별 응답은 공개 Git에 커밋하지 않는다. 생성기는 workspace를
+`0700`, plan·packet·response·attestation을 `0600`으로 만든다. 검토자가 제출하는 identity·affiliation·signed
+statement도 `chmod 600`을 적용해야 하며, group/other 권한이 하나라도 있으면 병합기는 거부한다. 병합 audit은
+workspace 내부에만 `0600` 배타 생성한다.
 
 ```bash
 REVIEW_DIR=../ko_redteam_private/reviews/successor-pilot-v1
@@ -64,6 +67,11 @@ attestation 불일치, reject 또는 의견 불일치가 한 건이라도 있으
 모든 원형이 서로 다른 두 검토자에게 accept된 경우에만 공개 가능한 `practice-review.v2`가 생성된다. 공개
 artifact에는 원문 응답이나 notes 대신 plan, packet, response, 신원·소속·서명 attestation의 SHA-256 commitment와
 원형별 reviewer ID만 남는다.
+
+최종 review의 workflow, merge-code와 실제 merge CLI entrypoint SHA-256은 이후 pilot registration이 현재 tracked
+파일과 다시 대조한다. 이 구현 digest는 packet plan 시점에 먼저 동결되므로 검토 도중 병합 구현을 바꿀 수도 없다.
+검수 뒤 workflow 또는 merge 구현을 바꾸면 기존 응답을 새 protocol에 소급 적용하지 않고 새 workspace에서 다시
+검수한다.
 
 ## 4. Freeze Before Any Anchor Run
 

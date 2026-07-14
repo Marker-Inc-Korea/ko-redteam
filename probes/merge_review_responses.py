@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
+import os
 from pathlib import Path
 import sys
 
@@ -14,12 +16,26 @@ sys.path.insert(0, str(ROOT / "analysis"))
 from ko_practice_review import (  # noqa: E402
     MERGE_AUDIT_SCHEMA,
     merge_review_workspace,
+    review_implementation_evidence,
 )
 
 
 def _write(path: Path, value: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(value, ensure_ascii=False, indent=1) + "\n", "utf-8")
+    descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+            json.dump(value, handle, ensure_ascii=False, indent=1)
+            handle.write("\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+    except BaseException:
+        path.unlink(missing_ok=True)
+        raise
+
+
+def _file_sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def main() -> None:
@@ -36,6 +52,16 @@ def main() -> None:
     resolved_paths = {path.resolve() for path in (plan, output, audit_output)}
     if len(resolved_paths) != 3:
         raise SystemExit("plan, final review, and merge audit paths must be distinct")
+    if audit_output.resolve().parent != plan.resolve().parent:
+        raise SystemExit("merge audit must be written inside the private review workspace")
+    try:
+        implementation = review_implementation_evidence(args.root)
+    except (OSError, ValueError) as exc:
+        raise SystemExit(f"cannot verify review merge implementation: {exc}") from exc
+    if implementation["merge_entrypoint_sha256"] != _file_sha256(
+        Path(__file__).resolve()
+    ):
+        raise SystemExit("executing merge entrypoint differs from project source")
     for label, path in (("final review", output), ("merge audit", audit_output)):
         if path.exists():
             raise SystemExit(f"refusing to overwrite existing {label}: {path}")

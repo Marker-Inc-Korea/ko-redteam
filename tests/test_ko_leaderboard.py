@@ -42,7 +42,9 @@ def _practice_review_evidence(assignment_count: int) -> dict:
         "schema": "ko-redteam.practice-review-evidence.v1",
         "review_plan_sha256": "1" * 64,
         "review_plan_file_sha256": "2" * 64,
-        "review_workflow_sha256": "0" * 64,
+        "review_workflow_sha256": _sha_file(
+            ROOT / "governance" / "PRACTICE_REVIEW_WORKFLOW.md"
+        ),
         "planned_at": "2026-05-14T22:00:00+09:00",
         "minimum_distinct_reviewers_per_group": 2,
         "review_plan_schema": "ko-redteam.practice-review-plan.v1",
@@ -81,7 +83,10 @@ def _practice_review_evidence(assignment_count: int) -> dict:
         "private_evidence_files_verified": True,
         "reviewer_decisions_hidden_during_review": True,
         "response_notes_published": False,
-        "merge_code_sha256": "9" * 64,
+        "merge_code_sha256": _sha_file(ROOT / "analysis" / "ko_practice_review.py"),
+        "merge_entrypoint_sha256": _sha_file(
+            ROOT / "probes" / "merge_review_responses.py"
+        ),
     }
 
 

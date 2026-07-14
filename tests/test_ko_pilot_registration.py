@@ -1,6 +1,7 @@
 """Pre-execution power-pilot registration and review tests."""
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 import subprocess
@@ -14,6 +15,10 @@ from ko_run_context import canonical_sha256
 
 
 ROOT = Path(__file__).resolve().parent.parent
+
+
+def _sha(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 TARGET_COUNTS = {key: 20 for key in sorted(P.REQUIRED_TARGET_STRATA)}
@@ -65,7 +70,9 @@ def _practice_review() -> dict:
             "schema": "ko-redteam.practice-review-evidence.v1",
             "review_plan_sha256": "5" * 64,
             "review_plan_file_sha256": "6" * 64,
-            "review_workflow_sha256": "2" * 64,
+            "review_workflow_sha256": _sha(
+                ROOT / "governance" / "PRACTICE_REVIEW_WORKFLOW.md"
+            ),
             "planned_at": "2026-07-14T09:00:00+09:00",
             "minimum_distinct_reviewers_per_group": 2,
             "review_plan_schema": "ko-redteam.practice-review-plan.v1",
@@ -104,7 +111,10 @@ def _practice_review() -> dict:
             "private_evidence_files_verified": True,
             "reviewer_decisions_hidden_during_review": True,
             "response_notes_published": False,
-            "merge_code_sha256": "d" * 64,
+            "merge_code_sha256": _sha(ROOT / "analysis" / "ko_practice_review.py"),
+            "merge_entrypoint_sha256": _sha(
+                ROOT / "probes" / "merge_review_responses.py"
+            ),
         },
         "benchmarks": {
             suite: {
@@ -347,6 +357,24 @@ def test_frozen_pilot_registration_binds_review_and_pre_execution_design():
                 private_evidence_files_verified=False
             ),
             "blind independent approval",
+        ),
+        (
+            lambda registration, review: review["evidence"].update(
+                merge_code_sha256="0" * 64
+            ),
+            "merge code",
+        ),
+        (
+            lambda registration, review: review["evidence"].update(
+                merge_entrypoint_sha256="0" * 64
+            ),
+            "merge entrypoint",
+        ),
+        (
+            lambda registration, review: review["evidence"].update(
+                review_workflow_sha256="0" * 64
+            ),
+            "workflow",
         ),
         (
             lambda registration, review: review["evidence"][

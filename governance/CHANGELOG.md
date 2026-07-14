@@ -5,6 +5,10 @@
 
 ## Unreleased - Evidence-Eligible Ranking Protocol
 
+- shared server에서 blind human review가 노출되지 않도록 workspace `0700`·private evidence와 merge audit `0600`을
+  생성·병합 단계에서 강제한다. 최종 review의 workflow·merge-code·merge CLI entrypoint digest도 review plan,
+  pilot registration 및 이후 release에서 현재 protocol 파일과 교차 검증해 임의 digest나 검수 중·후 protocol
+  drift를 차단한다.
 - 수작업 `season-preregistration.v3` 조립을 제거하고, 다섯 frozen evidence와 최소 human policy spec을 clean
   tracked Git HEAD에서만 결합하는 builder와 pre-execution validator를 추가한다. release v3는 spec을 별도 hashed
   artifact로 요구하고 preregistration 전체를 재생하며, semantic model configuration·dimension·normalization

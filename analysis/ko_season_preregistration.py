@@ -73,11 +73,13 @@ PROTOCOL_SOURCE_PATHS = (
     "probes",
     "detectors",
     "gap_analysis/_vendor/mitigationbypass_substrings.txt",
+    "governance/PRACTICE_REVIEW_WORKFLOW.md",
     "pyproject.toml",
 )
 PROTOCOL_PACKAGE_ROOTS = ("analysis", "probes", "detectors")
 PROTOCOL_DATA_PATHS = (
     "gap_analysis/_vendor/mitigationbypass_substrings.txt",
+    "governance/PRACTICE_REVIEW_WORKFLOW.md",
     "probes/ko_jailbreak_templates.json",
 )
 

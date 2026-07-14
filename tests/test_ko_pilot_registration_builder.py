@@ -60,7 +60,9 @@ def _completed_review() -> dict:
             "schema": "ko-redteam.practice-review-evidence.v1",
             "review_plan_sha256": "1" * 64,
             "review_plan_file_sha256": "2" * 64,
-            "review_workflow_sha256": "3" * 64,
+            "review_workflow_sha256": _sha(
+                ROOT / "governance" / "PRACTICE_REVIEW_WORKFLOW.md"
+            ),
             "planned_at": "2026-07-15T08:00:00+09:00",
             "minimum_distinct_reviewers_per_group": 2,
             "review_plan_schema": "ko-redteam.practice-review-plan.v1",
@@ -99,7 +101,10 @@ def _completed_review() -> dict:
             "private_evidence_files_verified": True,
             "reviewer_decisions_hidden_during_review": True,
             "response_notes_published": False,
-            "merge_code_sha256": "f" * 64,
+            "merge_code_sha256": _sha(ROOT / B.REVIEW_MERGE_PATH),
+            "merge_entrypoint_sha256": _sha(
+                ROOT / B.REVIEW_MERGE_ENTRYPOINT_PATH
+            ),
         },
         "benchmarks": draft["benchmarks"],
         "target_strata": draft["target_strata"],
@@ -113,6 +118,9 @@ def _project_copy(tmp_path: Path) -> tuple[Path, Path, Path]:
     relative_paths = {
         B.BUILDER_PATH,
         B.BUILDER_ENTRYPOINT_PATH,
+        B.REVIEW_MERGE_PATH,
+        B.REVIEW_MERGE_ENTRYPOINT_PATH,
+        B.REVIEW_WORKFLOW_PATH,
         *(
             row["path"]
             for row in spec["design_sources"].values()
@@ -164,6 +172,9 @@ def test_registration_spec_source_paths_cover_every_build_input():
     assert paths == {
         B.BUILDER_PATH,
         B.BUILDER_ENTRYPOINT_PATH,
+        B.REVIEW_MERGE_PATH,
+        B.REVIEW_MERGE_ENTRYPOINT_PATH,
+        B.REVIEW_WORKFLOW_PATH,
         *(row["path"] for row in spec["design_sources"].values()),
         *(
             row["path"]
@@ -219,6 +230,30 @@ def test_builder_rejects_dirty_source_or_pending_review(tmp_path):
 
     _write(review_path, _load(root / DRAFT_PATH.relative_to(ROOT)))
     with pytest.raises(ValueError, match="practice review schema"):
+        B.build_pilot_registration(
+            spec_path,
+            review_path,
+            project_root=root,
+            registered_at="2026-07-15T11:00:00+09:00",
+            protocol_git_commit="a" * 40,
+            source_worktree_clean=True,
+        )
+
+
+@pytest.mark.parametrize(
+    ("relative_path", "message"),
+    [
+        (B.REVIEW_MERGE_PATH, "tracked merge code"),
+        (B.REVIEW_MERGE_ENTRYPOINT_PATH, "tracked merge entrypoint"),
+        (B.REVIEW_WORKFLOW_PATH, "tracked workflow"),
+    ],
+)
+def test_builder_rejects_review_protocol_drift(tmp_path, relative_path, message):
+    root, spec_path, review_path = _project_copy(tmp_path)
+    path = root / relative_path
+    path.write_bytes(path.read_bytes() + b"\n")
+
+    with pytest.raises(ValueError, match=message):
         B.build_pilot_registration(
             spec_path,
             review_path,

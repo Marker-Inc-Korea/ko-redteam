@@ -6,8 +6,10 @@ from datetime import datetime
 import hashlib
 import itertools
 import json
+import os
 from pathlib import Path
 import re
+import stat
 from typing import Any
 
 try:
@@ -28,11 +30,14 @@ ATTESTATION_SCHEMA = "ko-redteam.practice-reviewer-attestation.v1"
 MERGE_AUDIT_SCHEMA = "ko-redteam.practice-review-merge-audit.v1"
 FINAL_REVIEW_SCHEMA = "ko-redteam.practice-review.v2"
 REVIEW_EVIDENCE_SCHEMA = "ko-redteam.practice-review-evidence.v1"
+REVIEW_IMPLEMENTATION_SCHEMA = "ko-redteam.practice-review-implementation.v1"
 MIN_REVIEWERS_PER_GROUP = 2
 MAX_REVIEWERS = 16
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 REVIEWER_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{2,63}$")
 WORKFLOW_PATH = "governance/PRACTICE_REVIEW_WORKFLOW.md"
+MERGE_CODE_PATH = "analysis/ko_practice_review.py"
+MERGE_ENTRYPOINT_PATH = "probes/merge_review_responses.py"
 
 DRAFT_CRITERIA = [
     "기대 행동, 영역 및 채점 의도가 명확하다",
@@ -98,10 +103,28 @@ def _load_object(path: Path, label: str) -> dict[str, Any]:
 
 def _write_json(path: Path, value: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
-        json.dumps(value, ensure_ascii=False, indent=1) + "\n",
-        "utf-8",
-    )
+    descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+            json.dump(value, handle, ensure_ascii=False, indent=1)
+            handle.write("\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+    except BaseException:
+        path.unlink(missing_ok=True)
+        raise
+
+
+def _require_private_permissions(
+    path: Path,
+    label: str,
+    *,
+    directory: bool = False,
+) -> None:
+    mode = stat.S_IMODE(path.stat().st_mode)
+    if mode & (stat.S_IRWXG | stat.S_IRWXO):
+        kind = "directory" if directory else "file"
+        raise ValueError(f"{label} {kind} must not grant group or other permissions")
 
 
 def _required_string(value: Any, label: str) -> str:
@@ -135,6 +158,26 @@ def _relative_contained(path: Path, root: Path, label: str) -> tuple[Path, str]:
     except ValueError as exc:
         raise ValueError(f"{label} must be contained in project root") from exc
     return resolved, relative
+
+
+def review_implementation_evidence(project_root: str | Path) -> dict[str, str]:
+    """Hash both layers that can produce the public merged review."""
+    root = Path(project_root).resolve()
+    evidence = {"schema": REVIEW_IMPLEMENTATION_SCHEMA}
+    for name, relative in (
+        ("merge_code", MERGE_CODE_PATH),
+        ("merge_entrypoint", MERGE_ENTRYPOINT_PATH),
+    ):
+        path, normalized = _relative_contained(
+            root / relative,
+            root,
+            f"practice review {name.replace('_', ' ')}",
+        )
+        if normalized != relative or not path.is_file():
+            raise ValueError(f"practice review {name.replace('_', ' ')} is missing")
+        evidence[f"{name}_path"] = normalized
+        evidence[f"{name}_sha256"] = _file_sha256(path)
+    return evidence
 
 
 def _reviewer_ids(values: list[str]) -> list[str]:
@@ -228,6 +271,11 @@ def _load_source(
     )
     if normalized_workflow_path != WORKFLOW_PATH or not workflow_path.is_file():
         raise ValueError("practice review workflow is missing")
+    implementation = review_implementation_evidence(root)
+    if implementation["merge_code_sha256"] != _file_sha256(
+        Path(__file__).resolve()
+    ):
+        raise ValueError("executing practice review code differs from project source")
 
     benchmark_bindings: dict[str, Any] = {}
     groups: dict[tuple[str, str], dict[str, Any]] = {}
@@ -352,6 +400,7 @@ def _load_source(
             "path": WORKFLOW_PATH,
             "sha256": _file_sha256(workflow_path),
         },
+        "review_implementation": implementation,
     }
     if not isinstance(source["review_protocol"], dict):
         raise ValueError("draft review protocol must be an object")
@@ -450,6 +499,7 @@ def _make_plan(
         "target_strata": source["target_strata"],
         "review_protocol": source["review_protocol"],
         "workflow": source["workflow"],
+        "review_implementation": source["review_implementation"],
         "criteria": CRITERIA,
         "comparison_catalog_sha256": canonical_sha256(catalog),
         "reviewers": reviewer_rows,
@@ -587,7 +637,8 @@ def build_review_workspace(
     destination = Path(output_dir)
     if destination.exists() and any(destination.iterdir()):
         raise ValueError("review workspace must be new or empty")
-    destination.mkdir(parents=True, exist_ok=True)
+    destination.mkdir(parents=True, mode=0o700, exist_ok=True)
+    destination.chmod(0o700)
     plan_path = destination / "review-plan.json"
     _write_json(plan_path, plan)
     plan_sha256 = canonical_sha256(plan)
@@ -684,6 +735,10 @@ def _validate_attestation(
             raise ValueError(
                 f"reviewer attestation evidence file is empty: {reviewer_id}:{stem}"
             )
+        _require_private_permissions(
+            evidence_path,
+            f"reviewer attestation evidence: {reviewer_id}:{stem}",
+        )
         digest = str(attestation.get(digest_key) or "")
         if not SHA256_RE.fullmatch(digest) or digest != _file_sha256(evidence_path):
             raise ValueError(
@@ -861,6 +916,8 @@ def merge_review_workspace(
     """Merge completed human responses; never synthesize an approval."""
     plan_file = Path(plan_path).resolve()
     workspace = plan_file.parent
+    _require_private_permissions(workspace, "review workspace", directory=True)
+    _require_private_permissions(plan_file, "review plan")
     plan = _load_object(plan_file, "review plan")
     if plan.get("schema") != PLAN_SCHEMA:
         raise ValueError(f"review plan schema must be {PLAN_SCHEMA}")
@@ -898,14 +955,20 @@ def merge_review_workspace(
     for reviewer_id in reviewers:
         reviewer = reviewer_rows[reviewer_id]
         packet_path = workspace / reviewer["packet_path"]
+        _require_private_permissions(packet_path, f"review packet: {reviewer_id}")
         packet = _load_object(packet_path, f"review packet: {reviewer_id}")
         expected_packet = _make_packet(plan, plan_sha256, reviewer, catalog)
         if canonical_sha256(packet) != canonical_sha256(expected_packet):
             raise ValueError(f"review packet changed after planning: {reviewer_id}")
         packet_sha256 = _file_sha256(packet_path)
         response_path = workspace / reviewer["response_path"]
+        _require_private_permissions(response_path, f"review response: {reviewer_id}")
         response = _load_object(response_path, f"review response: {reviewer_id}")
         attestation_path = workspace / reviewer["attestation_path"]
+        _require_private_permissions(
+            attestation_path,
+            f"reviewer attestation: {reviewer_id}",
+        )
         attestation = _load_object(
             attestation_path, f"reviewer attestation: {reviewer_id}"
         )
@@ -1026,7 +1089,12 @@ def merge_review_workspace(
                 "private_evidence_files_verified": True,
                 "reviewer_decisions_hidden_during_review": True,
                 "response_notes_published": False,
-                "merge_code_sha256": _file_sha256(Path(__file__)),
+                "merge_code_sha256": plan["review_implementation"][
+                    "merge_code_sha256"
+                ],
+                "merge_entrypoint_sha256": plan["review_implementation"][
+                    "merge_entrypoint_sha256"
+                ],
             },
             "benchmarks": plan["benchmarks"],
             "target_strata": plan["target_strata"],
@@ -1039,7 +1107,10 @@ def merge_review_workspace(
         "review_plan_sha256": plan_sha256,
         "review_plan_file_sha256": _file_sha256(plan_file),
         "review_workflow_sha256": plan["workflow"]["sha256"],
-        "merge_code_sha256": _file_sha256(Path(__file__)),
+        "merge_code_sha256": plan["review_implementation"]["merge_code_sha256"],
+        "merge_entrypoint_sha256": plan["review_implementation"][
+            "merge_entrypoint_sha256"
+        ],
         "reviewers_planned": len(reviewers),
         "reviewers_completed": len(response_results),
         "assignments": len(plan["assignments"]),

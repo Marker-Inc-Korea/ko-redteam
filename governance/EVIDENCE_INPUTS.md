@@ -18,13 +18,17 @@ ID를 기록한다. `practice-review-plan.v1`과 검수 workflow의 digest, revi
 SHA-256, 독립성·blindness 진술, 실제 배정 수가 함께 결합되지 않으면 pilot registration에서 거부한다. 개별
 response와 notes 및 신원 문서는 비공개 workspace에 두고, 병합기가 실제 파일의 존재·비어 있지 않음·digest를
 검증한 뒤 최종 artifact에는 commitment만 공개한다.
+shared server의 workspace는 `0700`, 모든 private review·신원 증거와 merge audit은 `0600`이어야 한다. 최종
+review가 선언한 workflow, merge-code와 merge CLI entrypoint SHA-256은 pilot registration 시 현재 tracked 파일과
+일치해야 한다.
 검토자는 reference 출력에 blind해야 하며 machine-assisted draft 사용을 명시해야 한다. registration은 이 review의
 canonical SHA-256을 결합한다. 둘 중 하나가 누락·변조되거나 review가 등록 이후에 완료됐으면 power 입력을 만들 수
 없다.
 
 `ko-redteam-build-pilot-registration`은 공개
 [`SUCCESSOR_PILOT_REGISTRATION_SPEC.json`](./SUCCESSOR_PILOT_REGISTRATION_SPEC.json)을 유일한 설계 입력으로
-사용한다. clean Git HEAD에서 spec, 최종 review, 세 설계 근거, 네 benchmark와 세 분석 코드가 모두 tracked이고
+사용한다. clean Git HEAD에서 spec, 최종 review, 세 설계 근거, 네 benchmark, 세 분석 코드, review merge 코드·CLI
+entrypoint와 workflow가 모두 tracked이고
 digest가 일치할 때만 registration을 만든다. build evidence에는 HEAD, 생성 시각, spec·review의 file/canonical
 SHA-256, builder 구현과 entrypoint SHA-256을 기록한다. S4에서 재사용하는 것은 사전 공개된 두 anchor identity와
 equal-domain baseline allocation뿐이며, 과거 output·score·분산·power·통계 결론은 successor 입력으로 재사용하지

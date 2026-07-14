@@ -63,6 +63,7 @@ def _complete_response(
     for stem, payload in evidence_payloads.items():
         evidence_path = attestation_path.parent / attestation[f"{stem}_path"]
         evidence_path.write_text(payload, "utf-8")
+        evidence_path.chmod(0o600)
         evidence_digests[f"{stem}_sha256"] = hashlib.sha256(
             evidence_path.read_bytes()
         ).hexdigest()
@@ -124,6 +125,9 @@ def test_review_workspace_is_blind_balanced_and_byte_reproducible(tmp_path):
     )
     assert max(assignment_counts.values()) - min(assignment_counts.values()) <= 1
     assert str(ROOT) not in first_plan_path.read_text("utf-8")
+    assert first_workspace.stat().st_mode & 0o077 == 0
+    assert first_plan_path.stat().st_mode & 0o077 == 0
+    assert plan["review_implementation"] == R.review_implementation_evidence(ROOT)
 
     for reviewer in plan["reviewers"]:
         packet = _load(first_workspace / reviewer["packet_path"])
@@ -148,6 +152,8 @@ def test_review_workspace_is_blind_balanced_and_byte_reproducible(tmp_path):
         assert not (
             first_workspace / attestation["identity_record_path"]
         ).exists()
+        for key in ("packet_path", "response_path", "attestation_path"):
+            assert (first_workspace / reviewer[key]).stat().st_mode & 0o077 == 0
 
     second_plan_path = _build(tmp_path / "second", reviewers)
     second_workspace = second_plan_path.parent
@@ -171,6 +177,20 @@ def test_pending_responses_cannot_create_a_final_review(tmp_path):
         "response_pending:reviewer-a",
         "response_pending:reviewer-b",
     ]
+
+
+@pytest.mark.parametrize("target", ["workspace", "response"])
+def test_merge_rejects_non_private_workspace_permissions(tmp_path, target):
+    plan_path = _build(tmp_path, ["reviewer-a", "reviewer-b"])
+    if target == "workspace":
+        plan_path.parent.chmod(0o750)
+    else:
+        plan = _load(plan_path)
+        response_path = plan_path.parent / plan["reviewers"][0]["response_path"]
+        response_path.chmod(0o640)
+
+    with pytest.raises(ValueError, match="group or other permissions"):
+        R.merge_review_workspace(plan_path, project_root=ROOT)
 
 
 def test_two_completed_independent_acceptances_create_v2_review(tmp_path):
@@ -202,6 +222,9 @@ def test_two_completed_independent_acceptances_create_v2_review(tmp_path):
         R.ATTESTATION_SCHEMA
     )
     assert final_review["evidence"]["private_evidence_files_verified"] is True
+    assert final_review["evidence"]["merge_entrypoint_sha256"] == hashlib.sha256(
+        (ROOT / R.MERGE_ENTRYPOINT_PATH).read_bytes()
+    ).hexdigest()
     assert final_review["evidence"]["assignment_count"] == 140
     assert len(final_review["evidence"]["reviewer_responses"]) == 2
     assert len(final_review["case_reviews"]) == 140
@@ -351,6 +374,52 @@ def test_review_clis_preserve_pending_gate_and_refuse_path_collisions(tmp_path):
     assert "must be distinct" in collision.stderr
     assert plan_path.read_bytes() == original_plan
 
+    outside_audit = subprocess.run(
+        [
+            sys.executable,
+            str(ROOT / "probes" / "merge_review_responses.py"),
+            str(plan_path),
+            "--root",
+            str(ROOT),
+            "--output",
+            str(tmp_path / "final-review.json"),
+            "--audit-output",
+            str(tmp_path / "outside-audit.json"),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert outside_audit.returncode != 0
+    assert "inside the private review workspace" in outside_audit.stderr
+
+    stale_root = tmp_path / "stale-cli"
+    stale_entrypoint = stale_root / "probes" / "merge_review_responses.py"
+    stale_entrypoint.parent.mkdir(parents=True)
+    stale_entrypoint.write_bytes(
+        (ROOT / R.MERGE_ENTRYPOINT_PATH).read_bytes() + b"\n"
+    )
+    (stale_root / "analysis").symlink_to(ROOT / "analysis", target_is_directory=True)
+    stale_merge = subprocess.run(
+        [
+            sys.executable,
+            str(stale_entrypoint),
+            str(plan_path),
+            "--root",
+            str(ROOT),
+            "--output",
+            str(tmp_path / "final-review.json"),
+            "--audit-output",
+            str(workspace / "stale-audit.json"),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert stale_merge.returncode != 0
+    assert "executing merge entrypoint differs" in stale_merge.stderr
+    assert not (workspace / "stale-audit.json").exists()
+
     audit_path = workspace / "merge-audit.json"
     merge = subprocess.run(
         [
@@ -370,4 +439,5 @@ def test_review_clis_preserve_pending_gate_and_refuse_path_collisions(tmp_path):
     )
     assert merge.returncode == 2
     assert _load(audit_path)["status"] == "not_ready"
+    assert audit_path.stat().st_mode & 0o077 == 0
     assert not (tmp_path / "final-review.json").exists()

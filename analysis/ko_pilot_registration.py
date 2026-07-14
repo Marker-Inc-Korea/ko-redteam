@@ -3,8 +3,9 @@ from __future__ import annotations
 
 from collections import Counter
 from datetime import datetime
+import hashlib
 import math
-from pathlib import PurePosixPath
+from pathlib import Path, PurePosixPath
 import re
 from typing import Any
 
@@ -14,6 +15,7 @@ try:
         OFFICIAL_VARIANCE_CONFIDENCE_LEVEL,
     )
     import ko_model_ranking as ranking
+    import ko_practice_review as practice_review
     from ko_practice_review import (
         ATTESTATION_SCHEMA,
         FINAL_REVIEW_SCHEMA,
@@ -32,6 +34,7 @@ except ModuleNotFoundError:  # package import path
         OFFICIAL_VARIANCE_CONFIDENCE_LEVEL,
     )
     from . import ko_model_ranking as ranking
+    from . import ko_practice_review as practice_review
     from .ko_practice_review import (
         ATTESTATION_SCHEMA,
         FINAL_REVIEW_SCHEMA,
@@ -93,6 +96,14 @@ PILOT_REGISTRATION_FIELDS = {
     "statistics",
     "stopping_rules",
 }
+
+
+def _file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def _object(value: Any, context: str) -> dict[str, Any]:
@@ -562,8 +573,21 @@ def _review(
         "review_plan_file_sha256",
         "review_workflow_sha256",
         "merge_code_sha256",
+        "merge_entrypoint_sha256",
     ):
         _sha256(evidence.get(key), f"practice review evidence {key}")
+    package_root = Path(practice_review.__file__).resolve().parent.parent
+    implementation = practice_review.review_implementation_evidence(package_root)
+    workflow_path = package_root / practice_review.WORKFLOW_PATH
+    if evidence.get("merge_code_sha256") != implementation["merge_code_sha256"]:
+        raise ValueError("practice review merge code does not match the validator")
+    if (
+        evidence.get("merge_entrypoint_sha256")
+        != implementation["merge_entrypoint_sha256"]
+    ):
+        raise ValueError("practice review merge entrypoint does not match the validator")
+    if evidence.get("review_workflow_sha256") != _file_sha256(workflow_path):
+        raise ValueError("practice review workflow does not match the validator")
     planned_at = _timestamp(
         evidence.get("planned_at"), "practice review evidence planned_at"
     )

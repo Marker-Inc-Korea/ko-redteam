@@ -11,17 +11,22 @@ try:
     from ko_benchmark_identity import benchmark_content_sha256
     import ko_model_ranking as ranking
     import ko_pilot_registration as registration
+    import ko_practice_review as practice_review
     from ko_run_context import canonical_sha256
 except ModuleNotFoundError:  # package import path
     from .ko_benchmark_identity import benchmark_content_sha256
     from . import ko_model_ranking as ranking
     from . import ko_pilot_registration as registration
+    from . import ko_practice_review as practice_review
     from .ko_run_context import canonical_sha256
 
 
 SPEC_STATUS = "template_pending_human_review"
 BUILDER_PATH = "analysis/ko_pilot_registration_builder.py"
 BUILDER_ENTRYPOINT_PATH = "probes/build_pilot_registration.py"
+REVIEW_MERGE_PATH = practice_review.MERGE_CODE_PATH
+REVIEW_MERGE_ENTRYPOINT_PATH = practice_review.MERGE_ENTRYPOINT_PATH
+REVIEW_WORKFLOW_PATH = "governance/PRACTICE_REVIEW_WORKFLOW.md"
 ANALYSIS_CODE_KEYS = {
     "builder_code_sha256": "builder_code_path",
     "power_analysis_code_sha256": "power_analysis_code_path",
@@ -127,7 +132,13 @@ def registration_spec_source_paths(spec: dict[str, Any]) -> set[str]:
         statistics.get("analysis_code_paths"),
         "spec.statistics.analysis_code_paths",
     )
-    paths = {BUILDER_PATH, BUILDER_ENTRYPOINT_PATH}
+    paths = {
+        BUILDER_PATH,
+        BUILDER_ENTRYPOINT_PATH,
+        REVIEW_MERGE_PATH,
+        REVIEW_MERGE_ENTRYPOINT_PATH,
+        REVIEW_WORKFLOW_PATH,
+    }
     for label, rows in (("design_sources", sources), ("benchmarks", benchmarks)):
         for name, raw in rows.items():
             row = registration._object(raw, f"spec.{label}.{name}")
@@ -307,6 +318,13 @@ def validate_registration_spec(
         )
         code_sha256[digest_key] = _file_sha256(code_path)
         statistics[digest_key] = code_sha256[digest_key]
+    _project_file(root, REVIEW_MERGE_PATH, "practice review merge code")
+    _project_file(
+        root,
+        REVIEW_MERGE_ENTRYPOINT_PATH,
+        "practice review merge entrypoint",
+    )
+    _project_file(root, REVIEW_WORKFLOW_PATH, "practice review workflow")
     registration._statistics({"statistics": statistics})
 
     stopping = registration._object(spec.get("stopping_rules"), "stopping_rules")
@@ -345,6 +363,33 @@ def build_pilot_registration(
     spec = _load_object(spec_file, "pilot registration spec")
     review = _load_object(review_file, "practice review")
     validation = validate_registration_spec(spec, project_root=root)
+    if review.get("schema") != registration.PRACTICE_REVIEW_SCHEMA:
+        raise ValueError(
+            f"practice review schema must be {registration.PRACTICE_REVIEW_SCHEMA}"
+        )
+    if review.get("status") != registration.REVIEW_PASSED_STATUS:
+        raise ValueError("practice review must pass before pilot registration")
+    review_evidence = registration._object(
+        review.get("evidence"), "practice review evidence"
+    )
+    review_implementation = practice_review.review_implementation_evidence(root)
+    review_workflow_file, _ = _project_file(
+        root, REVIEW_WORKFLOW_PATH, "practice review workflow"
+    )
+    if (
+        review_evidence.get("merge_code_sha256")
+        != review_implementation["merge_code_sha256"]
+    ):
+        raise ValueError("completed review does not match the tracked merge code")
+    if (
+        review_evidence.get("merge_entrypoint_sha256")
+        != review_implementation["merge_entrypoint_sha256"]
+    ):
+        raise ValueError("completed review does not match the tracked merge entrypoint")
+    if review_evidence.get("review_workflow_sha256") != _file_sha256(
+        review_workflow_file
+    ):
+        raise ValueError("completed review does not match the tracked workflow")
 
     practice_design = deepcopy(spec["practice_design"])
     if practice_design["review_artifact"]["path"] != review_relative:
