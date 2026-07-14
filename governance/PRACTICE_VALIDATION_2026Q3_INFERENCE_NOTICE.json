@@ -1,0 +1,32 @@
+{
+  "schema": "ko-redteam.research-inference-notice.v1",
+  "status": "statistical_separation_withdrawn",
+  "issued_at": "2026-07-14T18:11:42+09:00",
+  "source_artifacts": {
+    "json": {
+      "path": "governance/PRACTICE_VALIDATION_2026Q3.json",
+      "sha256": "8ec345e34d4a48a5888119bb6d28002c3954022d38a51945a8f2d227aa7ec364"
+    },
+    "markdown": {
+      "path": "governance/PRACTICE_VALIDATION_2026Q3.md",
+      "sha256": "9cedd57a37cdbba8ba1cc7e01d2d172d4758300191f3691a3b049803eb9e0e02"
+    }
+  },
+  "affected_method": "two-sided paired bootstrap with plus-one correction",
+  "reason": "The reported tail probability was computed from a bootstrap distribution centered on the observed difference rather than from a null distribution.",
+  "withdrawn_claims": [
+    "8 of 21 model pairs were statistically separated",
+    "0 of 6 adjacent model pairs were statistically separated",
+    "all seven models formed one multiplicity-controlled diagnostic tier"
+  ],
+  "retained_descriptive_results": [
+    "observed diagnostic point estimates",
+    "bootstrap confidence intervals as descriptive uncertainty",
+    "critical, privacy, endpoint-error, and decision-flip counts",
+    "all seven models were unqualified under the recorded deployment gates"
+  ],
+  "replacement_method": "two-sided paired independence-group sign-flip randomization; exact or Monte Carlo with plus-one correction",
+  "required_action": "Do not cite the withdrawn pair-separation or tier claims. Recompute from evidence-eligible model-ranking v4 runs produced from ranking-manifest v5 under the replacement method.",
+  "official_release_impact": "none; the source report was research-only and was never an official leaderboard release",
+  "raw_prompt_or_response_used": false
+}

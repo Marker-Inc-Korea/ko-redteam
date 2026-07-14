@@ -62,7 +62,7 @@ def _input() -> dict:
                 {"id": f"control-{index}", "upper": 100, "lower": 0}
                 for index in range(20)
             ],
-            "iterations": 1000,
+            "iterations": 10_000,
             "seed": 20260713,
         },
         "limitations": ["Unit fixture only; not empirical calibration evidence."],
@@ -99,8 +99,28 @@ def test_calibration_report_recomputes_metrics_without_private_item_ids():
     assert report["annotation"]["agreement"]["value"] > 0.9
     assert report["evaluator"]["macro_f1"] == 1.0
     assert report["control_separation"]["status"] == "pass"
+    assert report["control_separation"]["method"] == (
+        C.CONTROL_SEPARATION_METHOD
+    )
+    assert report["control_separation"]["randomization_mode"] == "monte_carlo"
+    assert report["control_separation"]["randomization_draws"] == 10_000
     assert "private-item-" not in serialized
     assert "ratings" not in report
+
+
+def test_control_separation_uses_a_one_sided_null_randomization_distribution():
+    result = C._one_sided_sign_flip_test(
+        [1.0, 1.0],
+        iterations=10_000,
+        seed=7,
+    )
+
+    assert result == {
+        "p_value": 0.25,
+        "mode": "exact",
+        "draws": 4,
+        "observed_difference": 1.0,
+    }
 
 
 def test_calibration_input_rejects_raw_prompt_fields():
@@ -108,6 +128,14 @@ def test_calibration_input_rejects_raw_prompt_fields():
     data["annotation"]["items"][0]["prompt"] = "must not be accepted"
 
     with pytest.raises(ValueError, match="labels-only"):
+        C.build_calibration_report(data)
+
+
+def test_calibration_rejects_underpowered_control_randomization():
+    data = _input()
+    data["controls"]["iterations"] = C.MIN_CONTROL_ITERATIONS - 1
+
+    with pytest.raises(ValueError, match="between 10000 and 100000"):
         C.build_calibration_report(data)
 
 

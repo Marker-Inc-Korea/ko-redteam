@@ -156,6 +156,8 @@ def _registration(review: dict) -> dict:
             "weight_profiles": {
                 "balanced": R.WEIGHT_PROFILES["balanced"],
             },
+            "pairwise_test": R.PAIRWISE_TEST,
+            "randomization_iterations": 10_000,
             "maximum_official_models": R.RANKING_POLICY["maximum_models"],
             "maximum_comparison_family_size": 21,
             "multiple_comparison_correction": "holm",
@@ -228,6 +230,12 @@ def test_frozen_pilot_registration_binds_review_and_pre_execution_design():
                 completed_at="2026-07-14T12:00:00+09:00"
             ),
             "before pilot registration",
+        ),
+        (
+            lambda registration, review: registration["statistics"].update(
+                pairwise_test=R.LEGACY_PAIRWISE_TEST
+            ),
+            "pairwise test",
         ),
     ],
 )

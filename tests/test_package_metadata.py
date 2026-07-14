@@ -117,6 +117,16 @@ def test_package_data_paths_exist():
     assert (ROOT / "governance" / "PRACTICE_VALIDATION_2026Q3.json").exists()
     assert (ROOT / "governance" / "PRACTICE_VALIDATION_2026Q3.md").exists()
     assert (
+        ROOT
+        / "governance"
+        / "PRACTICE_VALIDATION_2026Q3_INFERENCE_NOTICE.json"
+    ).exists()
+    assert (
+        ROOT
+        / "governance"
+        / "PRACTICE_VALIDATION_2026Q3_INFERENCE_NOTICE.md"
+    ).exists()
+    assert (
         ROOT / "governance" / "SUCCESSOR_PILOT_PRACTICE_REVIEW_DRAFT.json"
     ).exists()
     assert (
@@ -210,5 +220,5 @@ def test_leaderboard_protocol_uses_current_official_manifest_contract():
     assert "공식 v2" not in protocol
     assert "v2 manifest만" not in protocol
     assert "protocol v2 공식 결과" in protocol
-    assert "v4 manifest를 사용한다" in protocol
+    assert "v5 manifest를 사용한다" in protocol
     assert "v3 manifest만" not in protocol

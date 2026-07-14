@@ -240,11 +240,11 @@ def build_power_pilot_input(
     manifest_path = Path(ranking_manifest_path).resolve()
     manifest, runs_by_model, suites = ranking.load_ranking_manifest(manifest_path)
     if manifest.get("schema") not in ranking.POWER_PILOT_RANKING_MANIFEST_SCHEMAS:
-        raise ValueError("power pilot requires a v2, v3, or v4 hashed ranking manifest")
+        raise ValueError("power pilot requires a v2-v5 hashed ranking manifest")
     if suites != ranking.OFFICIAL_SUITES:
         raise ValueError("power pilot requires all four official suites")
     if (
-        manifest.get("schema") == ranking.RANKING_MANIFEST_SCHEMA
+        manifest.get("schema") in ranking.SEPARATED_RANKING_MANIFEST_SCHEMAS
         and preregistration_schema
         not in {
             PREREGISTRATION_SCHEMA,
@@ -252,7 +252,7 @@ def build_power_pilot_input(
         }
     ):
         raise ValueError(
-            "v4 power pilots require season preregistration v2 or a frozen pilot registration"
+            "v4-v5 power pilots require season preregistration v2 or a frozen pilot registration"
         )
     for model_name, runs in runs_by_model.items():
         for run_index, run in enumerate(runs, 1):
@@ -339,7 +339,7 @@ def build_power_pilot_input(
             required_manifest_schema
             not in ranking.EXECUTION_EVIDENCE_RANKING_MANIFEST_SCHEMAS
         ):
-            raise ValueError("execution-evidence power pilots require v3 or v4")
+            raise ValueError("execution-evidence power pilots require v3-v5")
     if (
         required_manifest_schema is not None
         and manifest.get("schema") != required_manifest_schema
@@ -361,7 +361,7 @@ def build_power_pilot_input(
     builder_code_sha256 = _file_sha256(Path(__file__))
     required_pilot_groups_per_stratum = (
         OFFICIAL_MIN_PILOT_GROUPS_PER_STRATUM
-        if manifest.get("schema") == ranking.RANKING_MANIFEST_SCHEMA
+        if manifest.get("schema") in ranking.SEPARATED_RANKING_MANIFEST_SCHEMAS
         else MIN_PILOT_CLUSTERS_PER_STRATUM
     )
     if (
@@ -629,6 +629,10 @@ def build_power_pilot_input(
         "estimand": statistics.get("estimand"),
         "minimum_detectable_effect": statistics.get(
             "minimum_detectable_effect"
+        ),
+        "pairwise_test": statistics.get("pairwise_test"),
+        "randomization_iterations": statistics.get(
+            "randomization_iterations"
         ),
         "actual_independence_groups": total_groups,
         "pilot_dataset_sha256": pilot_dataset_sha256,

@@ -38,6 +38,15 @@ SUCCESSOR_PRECISION_PATH = (
 SUCCESSOR_PRECISION_MD_PATH = (
     ROOT / "governance" / "SEASON_2026Q3_SUCCESSOR_PILOT_PRECISION_AUDIT.md"
 )
+PRACTICE_VALIDATION_PATH = (
+    ROOT / "governance" / "PRACTICE_VALIDATION_2026Q3.json"
+)
+PRACTICE_VALIDATION_MD_PATH = (
+    ROOT / "governance" / "PRACTICE_VALIDATION_2026Q3.md"
+)
+PRACTICE_INFERENCE_NOTICE_PATH = (
+    ROOT / "governance" / "PRACTICE_VALIDATION_2026Q3_INFERENCE_NOTICE.json"
+)
 S1_REGISTRATION_COMMIT = "6de04e588d29fddb2cae5db1d4f481c68883f6f8"
 S2_REGISTRATION_COMMIT = "7d2eef959b8b039162d9bc89e1c77218d33000df"
 S3_REGISTRATION_COMMIT = "46ecc81d88e7437f22ef23a128d05894905d737f"
@@ -54,6 +63,8 @@ S4_FAMILYWISE_SHA256 = "8eb3b380a2f0a222f769191817c83302824b94aa7ea7f9647c46190c
 S4_STOP_SHA256 = "8c2610f43eaf8f7859bdd09673b0ba977f01ea0c22264e8451300241060d7e59"
 SUCCESSOR_PRECISION_SHA256 = "b886bddb0d8eff283302175fa7566c4c1d0e4450e292318ae1eb313b73782b58"
 SUCCESSOR_PRECISION_MD_SHA256 = "4b0a75d44d4120612fe7f4bb496b624272b2fe5fc790c087cbfaa165d7341991"
+PRACTICE_VALIDATION_SHA256 = "8ec345e34d4a48a5888119bb6d28002c3954022d38a51945a8f2d227aa7ec364"
+PRACTICE_VALIDATION_MD_SHA256 = "9cedd57a37cdbba8ba1cc7e01d2d172d4758300191f3691a3b049803eb9e0e02"
 
 
 def _load(path: Path) -> dict:
@@ -67,6 +78,32 @@ def _git_blob(commit: str, relative_path: str) -> bytes:
         check=True,
     )
     return result.stdout
+
+
+def test_practice_pairwise_inference_notice_binds_preserved_research_record():
+    notice = _load(PRACTICE_INFERENCE_NOTICE_PATH)
+    source_json_sha256 = hashlib.sha256(
+        PRACTICE_VALIDATION_PATH.read_bytes()
+    ).hexdigest()
+    source_markdown_sha256 = hashlib.sha256(
+        PRACTICE_VALIDATION_MD_PATH.read_bytes()
+    ).hexdigest()
+
+    assert notice["status"] == "statistical_separation_withdrawn"
+    assert source_json_sha256 == PRACTICE_VALIDATION_SHA256
+    assert source_markdown_sha256 == PRACTICE_VALIDATION_MD_SHA256
+    assert notice["source_artifacts"]["json"]["sha256"] == source_json_sha256
+    assert notice["source_artifacts"]["markdown"]["sha256"] == (
+        source_markdown_sha256
+    )
+    assert notice["affected_method"] == R.LEGACY_PAIRWISE_TEST
+    assert notice["replacement_method"] == R.PAIRWISE_TEST
+    assert len(notice["withdrawn_claims"]) == 3
+    assert notice["official_release_impact"].startswith("none")
+    assert notice["raw_prompt_or_response_used"] is False
+    public_text = PRACTICE_INFERENCE_NOTICE_PATH.read_text("utf-8")
+    assert "/data1/" not in public_text
+    assert "192" + ".168." not in public_text
 
 
 def test_frozen_seasons_are_preserved_and_s4_supersedes_stopped_s3():

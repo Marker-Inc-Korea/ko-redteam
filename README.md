@@ -23,16 +23,18 @@ scorecard, finding, 권장 조치만 남겨 운영 환경에서도 감사 가능
 | 결과 단계 | 현재 의미 | 공개 순위 사용 |
 |---|---|---|
 | Development | 공개 seed 기반 기능·회귀 점검 | 불가 |
-| Research preview | 반복 실행과 bootstrap을 갖춘 비교 | 불가 |
+| Research preview | 반복 실행과 불확실성·randomization 분석을 갖춘 비교 | 불가 |
 | Official release | hidden split, 사람 calibration, power analysis, 외부 검토까지 통과 | 가능 |
 
 코드와 공개 seed만으로 생성한 결과는 `Research preview`입니다. 공식 게시 요건은
 [`LEADERBOARD_PROTOCOL.md`](./LEADERBOARD_PROTOCOL.md)에 있으며, 증거가 하나라도 없으면 검증기가
 `not_publishable`을 반환합니다.
 
-7개 공개 모델로 확인한 도구 판별력과 통계적 한계는
-[`governance/PRACTICE_VALIDATION_2026Q3.md`](./governance/PRACTICE_VALIDATION_2026Q3.md)에 공개합니다. 먼 모델
-8쌍은 분리됐지만 인접 6쌍은 하나도 분리되지 않아, 이 결과를 순위표로 사용하지 않습니다.
+7개 공개 모델의 관측 진단값은
+[`governance/PRACTICE_VALIDATION_2026Q3.md`](./governance/PRACTICE_VALIDATION_2026Q3.md)에 보존합니다. 당시
+bootstrap-tail p-value에서 나온 모델 쌍 분리와 tier 주장은
+[별도 notice](./governance/PRACTICE_VALIDATION_2026Q3_INFERENCE_NOTICE.md)로 철회했으며, model-ranking v4의
+null-randomization 방법으로 evidence-eligible 재실행하기 전에는 순위 추론에 사용하지 않습니다.
 
 > [!IMPORTANT]
 > 높은 진단 점수는 안전 인증이나 일반 성능 등급이 아닙니다. 공식 결과는 ranking evidence가 완전한 모델의
@@ -362,23 +364,29 @@ ko-redteam-gate-reports benchmark_ko_llm_paperbench_v1_report.json \
   --markdown-output gate_report.md
 ```
 
-모델 비교 manifest는 각 모델의 반복 실행별 paperbench, mini, multiturn, agent harness 리포트를 묶습니다. v1-v3는
+모델 비교 manifest는 각 모델의 반복 실행별 paperbench, mini, multiturn, agent harness 리포트를 묶습니다. v1-v4는
 과거 분석 재현성만 유지합니다. 공식 후보는 frozen ranking policy와 네 report digest, `core`, `mini_single` 실행
-증거를 요구하는 v4여야 합니다. 실행 증거는 endpoint smoke, benchmark audit/coverage, report doctor, endpoint 오류 0건과 실제 report digest를
+증거를 요구하는 v5여야 합니다. 실행 증거는 endpoint smoke, benchmark audit/coverage, report doctor, endpoint 오류 0건과 실제 report digest를
 결합합니다. 아래는 모델 1개와 반복 1개만 보인 축약 구조이며, 실제 공식 비교에는 모델 2개 이상과 모델별 반복 3개
 이상이 필요합니다. `models[].name`은 각 report run context의 `model.served_model`과 정확히 같아야 합니다.
+점수 신뢰구간과 방향 확률은 paired bootstrap으로 계산하지만, 공식 tier p-value는 bootstrap tail이 아니라
+suite-qualified 독립 그룹 단위의 양측 sign-flip randomization test로 계산합니다. 모든 primary 모델 쌍을 하나의
+Holm family로 보정하며, Monte Carlo 검정은 최소 10,000회와 plus-one 보정을 사용합니다.
 
 ```json
 {
-  "schema": "ko-redteam.ranking-manifest.v4",
+  "schema": "ko-redteam.ranking-manifest.v5",
   "name": "release-candidates",
   "ranking_policy": {
-    "schema": "ko-redteam.ranking-policy.v1",
+    "schema": "ko-redteam.ranking-policy.v2",
     "ranking_gate": "complete_execution_and_provenance_evidence",
     "deployment_screen_affects_ranking": false,
     "primary_inferential_weight_profile": "balanced",
     "sensitivity_weight_profiles": ["safety_priority", "utility_priority"],
     "comparison_family": "all unordered ranking-eligible model pairs for the primary profile",
+    "pairwise_test": "two-sided paired independence-group sign-flip randomization; exact or Monte Carlo with plus-one correction",
+    "pairwise_randomization_unit": "suite-qualified independence_group",
+    "model_cohort": "exact immutable candidate cohort frozen before official execution",
     "tier_claim": "multiplicity-controlled contiguous tiers; ties remain when not separated",
     "complete_order_claimed": false,
     "maximum_models": 7

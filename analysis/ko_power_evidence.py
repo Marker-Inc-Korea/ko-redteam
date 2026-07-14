@@ -12,8 +12,10 @@ from statistics import NormalDist, mean, stdev
 from typing import Any
 
 try:
+    from ko_model_ranking import PAIRWISE_TEST
     from ko_run_context import canonical_sha256
 except ModuleNotFoundError:  # package import path
+    from .ko_model_ranking import PAIRWISE_TEST
     from .ko_run_context import canonical_sha256
 
 
@@ -158,6 +160,8 @@ def build_power_report(data: dict[str, Any]) -> dict[str, Any]:
             "target_power",
             "estimand",
             "minimum_detectable_effect",
+            "pairwise_test",
+            "randomization_iterations",
             "actual_independence_groups",
             "pilot_dataset_sha256",
             "pilot_clusters",
@@ -194,6 +198,9 @@ def build_power_report(data: dict[str, Any]) -> dict[str, Any]:
     )
     if not 0.0 < effect <= 100.0:
         raise ValueError("minimum_detectable_effect must be between 0 and 100")
+    pairwise_test = data.get("pairwise_test")
+    if pairwise_test is not None and pairwise_test != PAIRWISE_TEST:
+        raise ValueError("pairwise_test must target the official pairwise test")
 
     actual_groups = data.get("actual_independence_groups")
     if (
@@ -296,6 +303,24 @@ def build_power_report(data: dict[str, Any]) -> dict[str, Any]:
         if pilot_source_schema not in SUPPORTED_PILOT_SOURCE_SCHEMAS:
             raise ValueError(
                 "pilot_source.schema must be a supported power-pilot source"
+            )
+        if (
+            pilot_source_schema == PILOT_SOURCE_V2_SCHEMA
+            and pairwise_test != PAIRWISE_TEST
+        ):
+            raise ValueError(
+                "registration-bound power must target the official pairwise test"
+            )
+        randomization_iterations = data.get("randomization_iterations")
+        if pilot_source_schema == PILOT_SOURCE_V2_SCHEMA and (
+            not isinstance(randomization_iterations, int)
+            or isinstance(randomization_iterations, bool)
+            or not MIN_SIMULATIONS
+            <= randomization_iterations
+            <= 100_000
+        ):
+            raise ValueError(
+                "registration-bound randomization_iterations must be between 10000 and 100000"
             )
         for key in (
             "ranking_manifest_sha256",
@@ -489,7 +514,12 @@ def build_power_report(data: dict[str, Any]) -> dict[str, Any]:
     return {
         "schema": OUTPUT_SCHEMA,
         "method": (
-            "two-sided normal-approximation power with Monte Carlo verification "
+            (
+                "large-sample normal-approximation power for the paired sign-flip "
+                "weighted-score test with Monte Carlo verification "
+                if pairwise_test == PAIRWISE_TEST
+                else "two-sided normal-approximation power with Monte Carlo verification "
+            )
             + (
                 "from fixed-allocation stratified paired-cluster variance"
                 if target_strata is not None
@@ -499,6 +529,10 @@ def build_power_report(data: dict[str, Any]) -> dict[str, Any]:
         "alpha": alpha,
         "target_power": target_power,
         "estimand": estimand.strip(),
+        "analysis_target_pairwise_test": pairwise_test,
+        "analysis_target_randomization_iterations": data.get(
+            "randomization_iterations"
+        ),
         "achieved_power": simulated_power,
         "minimum_detectable_effect": effect,
         "required_independence_groups": required_groups,
@@ -555,13 +589,16 @@ def render_power_markdown(report: dict[str, Any]) -> str:
         "",
         f"- Target power: **{report.get('target_power', 0):.4f}**",
         f"- Estimand: **{report.get('estimand', '-')}**",
+        f"- Target pairwise test: **{report.get('analysis_target_pairwise_test', '-')}**",
         f"- Simulated achieved power: **{report.get('achieved_power', 0):.4f}**",
         f"- Minimum detectable effect: **{report.get('minimum_detectable_effect', 0):.4f}**",
         f"- Required independent groups: **{report.get('required_independence_groups', 0)}**",
         f"- Actual independent groups: **{report.get('actual_independence_groups', 0)}**",
         f"- Pilot paired groups: **{pilot.get('cluster_count', 0)}**",
+        f"- Target randomization draws: **{report.get('analysis_target_randomization_iterations', 0)}**",
         f"- Simulations: **{report.get('simulation_iterations', 0)}**",
         "",
+        "Power is a large-sample normal approximation to the registered paired sign-flip test.",
         "Pilot group identifiers and benchmark content are not included.",
         "",
     ]

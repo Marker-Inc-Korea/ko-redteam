@@ -11,6 +11,12 @@ import re
 from typing import Any
 
 try:
+    from ko_calibration import (
+        CONTROL_SEPARATION_METHOD,
+        MIN_CONTROL_ITERATIONS,
+        MIN_CONTROL_PAIRS,
+        OUTPUT_SCHEMA as CALIBRATION_SCHEMA,
+    )
     import ko_familywise_power as familywise_power
     import ko_pilot_registration as pilot_registration
     from ko_familywise_power import (
@@ -25,6 +31,7 @@ try:
         EXECUTION_EVIDENCE_CONTRACT,
         MODEL_RANKING_SCHEMA,
         OFFICIAL_SUITES,
+        PAIRWISE_TEST,
         POWER_PILOT_RANKING_MANIFEST_SCHEMAS,
         RANKING_POLICY,
         RANKING_MANIFEST_SCHEMA,
@@ -33,6 +40,12 @@ try:
     )
     from ko_run_context import canonical_sha256, validate_run_context
 except ModuleNotFoundError:  # package import path
+    from .ko_calibration import (
+        CONTROL_SEPARATION_METHOD,
+        MIN_CONTROL_ITERATIONS,
+        MIN_CONTROL_PAIRS,
+        OUTPUT_SCHEMA as CALIBRATION_SCHEMA,
+    )
     from . import ko_familywise_power as familywise_power
     from . import ko_pilot_registration as pilot_registration
     from .ko_familywise_power import (
@@ -47,6 +60,7 @@ except ModuleNotFoundError:  # package import path
         EXECUTION_EVIDENCE_CONTRACT,
         MODEL_RANKING_SCHEMA,
         OFFICIAL_SUITES,
+        PAIRWISE_TEST,
         POWER_PILOT_RANKING_MANIFEST_SCHEMAS,
         RANKING_POLICY,
         RANKING_MANIFEST_SCHEMA,
@@ -58,7 +72,6 @@ except ModuleNotFoundError:  # package import path
 
 RELEASE_SCHEMA = "ko-redteam.leaderboard-release.v2"
 RANKING_SCHEMA = MODEL_RANKING_SCHEMA
-CALIBRATION_SCHEMA = "ko-redteam.evaluator-calibration.v1"
 CALIBRATION_INPUT_SCHEMA = "ko-redteam.calibration-input.v1"
 SPLIT_AUDIT_SCHEMA = "ko-redteam.benchmark-split-audit.v1"
 POWER_SCHEMA = "ko-redteam.power-analysis.v1"
@@ -99,7 +112,7 @@ PUBLIC_REQUIREMENTS = {
     "minimum_bootstrap_iterations": 10_000,
     "maximum_bootstrap_iterations": 100_000,
     "minimum_pairwise_confidence": 95.0,
-    "pairwise_test": "two-sided paired bootstrap with plus-one correction",
+    "pairwise_test": PAIRWISE_TEST,
     "multiple_comparison_correction": "holm-bonferroni",
     "minimum_groups_per_domain": 30,
     "minimum_calibration_samples": 300,
@@ -583,6 +596,11 @@ def _audit_ranking(audit: _Audit, ranking: dict[str, Any], ranking_manifest: dic
         "official ranking reports must contain the six declared domains at the minimum independent-group coverage",
     )
     iterations = method.get("iterations")
+    iteration_limit = (
+        iterations
+        if isinstance(iterations, int) and not isinstance(iterations, bool)
+        else 0
+    )
     audit.check(
         "ranking.bootstrap_iterations",
         "statistics",
@@ -629,8 +647,20 @@ def _audit_ranking(audit: _Audit, ranking: dict[str, Any], ranking_manifest: dic
     audit.check(
         "ranking.pairwise_test",
         "statistics",
-        method.get("pairwise_test") == PUBLIC_REQUIREMENTS["pairwise_test"],
-        "pairwise separation must use a two-sided plus-one-corrected paired bootstrap test",
+        method.get("pairwise_test") == PUBLIC_REQUIREMENTS["pairwise_test"]
+        and method.get("pairwise_null_hypothesis")
+        == (
+            "model labels are exchangeable within every paired "
+            "suite-qualified independence group"
+        )
+        and method.get("pairwise_randomization_unit")
+        == "suite-qualified independence_group"
+        and method.get("pairwise_randomization_tail")
+        == "absolute balanced weighted-score difference"
+        and method.get("pairwise_randomization_iterations") == iterations
+        and method.get("pairwise_randomization_exact_when_feasible") is True
+        and method.get("pairwise_randomization_monte_carlo_plus_one") is True,
+        "pairwise separation must use the frozen paired-group null randomization test",
         actual=method.get("pairwise_test"),
     )
     audit.check(
@@ -698,6 +728,63 @@ def _audit_ranking(audit: _Audit, ranking: dict[str, Any], ranking_manifest: dic
             and set(row.get("p_value_by_weight_profile") or {}) == {"balanced"}
             and set(row.get("holm_adjusted_p_value_by_weight_profile") or {})
             == {"balanced"}
+            and set(row.get("randomization_mode_by_weight_profile") or {})
+            == {"balanced"}
+            and set(row.get("randomization_draws_by_weight_profile") or {})
+            == {"balanced"}
+            and set(
+                row.get("randomization_group_count_by_weight_profile") or {}
+            )
+            == {"balanced"}
+            and set(row.get("observed_difference_by_weight_profile") or {})
+            == {"balanced"}
+            and _number(
+                row["p_value_by_weight_profile"].get("balanced")
+            )
+            is not None
+            and 0.0
+            < float(row["p_value_by_weight_profile"]["balanced"])
+            <= 1.0
+            and _number(
+                row["holm_adjusted_p_value_by_weight_profile"].get("balanced")
+            )
+            is not None
+            and float(row["p_value_by_weight_profile"]["balanced"])
+            <= float(
+                row["holm_adjusted_p_value_by_weight_profile"]["balanced"]
+            )
+            <= 1.0
+            and row["randomization_mode_by_weight_profile"].get("balanced")
+            in {"exact", "monte_carlo"}
+            and isinstance(
+                row["randomization_draws_by_weight_profile"].get("balanced"),
+                int,
+            )
+            and not isinstance(
+                row["randomization_draws_by_weight_profile"].get("balanced"),
+                bool,
+            )
+            and 1
+            <= row["randomization_draws_by_weight_profile"]["balanced"]
+            <= iteration_limit
+            and isinstance(
+                row["randomization_group_count_by_weight_profile"].get(
+                    "balanced"
+                ),
+                int,
+            )
+            and not isinstance(
+                row["randomization_group_count_by_weight_profile"].get(
+                    "balanced"
+                ),
+                bool,
+            )
+            and row["randomization_group_count_by_weight_profile"]["balanced"]
+            > 0
+            and _number(
+                row["observed_difference_by_weight_profile"].get("balanced")
+            )
+            is not None
             for row in pairwise
         ),
         "the Holm family must contain every ranking-eligible model pair exactly once for the primary profile",
@@ -1284,18 +1371,31 @@ def _audit_calibration(
         "calibration.control_reproducibility",
         "artifact_integrity",
         control_p_value is not None
-        and 0.0 <= control_p_value <= 0.05
+        and 0.0 < control_p_value <= 0.05
         and bool(SHA256_RE.fullmatch(str(control.get("dataset_sha256") or "")))
         and bool(SHA256_RE.fullmatch(str(control.get("input_sha256") or "")))
         and isinstance(control.get("sample_count"), int)
         and not isinstance(control.get("sample_count"), bool)
-        and control.get("sample_count") >= 20
+        and control.get("sample_count") >= MIN_CONTROL_PAIRS
         and isinstance(control.get("iterations"), int)
         and not isinstance(control.get("iterations"), bool)
-        and control.get("iterations") >= 1_000
-        and isinstance(control.get("method"), str)
-        and bool(control.get("method", "").strip()),
-        "control separation must bind its dataset and paired inputs with reproducible resampling evidence",
+        and MIN_CONTROL_ITERATIONS
+        <= control.get("iterations")
+        <= PUBLIC_REQUIREMENTS["maximum_bootstrap_iterations"]
+        and control.get("method") == CONTROL_SEPARATION_METHOD
+        and control.get("null_hypothesis")
+        == (
+            "upper and lower model labels are exchangeable within each "
+            "paired control"
+        )
+        and control.get("alternative")
+        == "upper_model score is greater than lower_model score"
+        and control.get("randomization_unit") == "paired control id"
+        and control.get("randomization_mode") in {"exact", "monte_carlo"}
+        and isinstance(control.get("randomization_draws"), int)
+        and not isinstance(control.get("randomization_draws"), bool)
+        and 1 <= control.get("randomization_draws") <= control.get("iterations"),
+        "control separation must bind its paired inputs to the frozen one-sided null randomization test",
     )
     limitations = calibration.get("limitations")
     audit.check(
@@ -1634,6 +1734,23 @@ def _audit_power(audit: _Audit, power: dict[str, Any]) -> None:
         and float(pilot.get("standard_deviation")) > 0,
         "power analysis must define its estimand and bind a non-degenerate paired-cluster pilot dataset",
     )
+    audit.check(
+        "power.pairwise_test_alignment",
+        "statistics",
+        power.get("analysis_target_pairwise_test") == PAIRWISE_TEST
+        and isinstance(
+            power.get("analysis_target_randomization_iterations"), int
+        )
+        and not isinstance(
+            power.get("analysis_target_randomization_iterations"), bool
+        )
+        and PUBLIC_REQUIREMENTS["minimum_bootstrap_iterations"]
+        <= power.get("analysis_target_randomization_iterations")
+        <= PUBLIC_REQUIREMENTS["maximum_bootstrap_iterations"]
+        and "paired sign-flip" in str(power.get("method") or ""),
+        "power must target the same paired-group randomization test used for official tiers",
+        actual=power.get("analysis_target_pairwise_test"),
+    )
     pilot_source = (
         pilot.get("source") if isinstance(pilot.get("source"), dict) else {}
     )
@@ -1892,6 +2009,11 @@ def _audit_pilot_evidence(
         and isinstance(power, dict)
         and power.get("analysis_code_sha256")
         == statistics.get("power_analysis_code_sha256")
+        and power.get("analysis_target_pairwise_test")
+        == statistics.get("pairwise_test")
+        == PAIRWISE_TEST
+        and power.get("analysis_target_randomization_iterations")
+        == statistics.get("randomization_iterations")
         and source.get("benchmark_fingerprints")
         == {
             suite: artifact.get("content_sha256")
@@ -2051,6 +2173,11 @@ def _audit_multiplicity_power(
         and source.get("marginal_target_power") == power.get("target_power")
         and source.get("minimum_detectable_effect")
         == power.get("minimum_detectable_effect")
+        and source.get("analysis_target_pairwise_test")
+        == power.get("analysis_target_pairwise_test")
+        == PAIRWISE_TEST
+        and source.get("analysis_target_randomization_iterations")
+        == power.get("analysis_target_randomization_iterations")
         and source.get("actual_independence_groups")
         == power.get("actual_independence_groups")
         and source.get("pilot_dataset_sha256")
@@ -2512,6 +2639,7 @@ def _audit_preregistration(
     target_power = _number(statistics.get("target_power"))
     confidence = _number(statistics.get("minimum_pairwise_confidence"))
     bootstrap_iterations = statistics.get("bootstrap_iterations")
+    randomization_iterations = statistics.get("randomization_iterations")
     profiles = (
         statistics.get("weight_profiles")
         if isinstance(statistics.get("weight_profiles"), dict)
@@ -2595,6 +2723,11 @@ def _audit_preregistration(
         and PUBLIC_REQUIREMENTS["minimum_bootstrap_iterations"]
         <= bootstrap_iterations
         <= PUBLIC_REQUIREMENTS["maximum_bootstrap_iterations"]
+        and isinstance(randomization_iterations, int)
+        and not isinstance(randomization_iterations, bool)
+        and PUBLIC_REQUIREMENTS["minimum_bootstrap_iterations"]
+        <= randomization_iterations
+        <= PUBLIC_REQUIREMENTS["maximum_bootstrap_iterations"]
         and profiles_valid
         and statistics.get("estimand") == power.get("estimand")
         and statistics.get("minimum_detectable_effect")
@@ -2602,6 +2735,9 @@ def _audit_preregistration(
         and statistics.get("alpha") == power.get("alpha")
         and statistics.get("target_power") == power.get("target_power")
         and statistics.get("bootstrap_iterations") == ranking_method.get("iterations")
+        and statistics.get("randomization_iterations")
+        == ranking_method.get("pairwise_randomization_iterations")
+        == power.get("analysis_target_randomization_iterations")
         and statistics.get("minimum_pairwise_confidence")
         == ranking_method.get("min_pairwise_confidence")
         and statistics.get("pairwise_test") == ranking_method.get("pairwise_test")
@@ -2922,6 +3058,12 @@ def _audit_preregistration(
         if isinstance(calibration_evaluator.get("per_domain"), dict)
         else {}
     )
+    calibration_control = (
+        calibration.get("control_separation")
+        if isinstance(calibration, dict)
+        and isinstance(calibration.get("control_separation"), dict)
+        else {}
+    )
     held_out_samples = calibration_design.get("held_out_samples")
     samples_per_domain = calibration_design.get("samples_per_domain")
     minimum_raters = calibration_design.get("minimum_raters")
@@ -3008,6 +3150,14 @@ def _audit_preregistration(
             >= minimum_domain_f1
             for domain in REQUIRED_DOMAINS
         )
+        and calibration_design.get("control_separation_method")
+        == calibration_control.get("method")
+        == CONTROL_SEPARATION_METHOD
+        and calibration_design.get("control_randomization_iterations")
+        == calibration_control.get("iterations")
+        and calibration_design.get("minimum_control_pairs")
+        == MIN_CONTROL_PAIRS
+        and calibration_control.get("sample_count") >= MIN_CONTROL_PAIRS
     )
     audit.check(
         "preregistration.calibration",

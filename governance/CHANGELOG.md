@@ -14,6 +14,18 @@
   privacy 또는 반복 불안정성은 공개 위험 판정에 남지만 evidence-complete 모델을 통계 tier에서 삭제하지 않는다.
 - `balanced`를 유일한 primary inferential profile로 고정하고 최대 7모델의 21개 pair를 Holm family로 묶는다.
   safety·utility profile은 민감도 분석이며 complete-order recovery를 주장하지 않는다.
+- 관측 차이를 중심으로 재표집한 bootstrap 승률 꼬리를 영가설 p-value로 부르던 오류를 제거한다. 신뢰구간과
+  방향 확률에는 paired bootstrap을 유지하고, 공식 model-ranking v4 tier는 suite-qualified 독립 그룹 단위의 양측 sign-flip
+  randomization p-value와 Holm 보정을 사용한다. 과거 model-ranking v2/v3 결과는 공식 release에 재사용하지 않는다.
+  공개 practice의 `8/21`, 인접 `0/6`, 단일 tier 추론은
+  [`PRACTICE_VALIDATION_2026Q3_INFERENCE_NOTICE.json`](./PRACTICE_VALIDATION_2026Q3_INFERENCE_NOTICE.json)으로
+  철회하고 원 점수·실패 집계만 기술 통계로 보존한다.
+- ranking policy를 v2로 올려 pairwise null test와 suite-qualified 독립 그룹 randomization unit을 v5 manifest
+  자체에 결합한다. 이미 공개된 v4/policy v1 계약은 model-ranking v3 재현용으로 보존하며 공식 release에는
+  v5/policy v2만 허용한다.
+- calibration control의 관측 차이 bootstrap tail도 영가설 p-value가 아니므로 제거한다. calibration output을
+  v2로 올리고 20개 이상의 paired control에 대해 사전 방향 one-sided sign-flip randomization을 최소 10,000회
+  요구하며, method·null·alternative·unit·mode·draw 수를 season registration과 release gate에 결합한다.
 - 공식 release bundle에 최대 cohort의 보정 후 MDE power를 검증한 `multiplicity_power_audit`를 추가한다.
   v1-v3 manifest와 model-ranking v2 동작은 과거 결과 재현을 위해 보존한다.
 - 공식 모델 cohort의 이름·ID·불변 revision을 실행 전에 정확히 동결하고 ranking manifest와 불일치하면
@@ -27,7 +39,7 @@
   [`SUCCESSOR_PILOT_PRACTICE_REVIEW_DRAFT.json`](./SUCCESSOR_PILOT_PRACTICE_REVIEW_DRAFT.json)을 생성한다.
   모든 행은 `pending_human_review`이며 2인 독립 검토와 pilot 등록 전에는 anchor 실행에 사용할 수 없다.
 - breaking publication contract를 `leaderboard-release.v2`와 `season-preregistration.v2`로 승격한다. 과거
-  S1-S4 `v1` 등록은 수정하지 않으며 신규 v4 pilot이나 공식 release에 재사용할 수 없다.
+  S1-S4 `v1` 등록은 수정하지 않으며 신규 v5 pilot이나 공식 release에 재사용할 수 없다.
 
 ## 2026-07-14 - S3 Protocol Stop And S4 Preregistration
 
@@ -49,7 +61,9 @@
 - 공개 practice 64개 그룹에서 7모델 판별력을 별도로 감사했다. Qwen 계열 점수는 모델 크기 순으로
   단조적이고 upper/lower anchor는 분리됐지만, 보정 후 인접 모델은 한 쌍도 분리되지 않아(0/6) 총순위를 지원하지
   않았다. aggregate-only 결과와 한계는 [`PRACTICE_VALIDATION_2026Q3.md`](./PRACTICE_VALIDATION_2026Q3.md)에
-  공개한다.
+  공개했다. 이 문단의 모델 쌍 추론은 후속
+  [`PRACTICE_VALIDATION_2026Q3_INFERENCE_NOTICE.md`](./PRACTICE_VALIDATION_2026Q3_INFERENCE_NOTICE.md)에서
+  철회됐으며 현재 결론으로 인용하지 않는다.
 
 ## 2026-07-13 - S2 Power Stop And S3 Preregistration
 

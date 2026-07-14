@@ -9,6 +9,9 @@ placeholder이며 공식 기준을 충족하지 않는다. 입력 파일에는 r
 `ko-redteam.power-pilot-registration.v1`은 reference 출력 관측 전에 공개한다. 정확한 upper/lower revision,
 네 practice benchmark의 파일·content SHA-256, 7개 target stratum의 최소 20개 독립 group, generation settings,
 execution evidence, MDE, alpha, target power, 분산 상한과 다중비교 분석 코드 SHA-256을 포함한다.
+공식 모델 쌍 검정은 `balanced` score 차이에 대한 suite-qualified independence-group 단위의 양측 sign-flip
+randomization으로 고정하며, Monte Carlo를 사용할 때 최소 10,000회와 plus-one 보정을 등록한다. bootstrap은
+신뢰구간과 방향 확률에만 사용하고 영가설 p-value로 재사용하지 않는다.
 
 `ko-redteam.practice-review.v1`은 각 target `independence_group`, stratum, `accept` 결정과 두 명 이상의 reviewer
 ID를 기록한다.
@@ -26,14 +29,14 @@ upper/lower reference의 immutable revision, semantic overlap 설정, 사람 cal
 JSON을 상대경로와 SHA-256으로 결합하며 validator가 이전 pilot registration·review·power와 이후 split,
 ranking, calibration 및 run context를 대조한다. 변경이 필요하면 기존 파일을 덮어쓰지 않고 새 season ID를
 등록한다.
-S1-S4의 `v1` 등록은 불변 이력이며 신규 v4 ranking 또는 공식 release 계약으로 재사용하지 않는다.
+S1-S4의 `v1` 등록은 불변 이력이며 신규 v5 ranking 또는 공식 release 계약으로 재사용하지 않는다.
 
 ## Official Execution Evidence
 
 성공한 `ko-redteam-suite` 실행은 `ko-redteam.suite-execution-evidence.v1`을 함께 만든다. 이 파일은 endpoint나
 benchmark의 절대경로와 원문을 제외하고, 실행 profile, endpoint smoke 설정·결과, benchmark audit/coverage,
-measurement integrity, report doctor 단계와 report 상대경로·SHA-256을 보존한다. 공식 ranking manifest v4는
-동결된 `ko-redteam.ranking-policy.v1`과 각
+measurement integrity, report doctor 단계와 report 상대경로·SHA-256을 보존한다. 공식 ranking manifest v5는
+동결된 `ko-redteam.ranking-policy.v2`와 각
 반복에서 `core`와 `mini_single` evidence를 모두 해시로 참조해야 한다. evidence와 ranking report digest가 다르거나
 필수 단계가 실패·생략됐으면 공식 분석을 시작하지 않는다.
 
@@ -42,6 +45,9 @@ measurement integrity, report doctor 단계와 report 상대경로·SHA-256을 �
 `ko-redteam-build-calibration`은 `ko-redteam.calibration-input.v1`을 받는다. 실제 공식 입력은 300개 이상,
 각 영역 30개 이상이어야 한다. `adjudication_records`는 rater label이 갈린 모든 item을 정확히 한 번씩
 포함해야 한다.
+upper/lower control은 같은 control ID로 짝지은 20개 이상을 사용하고, 사전 방향 one-sided sign-flip
+randomization을 최소 10,000회 실행한다. 공개 `evaluator-calibration.v2`는 null, alternative, randomization
+unit·mode·draw 수와 plus-one p-value를 포함한다.
 
 ```json
 {

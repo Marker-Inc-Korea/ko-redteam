@@ -10,13 +10,18 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
 sys.path.insert(0, str(ROOT / "analysis"))
 
-from ko_model_ranking import analyze_ranking_manifest, render_model_ranking_markdown  # noqa: E402
+from ko_model_ranking import (  # noqa: E402
+    MODEL_RANKING_V3_SCHEMA,
+    MODEL_RANKING_SCHEMA,
+    analyze_ranking_manifest,
+    render_model_ranking_markdown,
+)
 
 
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "manifest", help="ko-redteam.ranking-manifest.v1/v2/v3/v4 JSON"
+        "manifest", help="ko-redteam.ranking-manifest.v1/v2/v3/v4/v5 JSON"
     )
     parser.add_argument("--iterations", type=int, default=10_000)
     parser.add_argument("--seed", type=int, default=20260713)
@@ -38,7 +43,7 @@ def main() -> None:
     markdown = Path(args.markdown_output)
     output.write_text(json.dumps(result, ensure_ascii=False, indent=1), "utf-8")
     markdown.write_text(render_model_ranking_markdown(result), "utf-8")
-    if result["schema"] == "ko-redteam.model-ranking.v3":
+    if result["schema"] in {MODEL_RANKING_V3_SCHEMA, MODEL_RANKING_SCHEMA}:
         eligible = sum(
             row["ranking_eligibility"] == "eligible" for row in result["models"]
         )

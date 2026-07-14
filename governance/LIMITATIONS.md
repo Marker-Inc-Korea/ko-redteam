@@ -34,6 +34,16 @@ Evidence-eligible tier는 이 프로토콜 안에서 통계적으로 분리된 �
 - 표본 수 설계의 95% 단측 분산 상한은 독립적인 층별 pilot 차이와 Welch-Satterthwaite 근사를 가정한다.
   층별 최소 20개와 상한 SD를 사용해 작은 pilot의 낙관성을 줄이지만, reference pair나 공개 practice의 분산이
   official 모델·문항 분산을 완전히 대표한다는 보장은 없다.
+- 모델 쌍 p-value의 sign-flip 검정은 영가설에서 paired 독립 그룹 안의 모델 라벨이 교환 가능하다고 가정한다.
+  표본 수와 power는 이 검정의 대규모 정규근사이므로, group contribution이 심하게 비대칭이거나 소수 원형에
+  지배되면 명목 유의수준과 검정력이 달라질 수 있다. 공개 report는 exact/Monte Carlo mode와 그룹 수를 함께
+  표시한다.
+- 공식 p-value는 원형별 반복 실행을 먼저 평균한 group contribution에 조건부다. 반복 실행 불확실성은 nested
+  bootstrap 신뢰구간과 반복 불안정성 gate로 별도 평가하며, sign-flip 영가설 분포에 반복을 독립 표본처럼
+  추가하지 않는다.
+- calibration의 upper/lower control 분리도 paired control 안의 모델 라벨 교환 가능성을 가정한다. 이는 자동
+  판정기의 전체 타당성을 증명하지 않으며, control 선정이 실제 오류 유형을 충분히 대표하지 못하면 높은 분리
+  확률과 무관하게 영역별 confusion gate와 외부 검토를 통과할 수 없다.
 - 모델 단독 평가 결과는 검색기, system prompt, 권한 설계, 후처리와 모니터링이 포함된 실제 서비스 결과와
   다를 수 있다.
 

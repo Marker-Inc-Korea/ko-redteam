@@ -19,7 +19,7 @@ from ko_power_pilot import (  # noqa: E402
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("ranking_manifest", help="private v2-v4 reference-run manifest")
+    parser.add_argument("ranking_manifest", help="private v2-v5 reference-run manifest")
     registration = parser.add_mutually_exclusive_group(required=True)
     registration.add_argument(
         "--preregistration",

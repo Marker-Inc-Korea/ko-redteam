@@ -23,7 +23,44 @@ def test_holm_adjustment_controls_complete_comparison_family():
     assert adjusted[keys[2]] == 0.50
 
 
-def test_v4_separates_ranking_evidence_from_deployment_screen():
+def test_paired_sign_flip_uses_a_null_distribution_not_bootstrap_confidence():
+    result = R._paired_sign_flip_test(
+        [1.0, 1.0],
+        iterations=100,
+        seed=7,
+    )
+
+    assert result == {
+        "p_value": 0.5,
+        "mode": "exact",
+        "draws": 4,
+        "group_count": 2,
+        "observed_difference": 2.0,
+    }
+
+
+def test_paired_sign_flip_monte_carlo_is_seeded_and_plus_one_corrected():
+    first = R._paired_sign_flip_test(
+        [float(index) for index in range(1, 21)],
+        iterations=1_000,
+        seed=17,
+    )
+    second = R._paired_sign_flip_test(
+        [float(index) for index in range(1, 21)],
+        iterations=1_000,
+        seed=17,
+    )
+
+    assert first == second
+    assert first["mode"] == "monte_carlo"
+    assert first["draws"] == 1_000
+    assert first["p_value"] >= 1 / 1_001
+    assert R._stable_randomization_seed(1, "balanced", "a", "b") == (
+        R._stable_randomization_seed(1, "balanced", "b", "a")
+    )
+
+
+def test_current_policy_separates_ranking_evidence_from_deployment_screen():
     summary = {
         "endpoint_errors": 0,
         "runs": 3,
@@ -56,7 +93,7 @@ def test_v4_separates_ranking_evidence_from_deployment_screen():
     assert deployment_reasons == ["critical_safety_failure", "privacy_failure"]
 
 
-def test_v4_manifest_requires_frozen_policy_and_model_cap(tmp_path):
+def test_v5_manifest_requires_frozen_policy_and_model_cap(tmp_path):
     path = tmp_path / "ranking_manifest.json"
     path.write_text(
         json.dumps({
@@ -65,7 +102,7 @@ def test_v4_manifest_requires_frozen_policy_and_model_cap(tmp_path):
         }),
         "utf-8",
     )
-    with pytest.raises(ValueError, match="freeze the current ranking policy"):
+    with pytest.raises(ValueError, match="freeze its canonical ranking policy"):
         R.load_ranking_manifest(path)
 
     path.write_text(
@@ -77,6 +114,32 @@ def test_v4_manifest_requires_frozen_policy_and_model_cap(tmp_path):
         "utf-8",
     )
     with pytest.raises(ValueError, match="maximum model count"):
+        R.load_ranking_manifest(path)
+
+
+def test_v4_manifest_preserves_the_published_policy_v1_contract(tmp_path):
+    path = tmp_path / "ranking_manifest.json"
+    models = [{"name": f"model-{index}", "runs": []} for index in range(2)]
+    path.write_text(
+        json.dumps({
+            "schema": R.RANKING_MANIFEST_V4_SCHEMA,
+            "ranking_policy": R.RANKING_POLICY,
+            "models": models,
+        }),
+        "utf-8",
+    )
+    with pytest.raises(ValueError, match="freeze its canonical ranking policy"):
+        R.load_ranking_manifest(path)
+
+    path.write_text(
+        json.dumps({
+            "schema": R.RANKING_MANIFEST_V4_SCHEMA,
+            "ranking_policy": R.LEGACY_RANKING_POLICY,
+            "models": models,
+        }),
+        "utf-8",
+    )
+    with pytest.raises(ValueError, match="non-empty runs"):
         R.load_ranking_manifest(path)
 
 
@@ -184,6 +247,36 @@ def _manifest(tmp_path: Path, models: list[dict]) -> Path:
     return path
 
 
+def test_v4_analysis_replays_the_model_ranking_v3_contract(
+    tmp_path, monkeypatch
+):
+    source_manifest = _manifest(tmp_path, [
+        _add_model(tmp_path, "legacy-a", scores=[90.0, 90.0, 90.0]),
+        _add_model(tmp_path, "legacy-b", scores=[80.0, 80.0, 80.0]),
+    ])
+    _, runs_by_model, suites = R.load_ranking_manifest(source_manifest)
+    legacy_manifest = {
+        "schema": R.RANKING_MANIFEST_V4_SCHEMA,
+        "name": "legacy-v4-replay",
+        "ranking_policy": R.LEGACY_RANKING_POLICY,
+    }
+    monkeypatch.setattr(
+        R,
+        "load_ranking_manifest",
+        lambda _: (legacy_manifest, runs_by_model, suites),
+    )
+
+    result = R.analyze_ranking_manifest(source_manifest, iterations=100)
+
+    assert result["schema"] == R.MODEL_RANKING_V3_SCHEMA
+    assert result["method"]["ranking_policy"] == R.LEGACY_RANKING_POLICY
+    assert result["method"]["pairwise_test"] == R.LEGACY_PAIRWISE_TEST
+    assert "pairwise_null_hypothesis" not in result["method"]
+    assert "Korean LLM Security and Reliability Tiers" in (
+        R.render_model_ranking_markdown(result)
+    )
+
+
 def test_critical_models_are_not_ranked(tmp_path):
     manifest = _manifest(tmp_path, [
         _add_model(tmp_path, "unsafe-a", scores=[100.0, 100.0], harmful=True),
@@ -255,7 +348,7 @@ def test_qualified_models_use_separated_tiers(tmp_path):
     assert result["method"]["suites"] == list(R.OFFICIAL_SUITES)
     assert "agent_harness" in result["models"][0]["components"]
     assert result["method"]["separation_requires_all_weight_profiles"] is True
-    assert result["method"]["pairwise_test"] == "two-sided paired bootstrap with plus-one correction"
+    assert result["method"]["pairwise_test"] == R.LEGACY_PAIRWISE_TEST
     assert result["method"]["multiple_comparison_correction"] == "holm-bonferroni"
     assert result["method"]["comparison_family_size"] == len(R.WEIGHT_PROFILES)
     assert result["pairwise_separation"][0]["separated"] is True

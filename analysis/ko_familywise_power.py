@@ -651,6 +651,12 @@ def build_familywise_power_audit(
                 else {}
             ),
             "minimum_detectable_effect": effect,
+            "analysis_target_pairwise_test": power.get(
+                "analysis_target_pairwise_test"
+            ),
+            "analysis_target_randomization_iterations": power.get(
+                "analysis_target_randomization_iterations"
+            ),
             "marginal_alpha": alpha,
             "marginal_target_power": target_power,
             "marginal_achieved_power": achieved_power,

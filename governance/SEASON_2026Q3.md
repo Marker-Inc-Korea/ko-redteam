@@ -28,7 +28,7 @@ candidate는 없다. S4의 동결된 기계 판독 사전등록은
 | Agent transport | `prompt_json_v1`, endpoint 오류 0건 hard gate |
 | 반복별 실행 증거 | `core`·`mini_single` v3 digest binding 필수 |
 | 공개 power-pilot practice target coverage | suite/domain/expected 7개 stratum, 각 5개 |
-| 7모델 공개 practice 판별력 | 먼 쌍 8/21 분리, 인접 쌍 0/6 분리, 공식 순위 사용 금지 |
+| 7모델 공개 practice 판별력 | 관측 진단값만 유지; 과거 pair 분리·tier 추론 철회, v5 재실행 전 순위 사용 금지 |
 | S4 비공개 official split | 미구성, 작성 금지 |
 | 300개 blinded 사람 calibration | 미수집 |
 | BGE-M3 exact·semantic split audit | 미실행 |
@@ -55,6 +55,10 @@ S4는 S3 결과를 보고 threshold, weight, scoring, reference model 또는 324
 power-derived 표본 수를 허용하도록 validator를 수정하고 실행 artifact의 출처를 v3 증거로 결합했다. S4 power
 입력은 두 reference model을 동결된 S4 commit으로 다시 실행해야 하며 과거 v2 manifest를 대신 사용할 수 없다.
 공개 practice 모델 비교는 판별력 진단일 뿐 official split, calibration 또는 외부 검토를 대체하지 않는다.
+당시 bootstrap-tail p-value는 영가설 분포를 만들지 않았으므로 pair 분리와 diagnostic tier 주장은
+[`PRACTICE_VALIDATION_2026Q3_INFERENCE_NOTICE.md`](./PRACTICE_VALIDATION_2026Q3_INFERENCE_NOTICE.md)에서
+철회했다. 관측 점수와 실패 집계는 기술 통계로만 보존하며 현재 ranking-manifest v5에서 model-ranking v4를
+재생성하기 전에는 줄세우기 근거로 사용하지 않는다.
 재실행 결과 S4의 단일 비교 simulated power는 0.8002로 목표를 통과했다. 그러나 7모델 × 3개 profile의
 63-comparison family를 반영하면 324그룹에서 개별 MDE 비교 power는 0.2906이고, 개별 80% 보장에는 727개,
 모든 비교의 동시 80% 보장에는 1527개가 필요하다. 집계 증거는

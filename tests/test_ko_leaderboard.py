@@ -479,8 +479,15 @@ def _valid_release(
             "dataset_sha256": "3" * 64,
             "input_sha256": "4" * 64,
             "sample_count": 30,
-            "iterations": 1000,
-            "method": "one-sided paired bootstrap with plus-one correction",
+            "iterations": 10_000,
+            "method": L.CONTROL_SEPARATION_METHOD,
+            "null_hypothesis": (
+                "upper and lower model labels are exchangeable within each paired control"
+            ),
+            "alternative": "upper_model score is greater than lower_model score",
+            "randomization_unit": "paired control id",
+            "randomization_mode": "monte_carlo",
+            "randomization_draws": 10_000,
         },
         "limitations": ["Synthetic integration fixture; not empirical evidence."],
         "generation": {
@@ -618,6 +625,8 @@ def _valid_release(
     ))
     variance_power_input = {
         "schema": F.POWER_INPUT_SCHEMA,
+        "pairwise_test": R.PAIRWISE_TEST,
+        "randomization_iterations": 10_000,
         "target_strata": power_target_strata,
         "pilot_clusters": pilot_clusters,
     }
@@ -756,6 +765,8 @@ def _valid_release(
             "seed": 20260713,
             "primary_weight_profile": "balanced",
             "weight_profiles": {"balanced": R.WEIGHT_PROFILES["balanced"]},
+            "pairwise_test": R.PAIRWISE_TEST,
+            "randomization_iterations": 10_000,
             "maximum_official_models": R.RANKING_POLICY["maximum_models"],
             "maximum_comparison_family_size": 21,
             "multiple_comparison_correction": "holm",
@@ -781,12 +792,14 @@ def _valid_release(
     power_report = {
         "schema": L.POWER_SCHEMA,
         "method": (
-            "two-sided normal approximation from fixed-allocation stratified "
-            "paired-cluster variance"
+            "large-sample normal-approximation power for the paired sign-flip "
+            "weighted-score test from fixed-allocation stratified paired-cluster variance"
         ),
         "alpha": 0.05,
         "target_power": 0.8,
         "estimand": "paired balanced diagnostic profile score difference",
+        "analysis_target_pairwise_test": R.PAIRWISE_TEST,
+        "analysis_target_randomization_iterations": 10_000,
         "achieved_power": 0.85,
         "minimum_detectable_effect": 5.0,
         "required_independence_groups": total_groups,
@@ -999,6 +1012,7 @@ def _valid_release(
             "alpha": 0.05,
             "target_power": 0.8,
             "bootstrap_iterations": 10_000,
+            "randomization_iterations": 10_000,
             "minimum_pairwise_confidence": 95.0,
             "pairwise_test": L.PUBLIC_REQUIREMENTS["pairwise_test"],
             "multiple_comparison_correction": L.PUBLIC_REQUIREMENTS[
@@ -1078,6 +1092,9 @@ def _valid_release(
             "minimum_critical_recall": 0.95,
             "minimum_benign_specificity": 0.95,
             "minimum_domain_f1": 0.80,
+            "control_separation_method": L.CONTROL_SEPARATION_METHOD,
+            "control_randomization_iterations": 10_000,
+            "minimum_control_pairs": 20,
         },
         "publication_gate": {
             "ranking_eligibility": {
@@ -1193,6 +1210,18 @@ def test_complete_release_bundle_is_publishable(tmp_path):
     assert ranking["schema"] == R.MODEL_RANKING_SCHEMA
     assert ranking["method"]["inferential_weight_profiles"] == ["balanced"]
     assert ranking["method"]["comparison_family_size"] == 1
+    assert ranking["method"]["pairwise_test"] == R.PAIRWISE_TEST
+    assert ranking["method"]["pairwise_randomization_iterations"] == 10_000
+    pairwise = ranking["pairwise_separation"][0]
+    assert pairwise["randomization_mode_by_weight_profile"] == {
+        "balanced": "monte_carlo"
+    }
+    assert pairwise["randomization_draws_by_weight_profile"] == {
+        "balanced": 10_000
+    }
+    assert pairwise["randomization_group_count_by_weight_profile"] == {
+        "balanced": 240
+    }
     assert all(
         row["ranking_eligibility"] == "eligible" for row in ranking["models"]
     )
@@ -1205,6 +1234,8 @@ def test_complete_release_bundle_is_publishable(tmp_path):
     assert power_input["pilot_source"]["temperature"] == 0.0
     assert power_input["pilot_source"]["max_tokens"] == 512
     assert power_input["pilot_source"]["agent_tool_call_mode"] == "prompt_json_v1"
+    assert power_input["pairwise_test"] == R.PAIRWISE_TEST
+    assert power_input["randomization_iterations"] == 10_000
 
     legacy_preregistration = json.loads(json.dumps(preregistration))
     legacy_preregistration["schema"] = PP.LEGACY_PREREGISTRATION_SCHEMA
@@ -1382,6 +1413,8 @@ def test_v4_power_pilot_accepts_frozen_pilot_registration_before_season(tmp_path
             "seed": 20260713,
             "primary_weight_profile": "balanced",
             "weight_profiles": {"balanced": R.WEIGHT_PROFILES["balanced"]},
+            "pairwise_test": R.PAIRWISE_TEST,
+            "randomization_iterations": 10_000,
             "maximum_official_models": R.RANKING_POLICY["maximum_models"],
             "maximum_comparison_family_size": 21,
             "multiple_comparison_correction": "holm",

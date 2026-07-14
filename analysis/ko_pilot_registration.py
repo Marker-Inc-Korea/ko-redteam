@@ -242,7 +242,7 @@ def _practice_design(
         )
 
     if practice.get("ranking_manifest_schema") != ranking.RANKING_MANIFEST_SCHEMA:
-        raise ValueError("current practice pilot requires ranking manifest v4")
+        raise ValueError("current practice pilot requires ranking manifest v5")
     if practice.get("weight_profile") != "balanced":
         raise ValueError("practice pilot weight_profile must be balanced")
     if practice.get("construction_method") != CONSTRUCTION_METHOD:
@@ -283,7 +283,7 @@ def _execution(registration: dict[str, Any]) -> dict[str, Any]:
         "ranking_manifest_schema": ranking.RANKING_MANIFEST_SCHEMA,
     }
     if execution.get("execution_evidence") != expected_evidence:
-        raise ValueError("execution evidence contract does not match v4")
+        raise ValueError("execution evidence contract does not match v5")
     if execution.get("immutable_model_revision_required") is not True:
         raise ValueError("immutable model revisions must be required")
     if execution.get("clean_evaluator_commit_required") is not True:
@@ -319,6 +319,16 @@ def _statistics(registration: dict[str, Any]) -> dict[str, Any]:
         raise ValueError("pilot statistics must contain only the balanced profile")
     if profiles["balanced"] != ranking.WEIGHT_PROFILES["balanced"]:
         raise ValueError("balanced weights must match the ranking policy")
+    if statistics.get("pairwise_test") != ranking.PAIRWISE_TEST:
+        raise ValueError("pairwise test must match the official ranking method")
+    randomization_iterations = _positive_int(
+        statistics.get("randomization_iterations"),
+        "statistics.randomization_iterations",
+    )
+    if not 10_000 <= randomization_iterations <= 100_000:
+        raise ValueError(
+            "ranking randomization_iterations must be between 10000 and 100000"
+        )
     if statistics.get("maximum_official_models") != ranking.RANKING_POLICY[
         "maximum_models"
     ]:

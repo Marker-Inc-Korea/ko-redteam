@@ -23,6 +23,8 @@ def _input() -> dict:
         "target_power": 0.80,
         "estimand": "paired balanced diagnostic profile score difference",
         "minimum_detectable_effect": 5.0,
+        "pairwise_test": P.PAIRWISE_TEST,
+        "randomization_iterations": 10_000,
         "actual_independence_groups": 180,
         "pilot_dataset_sha256": "d" * 64,
         "pilot_clusters": [
@@ -109,6 +111,9 @@ def test_power_report_is_reproducible_and_metadata_only():
 
     assert first == second
     assert first["schema"] == P.OUTPUT_SCHEMA
+    assert first["analysis_target_pairwise_test"] == P.PAIRWISE_TEST
+    assert first["analysis_target_randomization_iterations"] == 10_000
+    assert "paired sign-flip" in first["method"]
     assert first["required_independence_groups"] < first["actual_independence_groups"]
     assert first["achieved_power"] >= 0.80
     assert first["pilot_summary"]["cluster_count"] == 12
@@ -165,6 +170,16 @@ def test_stratified_power_accepts_registration_bound_v2_source():
     assert report["pilot_summary"]["source"][
         "pilot_registration_sha256"
     ] == "5" * 64
+
+    data["pairwise_test"] = "legacy-bootstrap-tail"
+    with pytest.raises(ValueError, match="official pairwise test"):
+        P.build_power_report(data)
+    data["pairwise_test"] = P.PAIRWISE_TEST
+
+    data["randomization_iterations"] = 9_999
+    with pytest.raises(ValueError, match="randomization_iterations"):
+        P.build_power_report(data)
+    data["randomization_iterations"] = 10_000
 
     data["pilot_source"]["first_run_started_at"] = (
         "2026-04-29T23:00:00+09:00"
