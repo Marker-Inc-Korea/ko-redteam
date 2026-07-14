@@ -122,16 +122,62 @@ def _practice_review() -> dict:
 
 
 def _registration(review: dict) -> dict:
+    protocol_commit = "a" * 40
+    registered_at = "2026-07-14T11:00:00+09:00"
     return {
         "schema": P.PILOT_REGISTRATION_SCHEMA,
         "status": P.FROZEN_STATUS,
         "pilot": {
             "id": "ko-redteam-2026q3-successor-power-pilot-v1",
-            "registered_at": "2026-07-14T11:00:00+09:00",
-            "protocol_git_commit": "a" * 40,
+            "registered_at": registered_at,
+            "protocol_git_commit": protocol_commit,
             "locale": "ko-KR",
             "purpose": "variance_and_sample_size_planning_only",
             "official_model_results_allowed": False,
+        },
+        "design_sources": {
+            "review_draft": {
+                "path": "governance/review_draft.json",
+                "sha256": "1" * 64,
+                "schema": "ko-redteam.practice-review-draft.v1",
+                "usage": "unit review draft",
+            },
+            "pilot_precision_audit": {
+                "path": "governance/precision.json",
+                "sha256": "2" * 64,
+                "schema": "ko-redteam.familywise-power-audit.v2",
+                "usage": "unit precision source",
+            },
+            "baseline_predecessor": {
+                "path": "governance/predecessor.json",
+                "sha256": "3" * 64,
+                "schema": "ko-redteam.season-preregistration.v1",
+                "usage": "unit baseline source",
+            },
+        },
+        "build_evidence": {
+            "schema": P.PILOT_REGISTRATION_BUILD_EVIDENCE_SCHEMA,
+            "spec": {
+                "path": "governance/registration_spec.json",
+                "sha256": "4" * 64,
+                "canonical_sha256": "5" * 64,
+            },
+            "practice_review": {
+                "path": "governance/successor_pilot_review.json",
+                "sha256": "6" * 64,
+                "canonical_sha256": canonical_sha256(review),
+            },
+            "builder": {
+                "path": "analysis/ko_pilot_registration_builder.py",
+                "sha256": "7" * 64,
+            },
+            "entrypoint": {
+                "path": "probes/build_pilot_registration.py",
+                "sha256": "8" * 64,
+            },
+            "source_worktree_clean": True,
+            "protocol_git_commit": protocol_commit,
+            "built_at": registered_at,
         },
         "reference_models": [
             {
@@ -354,6 +400,34 @@ def test_frozen_pilot_registration_binds_review_and_pre_execution_design():
             ),
             "pairwise test",
         ),
+        (
+            lambda registration, review: registration.update(extra="unsupported"),
+            "fields do not match",
+        ),
+        (
+            lambda registration, review: registration["design_sources"][
+                "review_draft"
+            ].update(schema="ko-redteam.practice-review-draft.v0"),
+            "schema is not frozen",
+        ),
+        (
+            lambda registration, review: registration["build_evidence"].pop(
+                "entrypoint"
+            ),
+            "entrypoint",
+        ),
+        (
+            lambda registration, review: registration["build_evidence"].update(
+                source_worktree_clean=False
+            ),
+            "clean source worktree",
+        ),
+        (
+            lambda registration, review: registration["practice_design"].pop(
+                "review_artifact"
+            ),
+            "review_artifact",
+        ),
     ],
 )
 def test_pilot_registration_rejects_unfrozen_or_unreviewed_designs(
@@ -363,8 +437,12 @@ def test_pilot_registration_rejects_unfrozen_or_unreviewed_designs(
     review = _practice_review()
     registration = _registration(review)
     mutation(registration, review)
-    if registration["status"] == P.FROZEN_STATUS:
-        registration["practice_design"]["review_artifact"][
+    review_artifact = registration["practice_design"].get("review_artifact")
+    if registration["status"] == P.FROZEN_STATUS and isinstance(
+        review_artifact, dict
+    ):
+        review_artifact["canonical_sha256"] = canonical_sha256(review)
+        registration["build_evidence"]["practice_review"][
             "canonical_sha256"
         ] = canonical_sha256(review)
 

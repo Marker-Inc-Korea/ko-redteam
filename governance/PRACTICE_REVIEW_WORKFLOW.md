@@ -67,6 +67,31 @@ artifact에는 원문 응답이나 notes 대신 plan, packet, response, 신원·
 
 ## 4. Freeze Before Any Anchor Run
 
-최종 review와 benchmark digest를 `power-pilot-registration.v2`에 결합하고 공개 commit으로 동결한다. 등록 시각은
-review 완료보다 늦어야 한다. 이 commit 이전에는 upper/lower anchor를 다운로드·서빙·실행하지 않으며, 이후
-benchmark, reviewer evidence 또는 threshold가 바뀌면 기존 pilot을 중단하고 새 ID로 등록한다.
+최종 review를 먼저 별도 commit으로 공개하고 push한다. source worktree가 clean한 상태에서만 공개 spec과 review,
+모든 benchmark·설계 근거·분석 코드의 tracked 상태와 SHA-256을 검증하여
+`power-pilot-registration.v2`와 audit을 생성한다.
+
+```bash
+git add governance/SUCCESSOR_PILOT_PRACTICE_REVIEW.json
+git commit -m "Publish independent successor pilot review"
+git push
+
+REGISTERED_AT=2026-07-15T11:00:00+09:00
+ko-redteam-build-pilot-registration \
+  governance/SUCCESSOR_PILOT_REGISTRATION_SPEC.json \
+  --review governance/SUCCESSOR_PILOT_PRACTICE_REVIEW.json \
+  --root . \
+  --registered-at "$REGISTERED_AT" \
+  --output governance/SUCCESSOR_PILOT_REGISTRATION.json \
+  --audit-output governance/SUCCESSOR_PILOT_REGISTRATION_AUDIT.json
+
+git add governance/SUCCESSOR_PILOT_REGISTRATION.json \
+  governance/SUCCESSOR_PILOT_REGISTRATION_AUDIT.json
+git commit -m "Freeze successor power pilot registration"
+git push
+```
+
+builder는 dirty source, Git 비추적 입력, 프로젝트 밖 출력, 기존 파일 덮어쓰기, source digest 변경, review 불일치와
+과거 분산·power·결과 재사용을 거부한다. 등록 시각은 review 완료보다 늦어야 한다. 두 번째 공개 commit이 원격에
+반영되기 전에는 upper/lower anchor를 다운로드·서빙·실행하지 않는다. 이후 benchmark, reviewer evidence,
+threshold 또는 분석 코드가 바뀌면 기존 pilot을 중단하고 새 ID로 등록한다.

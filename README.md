@@ -169,12 +169,31 @@ ko-redteam-merge-review-responses \
   --root . \
   --output governance/SUCCESSOR_PILOT_PRACTICE_REVIEW.json \
   --audit-output private/review-workspace/merge-audit.json
+
+# 최종 review를 먼저 공개 commit/push한 clean HEAD에서만 등록 생성
+git add governance/SUCCESSOR_PILOT_PRACTICE_REVIEW.json
+git commit -m "Publish independent successor pilot review"
+git push
+
+REGISTERED_AT=2026-07-15T11:00:00+09:00
+ko-redteam-build-pilot-registration \
+  governance/SUCCESSOR_PILOT_REGISTRATION_SPEC.json \
+  --review governance/SUCCESSOR_PILOT_PRACTICE_REVIEW.json \
+  --root . --registered-at "$REGISTERED_AT" \
+  --output governance/SUCCESSOR_PILOT_REGISTRATION.json \
+  --audit-output governance/SUCCESSOR_PILOT_REGISTRATION_AUDIT.json
+
+# 이 두 artifact도 별도 공개 commit/push한 뒤에만 anchor 실행
+git add governance/SUCCESSOR_PILOT_REGISTRATION.json \
+  governance/SUCCESSOR_PILOT_REGISTRATION_AUDIT.json
+git commit -m "Freeze successor power pilot registration"
+git push
 ```
 
 ```bash
-PILOT_REGISTRATION=governance/PILOT_ID_REGISTRATION.json
-PRACTICE_REVIEW=governance/PILOT_ID_PRACTICE_REVIEW.json
-POWER_FROZEN_AT=2026-07-14T16:00:00+09:00
+PILOT_REGISTRATION=governance/SUCCESSOR_PILOT_REGISTRATION.json
+PRACTICE_REVIEW=governance/SUCCESSOR_PILOT_PRACTICE_REVIEW.json
+POWER_FROZEN_AT=2026-07-16T16:00:00+09:00
 
 # 1. Validate pre-execution practice review and pilot registration
 ko-redteam-validate-pilot-registration "$PILOT_REGISTRATION" \

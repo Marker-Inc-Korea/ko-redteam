@@ -36,6 +36,7 @@ def test_console_script_targets_are_importable():
         "ko-redteam-build-power-pilot",
         "ko-redteam-build-review-packets",
         "ko-redteam-merge-review-responses",
+        "ko-redteam-build-pilot-registration",
         "ko-redteam-validate-pilot-registration",
         "ko-redteam-audit-splits",
         "ko-redteam-analyze-power",
@@ -134,6 +135,9 @@ def test_package_data_paths_exist():
     assert (
         ROOT / "governance" / "SUCCESSOR_PILOT_PRACTICE_REVIEW_DRAFT.md"
     ).exists()
+    assert (
+        ROOT / "governance" / "SUCCESSOR_PILOT_REGISTRATION_SPEC.json"
+    ).exists()
     assert (ROOT / "governance" / "PRACTICE_REVIEW_WORKFLOW.md").exists()
     assert (ROOT / "gap_analysis" / "_vendor" / "mitigationbypass_substrings.txt").exists()
 
@@ -159,6 +163,7 @@ def test_analysis_package_imports_without_flat_pythonpath():
                 "from analysis.ko_power_evidence import build_power_report;"
                 "from analysis.ko_power_pilot import build_power_pilot_input;"
                 "from analysis.ko_pilot_registration import validate_pilot_registration;"
+                "from analysis.ko_pilot_registration_builder import build_pilot_registration;"
                 "from analysis.ko_practice_review import build_review_workspace;"
                 "r=analyze_response('주민번호 900101-1234567');"
                 "assert r['risk_domain']=='pii_rrn';"
@@ -174,6 +179,7 @@ def test_analysis_package_imports_without_flat_pythonpath():
                 "assert callable(build_power_report);"
                 "assert callable(build_power_pilot_input);"
                 "assert callable(validate_pilot_registration);"
+                "assert callable(build_pilot_registration);"
                 "assert callable(build_review_workspace);"
                 "print('package-import-ok')"
             ),

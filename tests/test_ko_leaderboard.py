@@ -80,6 +80,62 @@ def _practice_review_evidence(assignment_count: int) -> dict:
     }
 
 
+def _pilot_design_sources() -> dict:
+    return {
+        "review_draft": {
+            "path": "governance/review-draft.json",
+            "sha256": "1" * 64,
+            "schema": "ko-redteam.practice-review-draft.v1",
+            "usage": "unit review draft",
+        },
+        "pilot_precision_audit": {
+            "path": "governance/precision-audit.json",
+            "sha256": "2" * 64,
+            "schema": "ko-redteam.familywise-power-audit.v2",
+            "usage": "unit precision source",
+        },
+        "baseline_predecessor": {
+            "path": "governance/predecessor.json",
+            "sha256": "3" * 64,
+            "schema": "ko-redteam.season-preregistration.v1",
+            "usage": "unit baseline source",
+        },
+    }
+
+
+def _pilot_build_evidence(
+    review: dict,
+    *,
+    review_path: str,
+    protocol_commit: str,
+    registered_at: str,
+) -> dict:
+    return {
+        "schema": PR.PILOT_REGISTRATION_BUILD_EVIDENCE_SCHEMA,
+        "spec": {
+            "path": "governance/registration-spec.json",
+            "sha256": "4" * 64,
+            "canonical_sha256": "5" * 64,
+        },
+        "practice_review": {
+            "path": review_path,
+            "sha256": "6" * 64,
+            "canonical_sha256": C.canonical_sha256(review),
+        },
+        "builder": {
+            "path": "analysis/ko_pilot_registration_builder.py",
+            "sha256": "7" * 64,
+        },
+        "entrypoint": {
+            "path": "probes/build_pilot_registration.py",
+            "sha256": "8" * 64,
+        },
+        "source_worktree_clean": True,
+        "protocol_git_commit": protocol_commit,
+        "built_at": registered_at,
+    }
+
+
 def _context(
     model: str,
     run: int,
@@ -737,6 +793,13 @@ def _valid_release(
             "purpose": "variance_and_sample_size_planning_only",
             "official_model_results_allowed": False,
         },
+        "design_sources": _pilot_design_sources(),
+        "build_evidence": _pilot_build_evidence(
+            practice_review,
+            review_path="practice_review.json",
+            protocol_commit="a" * 40,
+            registered_at="2026-05-20T00:00:00+09:00",
+        ),
         "reference_models": [
             {
                 "role": "upper_anchor",
@@ -1450,6 +1513,13 @@ def test_v4_power_pilot_accepts_frozen_pilot_registration_before_season(tmp_path
             "purpose": "variance_and_sample_size_planning_only",
             "official_model_results_allowed": False,
         },
+        "design_sources": _pilot_design_sources(),
+        "build_evidence": _pilot_build_evidence(
+            review,
+            review_path="governance/unit_pilot_review.json",
+            protocol_commit=preregistration["season"]["protocol_git_commit"],
+            registered_at="2026-05-20T00:00:00+09:00",
+        ),
         "reference_models": preregistration["reference_models"],
         "baseline_design": {
             "candidate_independence_groups": split_design[
@@ -1545,6 +1615,9 @@ def test_v4_power_pilot_accepts_frozen_pilot_registration_before_season(tmp_path
     late_registration["pilot"]["registered_at"] = (
         "2026-05-22T00:00:00+09:00"
     )
+    late_registration["build_evidence"]["built_at"] = (
+        "2026-05-22T00:00:00+09:00"
+    )
     with pytest.raises(ValueError, match="outside the frozen pilot window"):
         PP.build_power_pilot_input(
             manifest_path,
@@ -1565,6 +1638,9 @@ def test_v4_power_pilot_accepts_frozen_pilot_registration_before_season(tmp_path
     changed_review["case_reviews"][0]["independence_group"] += "-changed"
     changed_registration = json.loads(json.dumps(pilot_registration))
     changed_registration["practice_design"]["review_artifact"][
+        "canonical_sha256"
+    ] = C.canonical_sha256(changed_review)
+    changed_registration["build_evidence"]["practice_review"][
         "canonical_sha256"
     ] = C.canonical_sha256(changed_review)
     with pytest.raises(ValueError, match="independence-group set"):

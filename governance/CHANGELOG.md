@@ -43,6 +43,9 @@
   packet·response SHA-256을 결합한다. 병합기는 비공개 신원·소속·서명 파일의 존재와 digest까지 확인하며
   누락·변조·reject가 있으면 최종 review를 생성하지 않는다.
 - 새 사람 검수 증거 계약을 과거 `power-pilot-registration.v1` 의미에 덮어쓰지 않고 v2로 승격한다.
+- 공개 successor spec과 fail-closed registration builder를 추가한다. builder는 clean Git HEAD와 tracked
+  spec·review·설계 근거·benchmark·분석 코드의 digest를 검증하고, 구현·entrypoint·입력 commitment를 v2 build
+  evidence에 기록한다. 실제 2인 review가 없거나 입력이 바뀌면 registration을 생성하지 않는다.
 - breaking publication contract를 `leaderboard-release.v2`와 `season-preregistration.v2`로 승격한다. 과거
   S1-S4 `v1` 등록은 수정하지 않으며 신규 v5 pilot이나 공식 release에 재사용할 수 없다.
 

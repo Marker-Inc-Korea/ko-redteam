@@ -22,6 +22,14 @@ response와 notes 및 신원 문서는 비공개 workspace에 두고, 병합기�
 canonical SHA-256을 결합한다. 둘 중 하나가 누락·변조되거나 review가 등록 이후에 완료됐으면 power 입력을 만들 수
 없다.
 
+`ko-redteam-build-pilot-registration`은 공개
+[`SUCCESSOR_PILOT_REGISTRATION_SPEC.json`](./SUCCESSOR_PILOT_REGISTRATION_SPEC.json)을 유일한 설계 입력으로
+사용한다. clean Git HEAD에서 spec, 최종 review, 세 설계 근거, 네 benchmark와 세 분석 코드가 모두 tracked이고
+digest가 일치할 때만 registration을 만든다. build evidence에는 HEAD, 생성 시각, spec·review의 file/canonical
+SHA-256, builder 구현과 entrypoint SHA-256을 기록한다. S4에서 재사용하는 것은 사전 공개된 두 anchor identity와
+equal-domain baseline allocation뿐이며, 과거 output·score·분산·power·통계 결론은 successor 입력으로 재사용하지
+않는다.
+
 ## Public Season Preregistration
 
 `ko-redteam.season-preregistration.v2`는 비공개 입력이 아니라 power gate 통과 후 official prompt 작성 전에

@@ -35,6 +35,8 @@ KNOWN_SCHEMAS = PRIMARY_REPORT_SCHEMAS | {
     "ko-redteam.ranking-manifest.v1",
     "ko-redteam.power-pilot-registration.v1",
     "ko-redteam.power-pilot-registration.v2",
+    "ko-redteam.power-pilot-registration-spec.v1",
+    "ko-redteam.power-pilot-registration-build-evidence.v1",
     "ko-redteam.power-pilot-registration-audit.v1",
     "ko-redteam.practice-review.v2",
     "ko-redteam.practice-review.v1",

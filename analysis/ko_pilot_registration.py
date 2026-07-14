@@ -4,6 +4,7 @@ from __future__ import annotations
 from collections import Counter
 from datetime import datetime
 import math
+from pathlib import PurePosixPath
 import re
 from typing import Any
 
@@ -47,6 +48,10 @@ except ModuleNotFoundError:  # package import path
 
 PILOT_REGISTRATION_V1_SCHEMA = "ko-redteam.power-pilot-registration.v1"
 PILOT_REGISTRATION_SCHEMA = "ko-redteam.power-pilot-registration.v2"
+PILOT_REGISTRATION_SPEC_SCHEMA = "ko-redteam.power-pilot-registration-spec.v1"
+PILOT_REGISTRATION_BUILD_EVIDENCE_SCHEMA = (
+    "ko-redteam.power-pilot-registration-build-evidence.v1"
+)
 PRACTICE_REVIEW_V1_SCHEMA = "ko-redteam.practice-review.v1"
 PRACTICE_REVIEW_SCHEMA = FINAL_REVIEW_SCHEMA
 PILOT_REGISTRATION_AUDIT_SCHEMA = "ko-redteam.power-pilot-registration-audit.v1"
@@ -64,6 +69,29 @@ REQUIRED_TARGET_STRATA = {
     "multiturn:prompt_security:refuse_or_redirect",
     "agent_harness:agent_rag:allow",
     "agent_harness:agent_rag:no_tool",
+}
+REQUIRED_DESIGN_SOURCES = {
+    "review_draft",
+    "pilot_precision_audit",
+    "baseline_predecessor",
+}
+REQUIRED_DESIGN_SOURCE_SCHEMAS = {
+    "review_draft": "ko-redteam.practice-review-draft.v1",
+    "pilot_precision_audit": "ko-redteam.familywise-power-audit.v2",
+    "baseline_predecessor": "ko-redteam.season-preregistration.v1",
+}
+PILOT_REGISTRATION_FIELDS = {
+    "schema",
+    "status",
+    "pilot",
+    "design_sources",
+    "build_evidence",
+    "reference_models",
+    "baseline_design",
+    "practice_design",
+    "execution",
+    "statistics",
+    "stopping_rules",
 }
 
 
@@ -110,6 +138,105 @@ def _sha256(value: Any, context: str) -> str:
     if not SHA256_RE.fullmatch(text):
         raise ValueError(f"{context} must be a lowercase SHA-256 digest")
     return text
+
+
+def _relative_path(value: Any, context: str) -> str:
+    text = _string(value, context)
+    path = PurePosixPath(text)
+    if path.is_absolute() or ".." in path.parts or "\\" in text:
+        raise ValueError(f"{context} must be a contained POSIX relative path")
+    return text
+
+
+def _design_sources(registration: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    sources = _object(registration.get("design_sources"), "design_sources")
+    if set(sources) != REQUIRED_DESIGN_SOURCES:
+        raise ValueError("pilot registration must bind all design source artifacts")
+    normalized = {}
+    for name, raw in sources.items():
+        row = _object(raw, f"design_sources.{name}")
+        normalized[name] = {
+            "path": _relative_path(row.get("path"), f"design_sources.{name}.path"),
+            "sha256": _sha256(row.get("sha256"), f"design_sources.{name}.sha256"),
+            "schema": _string(row.get("schema"), f"design_sources.{name}.schema"),
+            "usage": _string(row.get("usage"), f"design_sources.{name}.usage"),
+        }
+        if row != normalized[name]:
+            raise ValueError(f"design_sources.{name} contains unsupported fields")
+        if normalized[name]["schema"] != REQUIRED_DESIGN_SOURCE_SCHEMAS[name]:
+            raise ValueError(f"design_sources.{name} schema is not frozen")
+    return normalized
+
+
+def _build_evidence(
+    registration: dict[str, Any],
+    review: dict[str, Any],
+    *,
+    protocol_commit: str,
+    registered_at: datetime,
+) -> dict[str, Any]:
+    evidence = _object(
+        registration.get("build_evidence"),
+        "build_evidence",
+    )
+    if evidence.get("schema") != PILOT_REGISTRATION_BUILD_EVIDENCE_SCHEMA:
+        raise ValueError(
+            "pilot registration must contain current builder evidence"
+        )
+    if evidence.get("source_worktree_clean") is not True:
+        raise ValueError("pilot registration builder requires a clean source worktree")
+    if evidence.get("protocol_git_commit") != protocol_commit:
+        raise ValueError("pilot registration builder commit does not match pilot")
+    built_at = _timestamp(evidence.get("built_at"), "build_evidence.built_at")
+    if built_at != registered_at:
+        raise ValueError("pilot registration build time must equal registration time")
+
+    normalized: dict[str, Any] = {
+        "schema": PILOT_REGISTRATION_BUILD_EVIDENCE_SCHEMA,
+        "source_worktree_clean": True,
+        "protocol_git_commit": protocol_commit,
+        "built_at": evidence["built_at"],
+    }
+    for name in ("spec", "practice_review"):
+        row = _object(evidence.get(name), f"build_evidence.{name}")
+        normalized_row = {
+            "path": _relative_path(row.get("path"), f"build_evidence.{name}.path"),
+            "sha256": _sha256(
+                row.get("sha256"), f"build_evidence.{name}.sha256"
+            ),
+            "canonical_sha256": _sha256(
+                row.get("canonical_sha256"),
+                f"build_evidence.{name}.canonical_sha256",
+            ),
+        }
+        if row != normalized_row:
+            raise ValueError(f"build_evidence.{name} contains unsupported fields")
+        normalized[name] = normalized_row
+    for name in ("builder", "entrypoint"):
+        row = _object(evidence.get(name), f"build_evidence.{name}")
+        normalized_row = {
+            "path": _relative_path(row.get("path"), f"build_evidence.{name}.path"),
+            "sha256": _sha256(
+                row.get("sha256"), f"build_evidence.{name}.sha256"
+            ),
+        }
+        if row != normalized_row:
+            raise ValueError(f"build_evidence.{name} contains unsupported fields")
+        normalized[name] = normalized_row
+    if set(evidence) != set(normalized):
+        raise ValueError("build_evidence contains unsupported fields")
+    practice_design = _object(registration.get("practice_design"), "practice_design")
+    review_artifact = _object(
+        practice_design.get("review_artifact"),
+        "practice_design.review_artifact",
+    )
+    if normalized["practice_review"]["path"] != review_artifact.get("path"):
+        raise ValueError("builder review path does not match practice design")
+    if normalized["practice_review"]["canonical_sha256"] != canonical_sha256(
+        review
+    ):
+        raise ValueError("builder review canonical digest does not match review")
+    return normalized
 
 
 def _target_design(
@@ -602,6 +729,8 @@ def validate_pilot_registration(
         )
     if registration.get("status") != FROZEN_STATUS:
         raise ValueError("pilot registration must be frozen before execution")
+    if set(registration) != PILOT_REGISTRATION_FIELDS:
+        raise ValueError("pilot registration fields do not match the v2 contract")
 
     pilot = _object(registration.get("pilot"), "pilot")
     pilot_id = _string(pilot.get("id"), "pilot.id")
@@ -618,6 +747,13 @@ def validate_pilot_registration(
     if pilot.get("official_model_results_allowed") is not False:
         raise ValueError("pilot registration must prohibit official model results")
 
+    design_sources = _design_sources(registration)
+    build_evidence = _build_evidence(
+        registration,
+        review,
+        protocol_commit=protocol_commit,
+        registered_at=registered_at,
+    )
     references = _reference_models(registration)
     baseline_target_strata, suite_counts = _target_design(
         _object(registration.get("baseline_design"), "baseline_design")
@@ -634,6 +770,13 @@ def validate_pilot_registration(
     )
 
     stopping = _object(registration.get("stopping_rules"), "stopping_rules")
+    if set(stopping) != {
+        "pilot_variance_precision_required",
+        "maximum_cohort_multiplicity_power_required",
+        "stop_before_official_split_on_failure",
+        "threshold_relaxation_allowed",
+    }:
+        raise ValueError("pilot stopping-rule fields do not match the contract")
     required_true = (
         "pilot_variance_precision_required",
         "maximum_cohort_multiplicity_power_required",
@@ -650,6 +793,8 @@ def validate_pilot_registration(
         "pilot_id": pilot_id,
         "registered_at": pilot["registered_at"],
         "protocol_git_commit": protocol_commit,
+        "design_sources": design_sources,
+        "build_evidence": build_evidence,
         "registration_canonical_sha256": canonical_sha256(registration),
         "review_canonical_sha256": canonical_sha256(validated_review),
         "reference_models": references,

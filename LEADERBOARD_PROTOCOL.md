@@ -229,10 +229,19 @@ ko-redteam-validate-leaderboard release_manifest.json \
 사전 증거 생성 명령:
 
 ```bash
-PILOT_REGISTRATION=governance/PILOT_ID_REGISTRATION.json
-PRACTICE_REVIEW=governance/PILOT_ID_PRACTICE_REVIEW.json
-POWER_FROZEN_AT=2026-07-14T16:00:00+09:00
+PILOT_REGISTRATION=governance/SUCCESSOR_PILOT_REGISTRATION.json
+PRACTICE_REVIEW=governance/SUCCESSOR_PILOT_PRACTICE_REVIEW.json
+POWER_FROZEN_AT=2026-07-16T16:00:00+09:00
 PREREGISTRATION=governance/SEASON_ID_PREREGISTRATION.json
+# 최종 review를 별도 commit/push한 clean HEAD에서 실행하고, 생성물도
+# 별도 commit/push한 뒤에만 아래 anchor pilot을 시작합니다.
+REGISTERED_AT=2026-07-15T11:00:00+09:00
+ko-redteam-build-pilot-registration \
+  governance/SUCCESSOR_PILOT_REGISTRATION_SPEC.json \
+  --review "$PRACTICE_REVIEW" --root . \
+  --registered-at "$REGISTERED_AT" \
+  --output "$PILOT_REGISTRATION" \
+  --audit-output governance/SUCCESSOR_PILOT_REGISTRATION_AUDIT.json
 ko-redteam-validate-pilot-registration "$PILOT_REGISTRATION" \
   --review "$PRACTICE_REVIEW"
 ko-redteam-build-power-pilot private/reference/ranking_manifest.json \
