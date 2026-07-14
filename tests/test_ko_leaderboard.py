@@ -32,6 +32,54 @@ def _write_json(path: Path, value: dict) -> None:
     path.write_text(json.dumps(value, ensure_ascii=False, indent=1), "utf-8")
 
 
+def _practice_review_evidence(assignment_count: int) -> dict:
+    return {
+        "schema": "ko-redteam.practice-review-evidence.v1",
+        "review_plan_sha256": "1" * 64,
+        "review_plan_file_sha256": "2" * 64,
+        "review_workflow_sha256": "0" * 64,
+        "planned_at": "2026-05-14T22:00:00+09:00",
+        "minimum_distinct_reviewers_per_group": 2,
+        "review_plan_schema": "ko-redteam.practice-review-plan.v1",
+        "review_packet_schema": "ko-redteam.practice-review-packet.v1",
+        "review_response_schema": "ko-redteam.practice-review-response.v1",
+        "reviewer_attestation_schema": (
+            "ko-redteam.practice-reviewer-attestation.v1"
+        ),
+        "assignment_count": assignment_count,
+        "reviewer_responses": [
+            {
+                "reviewer_id": "reviewer-a",
+                "assignment_count": assignment_count,
+                "packet_sha256": "3" * 64,
+                "response_sha256": "4" * 64,
+                "attestation_sha256": "5" * 64,
+                "identity_record_sha256": "a" * 64,
+                "affiliation_record_sha256": "b" * 64,
+                "signed_statement_sha256": "c" * 64,
+                "completed_at": "2026-05-14T23:30:00+09:00",
+            },
+            {
+                "reviewer_id": "reviewer-b",
+                "assignment_count": assignment_count,
+                "packet_sha256": "6" * 64,
+                "response_sha256": "7" * 64,
+                "attestation_sha256": "8" * 64,
+                "identity_record_sha256": "d" * 64,
+                "affiliation_record_sha256": "e" * 64,
+                "signed_statement_sha256": "f" * 64,
+                "completed_at": "2026-05-15T00:00:00+09:00",
+            },
+        ],
+        "all_assigned_decisions_accept": True,
+        "all_reviewers_attested_no_disqualifying_conflict": True,
+        "private_evidence_files_verified": True,
+        "reviewer_decisions_hidden_during_review": True,
+        "response_notes_published": False,
+        "merge_code_sha256": "9" * 64,
+    }
+
+
 def _context(
     model: str,
     run: int,
@@ -603,6 +651,14 @@ def _valid_release(
         "agent_harness:agent_rag:no_tool": 20,
         "agent_harness:agent_rag:allow": 20,
     }
+    practice_suite_counts = {
+        suite: sum(
+            count
+            for stratum, count in practice_target_counts.items()
+            if stratum.startswith(f"{suite}:")
+        )
+        for suite in R.SUITES
+    }
     pilot_difference = math.sqrt(60.8)
     pilot_clusters = [
         {
@@ -642,8 +698,14 @@ def _valid_release(
             "conflicts_resolved": True,
             "reviewer_ids": ["reviewer-a", "reviewer-b"],
         },
+        "evidence": _practice_review_evidence(sum(practice_target_counts.values())),
         "benchmarks": {
-            suite: {"content_sha256": fingerprint}
+            suite: {
+                "path": f"benchmarks/{suite}.json",
+                "sha256": fingerprint,
+                "content_sha256": fingerprint,
+                "cases": practice_suite_counts[suite],
+            }
             for suite, fingerprint in suite_fingerprints.items()
         },
         "target_strata": practice_target_counts,
@@ -731,6 +793,7 @@ def _valid_release(
                     "path": f"benchmarks/{suite}.json",
                     "sha256": fingerprint,
                     "content_sha256": fingerprint,
+                    "cases": practice_suite_counts[suite],
                 }
                 for suite, fingerprint in suite_fingerprints.items()
             },
@@ -1321,9 +1384,21 @@ def test_v4_power_pilot_accepts_frozen_pilot_registration_before_season(tmp_path
         )
         for stratum in historical_input["target_strata"]
     }
+    practice_suite_counts = {
+        suite: sum(
+            count
+            for stratum, count in practice_counts.items()
+            if stratum.startswith(f"{suite}:")
+        )
+        for suite in R.OFFICIAL_SUITES
+    }
     fingerprints = preregistration["statistics"]["power_pilot"][
         "practice_benchmark_fingerprints"
     ]
+    file_digests = {
+        suite: str(index) * 64
+        for index, suite in enumerate(R.OFFICIAL_SUITES, 5)
+    }
     review = {
         "schema": PR.PRACTICE_REVIEW_SCHEMA,
         "status": PR.REVIEW_PASSED_STATUS,
@@ -1335,8 +1410,14 @@ def test_v4_power_pilot_accepts_frozen_pilot_registration_before_season(tmp_path
             "conflicts_resolved": True,
             "reviewer_ids": ["reviewer-a", "reviewer-b"],
         },
+        "evidence": _practice_review_evidence(sum(practice_counts.values())),
         "benchmarks": {
-            suite: {"content_sha256": fingerprint}
+            suite: {
+                "path": f"benchmarks/{suite}.json",
+                "sha256": file_digests[suite],
+                "content_sha256": fingerprint,
+                "cases": practice_suite_counts[suite],
+            }
             for suite, fingerprint in fingerprints.items()
         },
         "target_strata": practice_counts,
@@ -1388,10 +1469,11 @@ def test_v4_power_pilot_accepts_frozen_pilot_registration_before_season(tmp_path
             "benchmark_artifacts": {
                 suite: {
                     "path": f"benchmarks/{suite}.json",
-                    "sha256": str(index) * 64,
+                    "sha256": file_digests[suite],
                     "content_sha256": fingerprints[suite],
+                    "cases": practice_suite_counts[suite],
                 }
-                for index, suite in enumerate(R.OFFICIAL_SUITES, 5)
+                for suite in R.OFFICIAL_SUITES
             },
             "review_artifact": {
                 "schema": PR.PRACTICE_REVIEW_SCHEMA,

@@ -158,7 +158,7 @@ adherence, benign utility를 공개한다. 모델 크기나 일반 능력과 보
 - `lower_anchor`: 판정기가 취약한 동작을 실제로 구분하는지 확인하는 기준점
 
 두 anchor의 선정 이유, 공개 practice fingerprint, 실행 설정, 최소 검출 효과, alpha 0.05 이하, power 0.80
-이상과 분석 방법은 reference 출력을 보기 전에 `power-pilot-registration.v1`으로 공개 등록한다. practice의
+이상과 분석 방법은 reference 출력을 보기 전에 `power-pilot-registration.v2`로 공개 등록한다. practice의
 각 target case는 reference 출력에 blind한 검토자 2명 이상이 승인해야 하며, machine-assisted draft 사용을
 숨기지 않는다. calibration set에서 두 anchor가 95% 이상 분리되지 않으면 official 평가를 시작하지 않는다.
 실제 독립 원형 수가
@@ -208,7 +208,7 @@ appeal 기록과 외부 attestation은 공통 정책 문서만으로 대체할 �
 공식 bundle은 `ko-redteam.leaderboard-release.v2` manifest와 다음 hashed JSON artifact를 포함한다.
 
 - `pilot_registration`: reference 실행 전에 동결한 practice, anchor, 실행 설정과 power 분석 계약
-- `practice_review`: reference 출력에 blind한 2인 이상 사례별 practice 승인 기록
+- `practice_review`: reference 출력에 blind한 2인 이상 사례별 `practice-review.v2` 승인과 packet·response·attestation commitment
 - `preregistration`: power 통과 뒤 official prompt 작성 전에 동결한 model cohort, split 배분과 통계 기준
 - `ranking_manifest`: 각 run의 네 suite report와 `core`·`mini_single` execution evidence path 및 SHA-256
 - `ranking_report`: 10,000회 이상 bootstrap·null randomization 및 Holm 보정 결과

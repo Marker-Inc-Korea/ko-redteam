@@ -10,7 +10,7 @@
   "reference_model_outputs_used": false,
   "human_review_required": true,
   "generator_path": "probes/build_successor_pilot_drafts.py",
-  "generator_sha256": "310af092f52a891de9e7cf89c689ef35e72cc867e3a798a17148a72fde8adc75",
+  "generator_sha256": "43e752a1bb125d51821fef0f512243d99bdf7066bb96da5664d095ef71c1a22c",
   "source_benchmark_path": "benchmarks/ko_llm_agent_harness_v2.json",
   "historical_source_overwritten": false
  },

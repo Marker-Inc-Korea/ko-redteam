@@ -6,15 +6,18 @@ placeholder이며 공식 기준을 충족하지 않는다. 입력 파일에는 r
 
 ## Public Power-Pilot Registration
 
-`ko-redteam.power-pilot-registration.v1`은 reference 출력 관측 전에 공개한다. 정확한 upper/lower revision,
+`ko-redteam.power-pilot-registration.v2`는 reference 출력 관측 전에 공개한다. 정확한 upper/lower revision,
 네 practice benchmark의 파일·content SHA-256, 7개 target stratum의 최소 20개 독립 group, generation settings,
 execution evidence, MDE, alpha, target power, 분산 상한과 다중비교 분석 코드 SHA-256을 포함한다.
 공식 모델 쌍 검정은 `balanced` score 차이에 대한 suite-qualified independence-group 단위의 양측 sign-flip
 randomization으로 고정하며, Monte Carlo를 사용할 때 최소 10,000회와 plus-one 보정을 등록한다. bootstrap은
 신뢰구간과 방향 확률에만 사용하고 영가설 p-value로 재사용하지 않는다.
 
-`ko-redteam.practice-review.v1`은 각 target `independence_group`, stratum, `accept` 결정과 두 명 이상의 reviewer
-ID를 기록한다.
+`ko-redteam.practice-review.v2`는 각 target `independence_group`, stratum, `accept` 결정과 두 명 이상의 reviewer
+ID를 기록한다. `practice-review-plan.v1`과 검수 workflow의 digest, reviewer별 packet·response·신원·소속·서명 attestation
+SHA-256, 독립성·blindness 진술, 실제 배정 수가 함께 결합되지 않으면 pilot registration에서 거부한다. 개별
+response와 notes 및 신원 문서는 비공개 workspace에 두고, 병합기가 실제 파일의 존재·비어 있지 않음·digest를
+검증한 뒤 최종 artifact에는 commitment만 공개한다.
 검토자는 reference 출력에 blind해야 하며 machine-assisted draft 사용을 명시해야 한다. registration은 이 review의
 canonical SHA-256을 결합한다. 둘 중 하나가 누락·변조되거나 review가 등록 이후에 완료됐으면 power 입력을 만들 수
 없다.

@@ -1,6 +1,7 @@
 """Validate pre-execution registration and review evidence for power pilots."""
 from __future__ import annotations
 
+from collections import Counter
 from datetime import datetime
 import math
 import re
@@ -12,6 +13,17 @@ try:
         OFFICIAL_VARIANCE_CONFIDENCE_LEVEL,
     )
     import ko_model_ranking as ranking
+    from ko_practice_review import (
+        ATTESTATION_SCHEMA,
+        FINAL_REVIEW_SCHEMA,
+        MAX_REVIEWERS,
+        MIN_REVIEWERS_PER_GROUP,
+        PACKET_SCHEMA,
+        PLAN_SCHEMA,
+        RESPONSE_SCHEMA,
+        REVIEW_EVIDENCE_SCHEMA,
+        REVIEWER_ID_RE,
+    )
     from ko_run_context import canonical_sha256
 except ModuleNotFoundError:  # package import path
     from .ko_familywise_power import (
@@ -19,11 +31,24 @@ except ModuleNotFoundError:  # package import path
         OFFICIAL_VARIANCE_CONFIDENCE_LEVEL,
     )
     from . import ko_model_ranking as ranking
+    from .ko_practice_review import (
+        ATTESTATION_SCHEMA,
+        FINAL_REVIEW_SCHEMA,
+        MAX_REVIEWERS,
+        MIN_REVIEWERS_PER_GROUP,
+        PACKET_SCHEMA,
+        PLAN_SCHEMA,
+        RESPONSE_SCHEMA,
+        REVIEW_EVIDENCE_SCHEMA,
+        REVIEWER_ID_RE,
+    )
     from .ko_run_context import canonical_sha256
 
 
-PILOT_REGISTRATION_SCHEMA = "ko-redteam.power-pilot-registration.v1"
-PRACTICE_REVIEW_SCHEMA = "ko-redteam.practice-review.v1"
+PILOT_REGISTRATION_V1_SCHEMA = "ko-redteam.power-pilot-registration.v1"
+PILOT_REGISTRATION_SCHEMA = "ko-redteam.power-pilot-registration.v2"
+PRACTICE_REVIEW_V1_SCHEMA = "ko-redteam.practice-review.v1"
+PRACTICE_REVIEW_SCHEMA = FINAL_REVIEW_SCHEMA
 PILOT_REGISTRATION_AUDIT_SCHEMA = "ko-redteam.power-pilot-registration-audit.v1"
 FROZEN_STATUS = "frozen_pre_execution"
 REVIEW_PASSED_STATUS = "passed"
@@ -240,6 +265,7 @@ def _practice_design(
             value.get("content_sha256"),
             f"practice benchmark artifact {suite}.content_sha256",
         )
+        _positive_int(value.get("cases"), f"practice benchmark artifact {suite}.cases")
 
     if practice.get("ranking_manifest_schema") != ranking.RANKING_MANIFEST_SCHEMA:
         raise ValueError("current practice pilot requires ranking manifest v5")
@@ -383,7 +409,7 @@ def _review(
     raw_reviewer_ids = metadata.get("reviewer_ids")
     if (
         not isinstance(raw_reviewer_ids, list)
-        or len(raw_reviewer_ids) < 2
+        or not MIN_REVIEWERS_PER_GROUP <= len(raw_reviewer_ids) <= MAX_REVIEWERS
         or not all(
             isinstance(value, str) and value.strip()
             for value in raw_reviewer_ids
@@ -391,22 +417,114 @@ def _review(
     ):
         raise ValueError("practice review requires at least two distinct reviewers")
     reviewer_ids = [value.strip() for value in raw_reviewer_ids]
-    if len(set(reviewer_ids)) != len(reviewer_ids):
+    if (
+        len(set(reviewer_ids)) != len(reviewer_ids)
+        or reviewer_ids != sorted(reviewer_ids)
+        or any(not REVIEWER_ID_RE.fullmatch(value) for value in reviewer_ids)
+    ):
         raise ValueError("practice review requires at least two distinct reviewers")
     known_reviewers = set(reviewer_ids)
+
+    evidence = _object(review.get("evidence"), "practice review evidence")
+    if evidence.get("schema") != REVIEW_EVIDENCE_SCHEMA:
+        raise ValueError(
+            f"practice review evidence schema must be {REVIEW_EVIDENCE_SCHEMA}"
+        )
+    for key in (
+        "review_plan_sha256",
+        "review_plan_file_sha256",
+        "review_workflow_sha256",
+        "merge_code_sha256",
+    ):
+        _sha256(evidence.get(key), f"practice review evidence {key}")
+    planned_at = _timestamp(
+        evidence.get("planned_at"), "practice review evidence planned_at"
+    )
+    if planned_at > completed_at:
+        raise ValueError("practice review plan must precede completed review")
+    if (
+        evidence.get("minimum_distinct_reviewers_per_group")
+        != MIN_REVIEWERS_PER_GROUP
+        or evidence.get("review_plan_schema") != PLAN_SCHEMA
+        or evidence.get("review_packet_schema") != PACKET_SCHEMA
+        or evidence.get("review_response_schema") != RESPONSE_SCHEMA
+        or evidence.get("reviewer_attestation_schema") != ATTESTATION_SCHEMA
+        or evidence.get("all_assigned_decisions_accept") is not True
+        or evidence.get("all_reviewers_attested_no_disqualifying_conflict") is not True
+        or evidence.get("private_evidence_files_verified") is not True
+        or evidence.get("reviewer_decisions_hidden_during_review") is not True
+        or evidence.get("response_notes_published") is not False
+    ):
+        raise ValueError("practice review evidence does not prove blind independent approval")
+    assignment_count = _positive_int(
+        evidence.get("assignment_count"),
+        "practice review evidence assignment_count",
+    )
+    response_rows = evidence.get("reviewer_responses")
+    if not isinstance(response_rows, list) or len(response_rows) != len(reviewer_ids):
+        raise ValueError("practice review evidence must bind every reviewer response")
+    response_assignment_counts: dict[str, int] = {}
+    response_commitments: dict[str, set[str]] = {
+        "packet_sha256": set(),
+        "response_sha256": set(),
+        "attestation_sha256": set(),
+        "identity_record_sha256": set(),
+        "signed_statement_sha256": set(),
+    }
+    response_completion_times = []
+    for index, value in enumerate(response_rows):
+        row = _object(value, f"practice review response evidence {index}")
+        reviewer_id = _string(
+            row.get("reviewer_id"),
+            f"practice review response evidence {index}.reviewer_id",
+        )
+        if reviewer_id not in known_reviewers or reviewer_id in response_assignment_counts:
+            raise ValueError("practice review response reviewer IDs must match metadata")
+        response_assignment_counts[reviewer_id] = _positive_int(
+            row.get("assignment_count"),
+            f"practice review response evidence {index}.assignment_count",
+        )
+        response_completed_at = _timestamp(
+            row.get("completed_at"),
+            f"practice review response evidence {index}.completed_at",
+        )
+        if not planned_at <= response_completed_at <= completed_at:
+            raise ValueError("practice review response time is outside the review window")
+        response_completion_times.append(response_completed_at)
+        for key, seen_commitments in response_commitments.items():
+            digest = row.get(key)
+            _sha256(
+                digest,
+                f"practice review response evidence {index}.{key}",
+            )
+            if digest in seen_commitments:
+                raise ValueError(f"practice review response {key} must be unique")
+            seen_commitments.add(digest)
+        _sha256(
+            row.get("affiliation_record_sha256"),
+            f"practice review response evidence {index}.affiliation_record_sha256",
+        )
+    if set(response_assignment_counts) != known_reviewers:
+        raise ValueError("practice review evidence must bind every reviewer exactly once")
+    if completed_at != max(response_completion_times):
+        raise ValueError("practice review completion time must match the final response")
 
     review_benchmarks = _object(review.get("benchmarks"), "practice review benchmarks")
     if set(review_benchmarks) != set(benchmark_artifacts):
         raise ValueError("practice review must bind every benchmark suite")
     for suite, artifact in benchmark_artifacts.items():
         row = _object(review_benchmarks[suite], f"practice review benchmark {suite}")
-        if row.get("content_sha256") != artifact.get("content_sha256"):
-            raise ValueError(f"practice review benchmark fingerprint changed: {suite}")
+        if any(
+            row.get(key) != artifact.get(key)
+            for key in ("path", "sha256", "content_sha256", "cases")
+        ):
+            raise ValueError(f"practice review benchmark binding changed: {suite}")
 
     case_reviews = review.get("case_reviews")
     if not isinstance(case_reviews, list):
         raise ValueError("practice review case_reviews must be a list")
     reviewed_counts = {key: 0 for key in practice_counts}
+    observed_reviewer_assignments: Counter[str] = Counter()
     seen: set[tuple[str, str]] = set()
     for index, value in enumerate(case_reviews):
         row = _object(value, f"practice review case_reviews[{index}]")
@@ -441,12 +559,14 @@ def _review(
             )
         row_reviewers = [reviewer_id.strip() for reviewer_id in raw_row_reviewers]
         if (
-            len(set(row_reviewers)) < 2
+            len(row_reviewers) != MIN_REVIEWERS_PER_GROUP
+            or len(set(row_reviewers)) != MIN_REVIEWERS_PER_GROUP
             or not set(row_reviewers) <= known_reviewers
         ):
             raise ValueError(
                 "every frozen pilot case requires two registered reviewers"
             )
+        observed_reviewer_assignments.update(set(row_reviewers))
         reviewed_counts[stratum] += 1
     if reviewed_counts != practice_counts:
         raise ValueError("practice review case coverage must match target_strata exactly")
@@ -454,6 +574,10 @@ def _review(
         raise ValueError("practice review target_strata must match registration")
     if review.get("raw_reference_output_used") is not False:
         raise ValueError("practice review must not use reference-model outputs")
+    if assignment_count != len(case_reviews):
+        raise ValueError("practice review evidence assignment count does not match cases")
+    if response_assignment_counts != dict(observed_reviewer_assignments):
+        raise ValueError("practice review response assignment counts do not match cases")
 
     expected_review_sha256 = registration["practice_design"]["review_artifact"][
         "canonical_sha256"

@@ -23,6 +23,18 @@ CONTENT_DIGESTS = {
     "multiturn": "3" * 64,
     "agent_harness": "4" * 64,
 }
+FILE_DIGESTS = {
+    suite: str(index) * 64
+    for index, suite in enumerate(R.OFFICIAL_SUITES, 5)
+}
+SUITE_CASE_COUNTS = {
+    suite: sum(
+        count
+        for stratum, count in TARGET_COUNTS.items()
+        if stratum.startswith(f"{suite}:")
+    )
+    for suite in R.OFFICIAL_SUITES
+}
 
 
 def _practice_review() -> dict:
@@ -49,8 +61,58 @@ def _practice_review() -> dict:
             "conflicts_resolved": True,
             "reviewer_ids": ["reviewer-a", "reviewer-b"],
         },
+        "evidence": {
+            "schema": "ko-redteam.practice-review-evidence.v1",
+            "review_plan_sha256": "5" * 64,
+            "review_plan_file_sha256": "6" * 64,
+            "review_workflow_sha256": "2" * 64,
+            "planned_at": "2026-07-14T09:00:00+09:00",
+            "minimum_distinct_reviewers_per_group": 2,
+            "review_plan_schema": "ko-redteam.practice-review-plan.v1",
+            "review_packet_schema": "ko-redteam.practice-review-packet.v1",
+            "review_response_schema": "ko-redteam.practice-review-response.v1",
+            "reviewer_attestation_schema": (
+                "ko-redteam.practice-reviewer-attestation.v1"
+            ),
+            "assignment_count": 140,
+            "reviewer_responses": [
+                {
+                    "reviewer_id": "reviewer-a",
+                    "assignment_count": 140,
+                    "packet_sha256": "7" * 64,
+                    "response_sha256": "8" * 64,
+                    "attestation_sha256": "9" * 64,
+                    "identity_record_sha256": "d" * 64,
+                    "affiliation_record_sha256": "1" * 64,
+                    "signed_statement_sha256": "f" * 64,
+                    "completed_at": "2026-07-14T09:50:00+09:00",
+                },
+                {
+                    "reviewer_id": "reviewer-b",
+                    "assignment_count": 140,
+                    "packet_sha256": "a" * 64,
+                    "response_sha256": "b" * 64,
+                    "attestation_sha256": "c" * 64,
+                    "identity_record_sha256": "e" * 64,
+                    "affiliation_record_sha256": "1" * 64,
+                    "signed_statement_sha256": "0" * 64,
+                    "completed_at": "2026-07-14T10:00:00+09:00",
+                },
+            ],
+            "all_assigned_decisions_accept": True,
+            "all_reviewers_attested_no_disqualifying_conflict": True,
+            "private_evidence_files_verified": True,
+            "reviewer_decisions_hidden_during_review": True,
+            "response_notes_published": False,
+            "merge_code_sha256": "d" * 64,
+        },
         "benchmarks": {
-            suite: {"content_sha256": digest}
+            suite: {
+                "path": f"benchmarks/{suite}_pilot.json",
+                "sha256": FILE_DIGESTS[suite],
+                "content_sha256": digest,
+                "cases": SUITE_CASE_COUNTS[suite],
+            }
             for suite, digest in CONTENT_DIGESTS.items()
         },
         "target_strata": TARGET_COUNTS,
@@ -117,10 +179,11 @@ def _registration(review: dict) -> dict:
             "benchmark_artifacts": {
                 suite: {
                     "path": f"benchmarks/{suite}_pilot.json",
-                    "sha256": str(index) * 64,
+                    "sha256": FILE_DIGESTS[suite],
                     "content_sha256": CONTENT_DIGESTS[suite],
+                    "cases": SUITE_CASE_COUNTS[suite],
                 }
-                for index, suite in enumerate(R.OFFICIAL_SUITES, 5)
+                for suite in R.OFFICIAL_SUITES
             },
             "review_artifact": {
                 "schema": P.PRACTICE_REVIEW_SCHEMA,
@@ -220,6 +283,60 @@ def test_frozen_pilot_registration_binds_review_and_pre_execution_design():
                 reviewer_ids=["reviewer-a", " reviewer-a "]
             ),
             "two distinct reviewers",
+        ),
+        (
+            lambda registration, review: review["review"].update(
+                reviewer_ids=["reviewer-b", "reviewer-a"]
+            ),
+            "two distinct reviewers",
+        ),
+        (
+            lambda registration, review: review["evidence"].update(
+                all_assigned_decisions_accept=False
+            ),
+            "blind independent approval",
+        ),
+        (
+            lambda registration, review: review["evidence"].update(
+                private_evidence_files_verified=False
+            ),
+            "blind independent approval",
+        ),
+        (
+            lambda registration, review: review["evidence"][
+                "reviewer_responses"
+            ][1].update(packet_sha256="7" * 64),
+            "packet_sha256 must be unique",
+        ),
+        (
+            lambda registration, review: review["evidence"][
+                "reviewer_responses"
+            ][1].update(identity_record_sha256="d" * 64),
+            "identity_record_sha256 must be unique",
+        ),
+        (
+            lambda registration, review: review["evidence"][
+                "reviewer_responses"
+            ][1].update(affiliation_record_sha256="invalid"),
+            "affiliation_record_sha256",
+        ),
+        (
+            lambda registration, review: review["benchmarks"][
+                "paperbench"
+            ].update(sha256="0" * 64),
+            "benchmark binding",
+        ),
+        (
+            lambda registration, review: review["evidence"][
+                "reviewer_responses"
+            ][0].update(assignment_count=139),
+            "assignment counts",
+        ),
+        (
+            lambda registration, review: review["review"].update(
+                completed_at="2026-07-14T10:10:00+09:00"
+            ),
+            "final response",
         ),
         (
             lambda registration, review: review["case_reviews"].pop(),

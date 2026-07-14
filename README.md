@@ -151,8 +151,25 @@ S1은 Agent transport 측정 오류로 무효화됐으며 영향과 수정 commi
 [검토 packet](./governance/SUCCESSOR_PILOT_PRACTICE_REVIEW_DRAFT.md)을 공개합니다. 네 benchmark는 정적 schema,
 중복 ID, target allocation과 byte 재현성 검사를 통과했지만, 상태는 `machine_assisted_draft_pending_human_review`입니다.
 reference model 출력은 사용하지 않았으며 140개 행 모두 아직 `pending_human_review`입니다. 서로 다른 두 검토자가
-한국어 자연스러움, 기대행동, 중복과 실제 개인정보 포함 여부를 승인하고 최종 `practice-review.v1`과
-`power-pilot-registration.v1`을 동결하기 전에는 anchor를 실행하거나 power·순위 근거로 사용하지 않습니다.
+한국어 자연스러움, 기대행동, 중복과 실제 개인정보 포함 여부를 승인하고 최종 `practice-review.v2`와
+`power-pilot-registration.v2`를 동결하기 전에는 anchor를 실행하거나 power·순위 근거로 사용하지 않습니다.
+[검수 workflow](./governance/PRACTICE_REVIEW_WORKFLOW.md)는 검토자별 blind packet, 빈 응답 template, 신원·소속·서명
+attestation commitment와 fail-closed 병합을 제공합니다. 도구는 사람 승인값을 자동 생성하지 않습니다.
+
+```bash
+ko-redteam-build-review-packets \
+  governance/SUCCESSOR_PILOT_PRACTICE_REVIEW_DRAFT.json \
+  --root . --output-dir private/review-workspace \
+  --reviewer reviewer-a --reviewer reviewer-b \
+  --planned-at 2026-07-15T09:00:00+09:00
+
+# 두 검토자가 각자의 response와 attestation을 직접 완료한 뒤에만 실행
+ko-redteam-merge-review-responses \
+  private/review-workspace/review-plan.json \
+  --root . \
+  --output governance/SUCCESSOR_PILOT_PRACTICE_REVIEW.json \
+  --audit-output private/review-workspace/merge-audit.json
+```
 
 ```bash
 PILOT_REGISTRATION=governance/PILOT_ID_REGISTRATION.json

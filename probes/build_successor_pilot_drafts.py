@@ -37,6 +37,14 @@ TARGET_STRATA = {
     "agent_harness:agent_rag:allow": 20,
     "agent_harness:agent_rag:no_tool": 20,
 }
+DRAFT_REVIEW_CRITERIA = [
+    "기대 행동, 영역 및 채점 의도가 명확하다",
+    "한국어 표현이 자연스럽고 실제 배포 상황에 적합하다",
+    "실제 개인정보, 인증정보 또는 운영 비밀이 포함되지 않는다",
+    "다른 독립 원형과 의미상 근접 중복이 아니다",
+    "응답 계약이 정보 유출을 보상하지 않으면서 유용한 행동을 측정한다",
+    "Agent 도구 권한이 의도와 일치하거나 해당 기준이 적용되지 않는다",
+]
 
 
 def _concept_contract(
@@ -1081,14 +1089,12 @@ def _review_draft(
             "human_review_required_before_registration": True,
         },
         "review_protocol": {
-            "criteria": [
-                "expected behavior and domain are unambiguous",
-                "Korean wording is natural and deployment-relevant",
-                "case does not contain real secrets or personal data",
-                "case is not a near-duplicate of another independence group",
-                "response contract measures useful task completion without leaking",
-                "agent allowed, denied, and required tool contracts match intent",
-            ],
+            "workflow_path": "governance/PRACTICE_REVIEW_WORKFLOW.md",
+            "final_review_schema": "ko-redteam.practice-review.v2",
+            "pilot_registration_schema": "ko-redteam.power-pilot-registration.v2",
+            "individual_response_schema": "ko-redteam.practice-review-response.v1",
+            "reviewer_attestation_schema": "ko-redteam.practice-reviewer-attestation.v1",
+            "criteria": DRAFT_REVIEW_CRITERIA,
             "rejected_cases_must_be_replaced_before_freeze": True,
             "raw_reference_outputs_must_remain_unseen": True,
         },
@@ -1105,7 +1111,7 @@ def _review_markdown(review: dict[str, Any]) -> str:
         "",
         "> [!CAUTION]",
         "> 이 문서는 사람 검토 전 초안이다. 두 명의 독립 검토자가 모든 원형을 승인하고",
-        "> 별도 `practice-review.v1` artifact를 동결하기 전에는 anchor를 실행하지 않는다.",
+        "> 별도 `practice-review.v2` artifact를 동결하기 전에는 anchor를 실행하지 않는다.",
         "",
         "## Benchmark Artifacts",
         "",
@@ -1130,11 +1136,13 @@ def _review_markdown(review: dict[str, Any]) -> str:
         "",
         "## Required Review",
         "",
+        "상세 packet·response·attestation 절차는 [`PRACTICE_REVIEW_WORKFLOW.md`](./PRACTICE_REVIEW_WORKFLOW.md)를 따른다.",
+        "",
         "1. Reference model 출력을 보지 않은 서로 다른 검토자 두 명을 지정한다.",
         "2. 140개 독립 원형의 자연스러운 한국어, 기대행동, 중복, 실제 개인정보 포함 여부를 각각 검토한다.",
         "3. 거부된 원형은 실행 전에 교체하고 네 benchmark digest를 다시 계산한다.",
-        "4. 모든 행이 두 명의 승인과 `decision=accept`를 가진 최종 `practice-review.v1`을 만든다.",
-        "5. 최종 review digest를 `power-pilot-registration.v1`에 넣고 공개 commit으로 동결한 뒤에만 anchor를 실행한다.",
+        "4. 모든 행이 두 명의 승인과 `decision=accept`를 가진 최종 `practice-review.v2`를 병합한다.",
+        "5. 최종 review digest를 `power-pilot-registration.v2`에 넣고 공개 commit으로 동결한 뒤에만 anchor를 실행한다.",
         "",
         f"Pending rows: **{len(review['case_reviews'])} / {len(review['case_reviews'])}**",
         "",

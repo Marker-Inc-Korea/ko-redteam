@@ -6,7 +6,7 @@
 ## Unreleased - Evidence-Eligible Ranking Protocol
 
 - reference 결과로 표본 수를 정해야 하는데 공식 season을 먼저 등록하던 순서 의존성을 제거한다. 공개 practice의
-  사례별 2인 검토와 `power-pilot-registration.v1`을 먼저 동결하고, power 통과 뒤에만
+  사례별 2인 검토와 `power-pilot-registration.v2`를 먼저 동결하고, power 통과 뒤에만
   `season-preregistration.v2`를 등록한다. release v2는 pilot registration과 review artifact를 필수화한다.
 - pilot 등록 전 실행 또는 power 동결 뒤 완료된 실행을 사후 증거로 사용할 수 없도록 anchor run context와
   `core`·`mini_single` execution evidence의 시작·완료 시각을 power source와 release gate에 결합한다.
@@ -38,6 +38,11 @@
 - reference 출력을 보지 않고 7개 target stratum을 각각 20개로 확장한 140그룹의 기계 보조 초안과
   [`SUCCESSOR_PILOT_PRACTICE_REVIEW_DRAFT.json`](./SUCCESSOR_PILOT_PRACTICE_REVIEW_DRAFT.json)을 생성한다.
   모든 행은 `pending_human_review`이며 2인 독립 검토와 pilot 등록 전에는 anchor 실행에 사용할 수 없다.
+- 사람 검수에 reviewer별 blind packet, 전체 중복 비교 catalog, 빈 response·attestation template과 fail-closed
+  병합기를 추가한다. 최종 `practice-review.v2`는 신원·소속·서명 commitment, 독립성·blindness 진술과 실제
+  packet·response SHA-256을 결합한다. 병합기는 비공개 신원·소속·서명 파일의 존재와 digest까지 확인하며
+  누락·변조·reject가 있으면 최종 review를 생성하지 않는다.
+- 새 사람 검수 증거 계약을 과거 `power-pilot-registration.v1` 의미에 덮어쓰지 않고 v2로 승격한다.
 - breaking publication contract를 `leaderboard-release.v2`와 `season-preregistration.v2`로 승격한다. 과거
   S1-S4 `v1` 등록은 수정하지 않으며 신규 v5 pilot이나 공식 release에 재사용할 수 없다.
 

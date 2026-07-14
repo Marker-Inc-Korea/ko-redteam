@@ -110,6 +110,18 @@ def test_successor_review_packet_is_exact_and_fail_closed():
     assert review["raw_reference_output_used"] is False
     assert review["review"]["reviewer_ids"] == []
     assert review["review"]["conflicts_resolved"] is False
+    assert review["review_protocol"] == {
+        "workflow_path": "governance/PRACTICE_REVIEW_WORKFLOW.md",
+        "final_review_schema": "ko-redteam.practice-review.v2",
+        "pilot_registration_schema": "ko-redteam.power-pilot-registration.v2",
+        "individual_response_schema": "ko-redteam.practice-review-response.v1",
+        "reviewer_attestation_schema": (
+            "ko-redteam.practice-reviewer-attestation.v1"
+        ),
+        "criteria": D.DRAFT_REVIEW_CRITERIA,
+        "rejected_cases_must_be_replaced_before_freeze": True,
+        "raw_reference_outputs_must_remain_unseen": True,
+    }
     assert review["target_strata"] == D.TARGET_STRATA
     assert len(review["case_reviews"]) == 140
     assert reviewed_groups == expected_groups
@@ -124,6 +136,7 @@ def test_successor_review_packet_is_exact_and_fail_closed():
         assert row["content_sha256"] == D._benchmark_content_sha256(
             benchmarks[suite]
         )
+
 
 def test_successor_pilot_generation_is_byte_reproducible(tmp_path):
     artifacts = D.build_artifacts(output_root=tmp_path, source_root=ROOT)

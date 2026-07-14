@@ -11,18 +11,23 @@
  },
  "draft_provenance": {
   "generator_path": "probes/build_successor_pilot_drafts.py",
-  "generator_sha256": "310af092f52a891de9e7cf89c689ef35e72cc867e3a798a17148a72fde8adc75",
+  "generator_sha256": "43e752a1bb125d51821fef0f512243d99bdf7066bb96da5664d095ef71c1a22c",
   "reference_model_outputs_used": false,
   "human_review_required_before_registration": true
  },
  "review_protocol": {
+  "workflow_path": "governance/PRACTICE_REVIEW_WORKFLOW.md",
+  "final_review_schema": "ko-redteam.practice-review.v2",
+  "pilot_registration_schema": "ko-redteam.power-pilot-registration.v2",
+  "individual_response_schema": "ko-redteam.practice-review-response.v1",
+  "reviewer_attestation_schema": "ko-redteam.practice-reviewer-attestation.v1",
   "criteria": [
-   "expected behavior and domain are unambiguous",
-   "Korean wording is natural and deployment-relevant",
-   "case does not contain real secrets or personal data",
-   "case is not a near-duplicate of another independence group",
-   "response contract measures useful task completion without leaking",
-   "agent allowed, denied, and required tool contracts match intent"
+   "기대 행동, 영역 및 채점 의도가 명확하다",
+   "한국어 표현이 자연스럽고 실제 배포 상황에 적합하다",
+   "실제 개인정보, 인증정보 또는 운영 비밀이 포함되지 않는다",
+   "다른 독립 원형과 의미상 근접 중복이 아니다",
+   "응답 계약이 정보 유출을 보상하지 않으면서 유용한 행동을 측정한다",
+   "Agent 도구 권한이 의도와 일치하거나 해당 기준이 적용되지 않는다"
   ],
   "rejected_cases_must_be_replaced_before_freeze": true,
   "raw_reference_outputs_must_remain_unseen": true
@@ -30,25 +35,25 @@
  "benchmarks": {
   "paperbench": {
    "path": "benchmarks/ko_llm_paperbench_pilot_v1.json",
-   "sha256": "75f48eba21525255267181482fa8943faa696347ddb420a93669ccfa91c1f07c",
+   "sha256": "e6a87741e7919da302804b5fcf387018a4e8a53b053c85037279aebc7983276a",
    "content_sha256": "421660d749ecea1d6c2c7f6ed514168f731095aefb0aeb210e574314d004074a",
    "cases": 40
   },
   "mini_single": {
    "path": "benchmarks/ko_llm_mini_pilot_v1.json",
-   "sha256": "f6caf6e185c7f06adc24986335f6596ee04744cc0b88584010304b0132796e83",
+   "sha256": "dba80c998e4b1759bac27c3597202366b6aace604d37b2c1352212ca589a8167",
    "content_sha256": "2d9e3ce01475fff7911ebbf191678914320eb8be526adb35a2729e80145cb903",
    "cases": 40
   },
   "multiturn": {
    "path": "benchmarks/ko_llm_multiturn_pilot_v1.json",
-   "sha256": "cda368972db484bc8b045e2b1ce69b728005eebcf4ce8186db42bf372f5f3253",
+   "sha256": "85db743e535310964b1ca5bdba139186cf5ef291d1bed1527f661a98956fb596",
    "content_sha256": "b20c7278f4da742003eeebdd89df52c047e4eade800e6abf7a0ecaa0a2be39c8",
    "cases": 20
   },
   "agent_harness": {
    "path": "benchmarks/ko_llm_agent_harness_pilot_v1.json",
-   "sha256": "2bfcdfca3bf767e3a96e65f893d26863d0bf586172a5af6be61d83e53f539fa8",
+   "sha256": "d25bea03eb4eefdd76a17993339601e9f5f8dc8908979615582ae303746ae5e4",
    "content_sha256": "a6e54ca0782d1612afcefb3ad55bd5e39e9ec900db4fd41b0bc8ddf0d5b013e1",
    "cases": 40
   }

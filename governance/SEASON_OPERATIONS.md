@@ -22,7 +22,7 @@
 1. 공개 practice의 7개 target stratum마다 최소 20개 독립 group을 준비하고 machine-assisted draft 여부를
    공개한다. reference 출력에 blind한 검토자 2명 이상이 각 사례를 승인해야 한다.
 2. protocol commit, benchmark fingerprint, 정확한 upper/lower immutable revision, generation settings,
-   execution evidence 계약, MDE, alpha, target power와 분산·다중비교 방법을 `power-pilot-registration.v1`로
+   execution evidence 계약, MDE, alpha, target power와 분산·다중비교 방법을 `power-pilot-registration.v2`로
    동결한다.
 3. 두 reference model을 실행하고 95% 단측 pilot-variance 상한으로 최대 cohort power를 계산한다. 미달하면
    official season과 split을 만들기 전에 중단한다.
