@@ -88,6 +88,8 @@ def test_package_data_paths_exist():
     assert (ROOT / "governance" / "SEASON_2026Q3_S2_POWER_ANALYSIS.md").exists()
     assert (ROOT / "governance" / "SEASON_2026Q3_S3_POWER_ANALYSIS.json").exists()
     assert (ROOT / "governance" / "SEASON_2026Q3_S3_POWER_ANALYSIS.md").exists()
+    assert (ROOT / "governance" / "PRACTICE_VALIDATION_2026Q3.json").exists()
+    assert (ROOT / "governance" / "PRACTICE_VALIDATION_2026Q3.md").exists()
     assert (ROOT / "gap_analysis" / "_vendor" / "mitigationbypass_substrings.txt").exists()
 
 
@@ -166,3 +168,12 @@ def test_user_facing_docs_keep_external_scanner_references_neutral():
         text = path.read_text("utf-8").lower()
         for term in banned_terms:
             assert term not in text, f"{term!r} should not appear in {path.relative_to(ROOT.parent)}"
+
+
+def test_leaderboard_protocol_uses_current_official_manifest_contract():
+    protocol = (ROOT / "LEADERBOARD_PROTOCOL.md").read_text("utf-8")
+
+    assert "공식 v2" not in protocol
+    assert "v2 manifest만" not in protocol
+    assert "공식 v3 증거" in protocol
+    assert "v3 manifest만" in protocol

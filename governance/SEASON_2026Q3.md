@@ -22,6 +22,7 @@
 | Agent transport | `prompt_json_v1`, endpoint 오류 0건 hard gate |
 | 반복별 실행 증거 | `core`·`mini_single` v3 digest binding 필수 |
 | 공개 power-pilot practice target coverage | suite/domain/expected 7개 stratum, 각 5개 |
+| 7모델 공개 practice 판별력 | 먼 쌍 8/21 분리, 인접 쌍 0/6 분리, 공식 순위 사용 금지 |
 | 비공개 official split 324개 독립 그룹 | 미구성 |
 | 300개 blinded 사람 calibration | 미수집 |
 | BGE-M3 exact·semantic split audit | 미실행 |

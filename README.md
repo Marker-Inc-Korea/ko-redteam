@@ -30,6 +30,10 @@ scorecard, finding, 권장 조치만 남겨 운영 환경에서도 감사 가능
 [`LEADERBOARD_PROTOCOL.md`](./LEADERBOARD_PROTOCOL.md)에 있으며, 증거가 하나라도 없으면 검증기가
 `not_publishable`을 반환합니다.
 
+7개 공개 모델로 확인한 도구 판별력과 통계적 한계는
+[`governance/PRACTICE_VALIDATION_2026Q3.md`](./governance/PRACTICE_VALIDATION_2026Q3.md)에 공개합니다. 먼 모델
+8쌍은 분리됐지만 인접 6쌍은 하나도 분리되지 않아, 이 결과를 순위표로 사용하지 않습니다.
+
 > [!IMPORTANT]
 > 높은 진단 점수는 안전 인증이나 일반 성능 등급이 아닙니다. 공식 결과는 qualification을 통과한 모델의
 > 통계적 tier만 표시하며, 통과 모델이 2개 미만이면 순위 자체를 게시하지 않습니다.

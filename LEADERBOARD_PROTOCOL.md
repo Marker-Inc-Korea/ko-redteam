@@ -101,8 +101,7 @@ commitment만 남긴다. 생성 명령은 `ko-redteam-build-calibration`이다.
 
 공식 실행은 모델별 최소 3회 반복한다. 각 반복은 `paperbench`, `mini_single`, `multiturn`,
 `agent_harness` 네 suite를 모두 실행하고 다음 `ko-redteam.run-context.v1` 정보를 네 report에 동일하게
-결합한다. 공개 v1 연구 manifest는 과거 호환을 위해 agent가 없는 3-suite 분석을 허용하지만 공식 v2에는
-사용할 수 없다.
+결합한다. 공개 v1/v2 연구 manifest는 과거 호환 분석에만 허용하며 공식 v3 증거로 사용할 수 없다.
 
 - 고정 모델 ID와 immutable revision
 - tokenizer revision, license, weights/API access 유형
@@ -223,7 +222,7 @@ analysis는 코드와 입력 commitment, 사전등록 시각, 최소 10,000회 s
 대조하고, `power 사전등록 -> split 감사/동결 ->
 첫 제출 -> 모델 실행 -> 외부 검토 -> release 동결`의 timezone 포함 시각 순서를 확인한다.
 
-공식 power pilot은 사전등록된 upper/lower revision을 같은 네 suite에서 3회 이상 실행한 v2 manifest만 받으며,
+공식 power pilot은 사전등록된 upper/lower revision을 같은 네 suite에서 3회 이상 실행한 v3 manifest만 받으며,
 입력 생성기 코드 자체의 SHA-256도 season 설계와 공개 power source metadata에 결합한다.
 각 frozen suite/domain stratum에 최소 5개 독립 그룹이 없거나 agent suite가 빠지면 input 생성 단계에서
 중단한다. 공개 power report에는 원형 ID 대신 source manifest commitment, stratum별 개수와 target 배분만 남긴다.
