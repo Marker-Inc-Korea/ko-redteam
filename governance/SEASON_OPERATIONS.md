@@ -19,8 +19,8 @@
 
 ## Required Order
 
-1. protocol version, suite×domain 배분, 최소 검출 효과, alpha, target power, generation settings, reference
-   revision과 제출 한도를 공개 사전등록하고 release bundle의 hashed artifact로 지정한다.
+1. protocol version, suite×domain 배분, 최소 검출 효과, alpha, target power, generation settings, execution
+   evidence 계약, reference revision과 제출 한도를 공개 사전등록하고 release bundle의 hashed artifact로 지정한다.
 2. 모델명에 blinded된 held-out 사람 라벨로 evaluator를 calibration하고 기준 미달 시 중단한다.
 3. practice와 official split의 exact·semantic overlap을 감사한다.
 4. official split과 모든 scoring/evaluator 설정을 첫 제출 전에 동결한다.
@@ -33,7 +33,9 @@
 
 프로토콜 검증기는 `power 사전등록 -> split 감사 -> split 동결 -> 첫 제출 -> 실행 -> 외부 검토 -> release
 동결` 시각 순서와 공개 season 사전등록이 power 사전등록보다 늦지 않은지도 확인한다. 현재 후보 설계는
-[`SEASON_2026Q3_S3_PREREGISTRATION.json`](./SEASON_2026Q3_S3_PREREGISTRATION.json)에 있다. S2는
+[`SEASON_2026Q3_S4_PREREGISTRATION.json`](./SEASON_2026Q3_S4_PREREGISTRATION.json)에 있다. S3는
+[`SEASON_2026Q3_S3_STOP.json`](./SEASON_2026Q3_S3_STOP.json)에 기록된 동결 validator 불일치로 official split
+작성 전에 중단됐다. S2는
 [`SEASON_2026Q3_S2_STOP.json`](./SEASON_2026Q3_S2_STOP.json)에 기록된 검정력 미달로 official split 작성 전에
 중단됐고, S1은 [`SEASON_2026Q3_S1_INVALIDATION.json`](./SEASON_2026Q3_S1_INVALIDATION.json)에 기록된 측정
 무결성 사고로 공식 증거 사용이 금지됐다.

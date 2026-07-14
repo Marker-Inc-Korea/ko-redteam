@@ -3,6 +3,18 @@
 프로토콜과 시즌 결과의 변경 이력을 분리해 기록한다. `Unreleased` 항목은 공식 시즌에 적용됐다는 뜻이
 아니며, release bundle에 포함된 동결 commit과 문서 digest가 최종 근거다.
 
+## 2026-07-14 - S3 Protocol Stop And S4 Preregistration
+
+- S3의 영역별 54개 power-derived 설계와 power 0.801은 기준을 충족했지만, 동결 validator는 선언 최소값을
+  protocol floor 30과 같게 요구했다. official split과 공식 제출 전에 S3를 중단했고
+  [`SEASON_2026Q3_S3_STOP.json`](./SEASON_2026Q3_S3_STOP.json)에 원인과 artifact digest를 기록했다.
+- S4는 S3의 324그룹 배분, MDE, alpha, power target, scoring, weight, reference revision과 qualification
+  threshold를 그대로 유지한다. power-derived 최소값을 검증할 수 있는 protocol commit을 새로 동결했다.
+- S4는 반복별 `core`·`mini_single` execution evidence, endpoint smoke, coverage, report doctor, report digest와
+  오류 0건 계약을 preregistration에 정확히 결합한다. 현재 시즌 power pilot은 v3 ranking manifest만 허용한다.
+- S4 power evidence는 Gemma 4 31B와 TinyLlama 1.1B를 동결된 S4 protocol로 다시 실행한 후에만 생성한다.
+  과거 v2 reference manifest는 과거 시즌 재현 외에는 사용할 수 없다.
+
 ## 2026-07-13 - S2 Power Stop And S3 Preregistration
 
 - S2 reference anchor를 동결된 네 suite에서 각 3회 실행했고 endpoint 오류는 0건이었다. 공개 practice 기반

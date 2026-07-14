@@ -14,18 +14,22 @@ REPO = ROOT.parent
 sys.path.insert(0, str(ROOT / "analysis"))
 
 import ko_benchmark_identity as I  # noqa: E402
+import ko_model_ranking as R  # noqa: E402
 import ko_power_pilot as P  # noqa: E402
 
 
 S1_PATH = ROOT / "governance" / "SEASON_2026Q3_PREREGISTRATION.json"
 S2_PATH = ROOT / "governance" / "SEASON_2026Q3_S2_PREREGISTRATION.json"
 S3_PATH = ROOT / "governance" / "SEASON_2026Q3_S3_PREREGISTRATION.json"
+S4_PATH = ROOT / "governance" / "SEASON_2026Q3_S4_PREREGISTRATION.json"
 INCIDENT_PATH = ROOT / "governance" / "SEASON_2026Q3_S1_INVALIDATION.json"
 S2_STOP_PATH = ROOT / "governance" / "SEASON_2026Q3_S2_STOP.json"
+S3_STOP_PATH = ROOT / "governance" / "SEASON_2026Q3_S3_STOP.json"
 S2_POWER_PATH = ROOT / "governance" / "SEASON_2026Q3_S2_POWER_ANALYSIS.json"
 S3_POWER_PATH = ROOT / "governance" / "SEASON_2026Q3_S3_POWER_ANALYSIS.json"
 S1_REGISTRATION_COMMIT = "6de04e588d29fddb2cae5db1d4f481c68883f6f8"
 S2_REGISTRATION_COMMIT = "7d2eef959b8b039162d9bc89e1c77218d33000df"
+S3_REGISTRATION_COMMIT = "46ecc81d88e7437f22ef23a128d05894905d737f"
 S2_POWER_SHA256 = "e01a1570a7ca298d34b17bd4fb743b7b6e1ea16be1588417e83d8aaca509dd11"
 
 
@@ -42,12 +46,14 @@ def _git_blob(commit: str, relative_path: str) -> bytes:
     return result.stdout
 
 
-def test_frozen_seasons_are_preserved_and_s3_supersedes_stopped_s2():
+def test_frozen_seasons_are_preserved_and_s4_supersedes_stopped_s3():
     s1 = _load(S1_PATH)
     s2 = _load(S2_PATH)
     s3 = _load(S3_PATH)
+    s4 = _load(S4_PATH)
     incident = _load(INCIDENT_PATH)
-    stop = _load(S2_STOP_PATH)
+    s2_stop = _load(S2_STOP_PATH)
+    s3_stop = _load(S3_STOP_PATH)
 
     assert S1_PATH.read_bytes() == _git_blob(
         S1_REGISTRATION_COMMIT,
@@ -57,29 +63,46 @@ def test_frozen_seasons_are_preserved_and_s3_supersedes_stopped_s2():
         S2_REGISTRATION_COMMIT,
         "governance/SEASON_2026Q3_S2_PREREGISTRATION.json",
     )
+    assert S3_PATH.read_bytes() == _git_blob(
+        S3_REGISTRATION_COMMIT,
+        "governance/SEASON_2026Q3_S3_PREREGISTRATION.json",
+    )
     assert s1["season"]["id"] == "ko-redteam-2026q3-s1"
     assert s2["season"]["id"] == "ko-redteam-2026q3-s2"
     assert s3["season"]["id"] == "ko-redteam-2026q3-s3"
+    assert s4["season"]["id"] == "ko-redteam-2026q3-s4"
     assert s2["season"]["supersedes"] == s1["season"]["id"]
     assert s2["season"]["predecessor_incident"] == incident["id"]
-    assert stop["affected_season"] == s2["season"]["id"]
-    assert stop["decision"]["successor_season"] == s3["season"]["id"]
+    assert s2_stop["affected_season"] == s2["season"]["id"]
+    assert s2_stop["decision"]["successor_season"] == s3["season"]["id"]
     assert s3["season"]["supersedes"] == s2["season"]["id"]
-    assert s3["season"]["predecessor_decision"] == stop["id"]
+    assert s3["season"]["predecessor_decision"] == s2_stop["id"]
+    assert s3_stop["affected_season"] == s3["season"]["id"]
+    assert s3_stop["decision"]["successor_season"] == s4["season"]["id"]
+    assert s4["season"]["supersedes"] == s3["season"]["id"]
+    assert s4["season"]["predecessor_decision"] == s3_stop["id"]
     assert s2["season"]["release_status"] == "candidate_pre_data"
     assert s3["season"]["release_status"] == "candidate_pre_data"
-    assert s3["execution"]["agent_tool_call_mode"] == "prompt_json_v1"
+    assert s4["season"]["release_status"] == "candidate_pre_data"
+    assert s4["execution"]["agent_tool_call_mode"] == "prompt_json_v1"
+    assert s4["execution"]["execution_evidence"] == R.EXECUTION_EVIDENCE_CONTRACT
     assert datetime.fromisoformat(incident["detected_at"]) < datetime.fromisoformat(
         s2["season"]["registered_at"]
     )
     assert datetime.fromisoformat(s2["season"]["registered_at"]) < datetime.fromisoformat(
-        stop["decided_at"]
+        s2_stop["decided_at"]
     )
-    assert datetime.fromisoformat(stop["decided_at"]) < datetime.fromisoformat(
+    assert datetime.fromisoformat(s2_stop["decided_at"]) < datetime.fromisoformat(
         s3["season"]["registered_at"]
     )
+    assert datetime.fromisoformat(s3["season"]["registered_at"]) < datetime.fromisoformat(
+        s3_stop["decided_at"]
+    )
+    assert datetime.fromisoformat(s3_stop["decided_at"]) < datetime.fromisoformat(
+        s4["season"]["registered_at"]
+    )
 
-    expected = s3["official_split_design"][
+    expected = s4["official_split_design"][
         "suite_domain_expected_independence_groups"
     ]
     assert expected == {
@@ -98,7 +121,7 @@ def test_frozen_seasons_are_preserved_and_s3_supersedes_stopped_s2():
             "agent_rag": {"allow": 27, "no_tool": 27},
         },
     }
-    target_strata, suite_counts = P._target_design(s3)
+    target_strata, suite_counts = P._target_design(s4)
     assert target_strata == {
         "paperbench:privacy:no_leak": 54,
         "paperbench:safety:refuse_or_redirect": 54,
@@ -115,12 +138,13 @@ def test_frozen_seasons_are_preserved_and_s3_supersedes_stopped_s2():
         "agent_harness": 54,
     }
     assert sum(target_strata.values()) == 324
-    assert s3["official_split_design"]["minimum_groups_per_domain"] == 54
+    assert s4["official_split_design"]["minimum_groups_per_domain"] == 54
 
     status_text = (ROOT / "governance" / "SEASON_2026Q3.md").read_text("utf-8")
     assert "not_publishable" in status_text
     assert "S1 candidate execution | `invalidated`" in status_text
     assert "S2 180그룹 candidate design | `stopped_insufficient_power`" in status_text
+    assert "S3 324그룹 candidate protocol | `stopped_validator_inconsistency`" in status_text
 
 
 def test_s2_power_stop_is_hash_bound_and_does_not_relax_thresholds():
@@ -195,6 +219,65 @@ def test_s3_power_evidence_matches_the_frozen_324_group_design():
     assert power["raw_prompt_or_response_used"] is False
 
     public_text = S3_POWER_PATH.read_text("utf-8")
+    assert "/data1/" not in public_text
+    assert "192" + ".168." not in public_text
+
+
+def test_s3_stop_preserves_the_power_derived_s4_design_and_thresholds():
+    s3 = _load(S3_PATH)
+    s4 = _load(S4_PATH)
+    stop = _load(S3_STOP_PATH)
+
+    assert stop["status"] == "closed_by_successor_preregistration"
+    assert stop["reason"] == "frozen_validator_rejects_power_derived_design"
+    assert stop["evidence"]["preregistration"]["sha256"] == hashlib.sha256(
+        S3_PATH.read_bytes()
+    ).hexdigest()
+    assert stop["evidence"]["power_analysis"]["sha256"] == hashlib.sha256(
+        S3_POWER_PATH.read_bytes()
+    ).hexdigest()
+    assert stop["evidence"]["frozen_protocol"][
+        "declared_minimum_required_by_code"
+    ] == 30
+    assert stop["evidence"]["frozen_protocol"][
+        "preregistered_minimum_groups_per_domain"
+    ] == 54
+    assert stop["evidence"]["official_split_constructed"] is False
+    assert stop["evidence"]["official_model_submission_started"] is False
+    assert stop["decision"]["thresholds_relaxed"] is False
+    assert stop["decision"]["scoring_changed"] is False
+    assert stop["decision"]["reference_models_changed"] is False
+    assert stop["decision"]["official_split_allocation_changed"] is False
+    assert stop["decision"]["protocol_code_changed"] is True
+    assert stop["decision"]["s3_results_publishable"] is False
+
+    assert s4["official_split_design"] == s3["official_split_design"]
+    for field in (
+        "estimand",
+        "minimum_detectable_effect",
+        "alpha",
+        "target_power",
+        "bootstrap_iterations",
+        "minimum_pairwise_confidence",
+        "pairwise_test",
+        "multiple_comparison_correction",
+        "weight_profiles",
+    ):
+        assert s4["statistics"][field] == s3["statistics"][field]
+    identity_fields = ("role", "name", "model_id", "revision")
+    assert [
+        {key: model[key] for key in identity_fields}
+        for model in s4["reference_models"]
+    ] == [
+        {key: model[key] for key in identity_fields}
+        for model in s3["reference_models"]
+    ]
+    assert s4["statistics"]["power_pilot"]["ranking_manifest_schema"] == (
+        R.RANKING_MANIFEST_SCHEMA
+    )
+    assert s4["execution"]["execution_evidence"] == R.EXECUTION_EVIDENCE_CONTRACT
+
+    public_text = S3_STOP_PATH.read_text("utf-8") + S4_PATH.read_text("utf-8")
     assert "/data1/" not in public_text
     assert "192" + ".168." not in public_text
 
@@ -274,3 +357,40 @@ def test_s3_code_and_practice_commitments_match_registered_protocol_commit():
         _load(INCIDENT_PATH)["change_control"]["corrective_protocol_commit"]
         == commit
     )
+
+
+def test_s4_code_and_practice_commitments_match_registered_protocol_commit():
+    s4 = _load(S4_PATH)
+    commit = s4["season"]["protocol_git_commit"]
+    statistics = s4["statistics"]
+    code_commitments = {
+        "analysis/ko_model_ranking.py": statistics[
+            "ranking_analysis_code_sha256"
+        ],
+        "analysis/ko_power_evidence.py": statistics[
+            "power_analysis_code_sha256"
+        ],
+        "analysis/ko_power_pilot.py": statistics["power_pilot"][
+            "builder_code_sha256"
+        ],
+        "analysis/ko_split_evidence.py": s4["semantic_overlap"][
+            "split_audit_code_sha256"
+        ],
+        "analysis/ko_calibration.py": s4["calibration"]["builder_code_sha256"],
+        "analysis/ko_leaderboard.py": s4["publication_gate"][
+            "validator_code_sha256"
+        ],
+    }
+    for relative_path, expected_sha256 in code_commitments.items():
+        assert hashlib.sha256(_git_blob(commit, relative_path)).hexdigest() == expected_sha256
+
+    benchmark_paths = {
+        "paperbench": "benchmarks/ko_llm_paperbench_v1.json",
+        "mini_single": "benchmarks/ko_llm_mini_v1.json",
+        "multiturn": "benchmarks/ko_llm_multiturn_v1.json",
+        "agent_harness": "benchmarks/ko_llm_agent_harness_v2.json",
+    }
+    fingerprints = statistics["power_pilot"]["practice_benchmark_fingerprints"]
+    for suite, relative_path in benchmark_paths.items():
+        benchmark = json.loads(_git_blob(commit, relative_path))
+        assert I.benchmark_content_sha256(benchmark) == fingerprints[suite]

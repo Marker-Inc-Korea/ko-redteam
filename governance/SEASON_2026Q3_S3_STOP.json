@@ -1,0 +1,58 @@
+{
+  "schema": "ko-redteam.season-stop.v1",
+  "id": "KO-RT-2026-003",
+  "status": "closed_by_successor_preregistration",
+  "decided_at": "2026-07-14T10:03:50+09:00",
+  "affected_season": "ko-redteam-2026q3-s3",
+  "reason": "frozen_validator_rejects_power_derived_design",
+  "summary": "The frozen S3 validator required the declared per-domain minimum to equal the protocol floor of 30 even though the preregistered power-derived matrix requires 54 groups per domain. The inconsistency was found before official split construction or model submission.",
+  "evidence": {
+    "preregistration": {
+      "path": "SEASON_2026Q3_S3_PREREGISTRATION.json",
+      "sha256": "89785224f950f6239751f7288044e6759cbf2b65d68ec8b9238f6efc8f7bcfa1"
+    },
+    "power_analysis": {
+      "path": "SEASON_2026Q3_S3_POWER_ANALYSIS.json",
+      "sha256": "3b6ecd389b76d54e9525b78b23de5285bd00255cbce7d6bbbbb972b7b6740fb3",
+      "target_power": 0.8,
+      "achieved_power": 0.801,
+      "minimum_detectable_effect": 5.0,
+      "planned_independence_groups": 324
+    },
+    "frozen_protocol": {
+      "git_commit": "b7e7a757acb8f5a8d2413f851f9155a0ed428b5b",
+      "validator_path": "analysis/ko_leaderboard.py",
+      "validator_sha256": "9389574873f8f100dc3f6d3371ac7a009db65058adf4933bfcf63c081ba1c10b",
+      "declared_minimum_required_by_code": 30,
+      "preregistered_minimum_groups_per_domain": 54
+    },
+    "successor_protocol": {
+      "git_commit": "dfef7c5455b28fd41f8bf2f5e9750711f2964fd0",
+      "validator_sha256": "42e94637b9ea21b6360f6a065ce418538b99e9f1cab6cc793120c3e10176c3a8",
+      "ranking_analysis_sha256": "96154bd0ad56d8aacf5c64b3e68366ba71592bbc28fd53d816011caa69ba867d",
+      "power_pilot_builder_sha256": "f15b81c5c071e4ac1879809949006adc8f15e7d0b4839c9910262829e4556c13"
+    },
+    "official_split_constructed": false,
+    "official_model_submission_started": false,
+    "official_release_published": false,
+    "raw_prompt_or_response_included": false
+  },
+  "decision": {
+    "action": "stop_before_official_split_and_preregister_s4",
+    "thresholds_relaxed": false,
+    "scoring_changed": false,
+    "reference_models_changed": false,
+    "official_split_allocation_changed": false,
+    "protocol_code_changed": true,
+    "s3_preregistration_preserved": true,
+    "s3_results_publishable": false,
+    "successor_season": "ko-redteam-2026q3-s4",
+    "successor_independence_groups": 324
+  },
+  "impact": {
+    "invalidated_scope": "S3 as an executable candidate official leaderboard protocol.",
+    "retained_evidence": "The aggregate-only S3 power result remains the disclosed sample-size basis for the unchanged S4 allocation, but S3 cannot produce an official ranking.",
+    "research_preview_status": "Public-practice diagnostics remain non-official and cannot satisfy S4 publication gates."
+  },
+  "independent_reinspection": "pending"
+}

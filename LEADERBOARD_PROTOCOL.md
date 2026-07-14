@@ -176,8 +176,8 @@ appeal 기록과 외부 attestation은 공통 정책 문서만으로 대체할 �
 
 공식 bundle은 `ko-redteam.leaderboard-release.v1` manifest와 다음 hashed JSON artifact를 포함한다.
 
-- `preregistration`: prompt 작성 전에 공개 동결한 split 배분, 실행·통계 기준, reference revision
-- `ranking_manifest`: 각 run의 네 suite report path와 SHA-256
+- `preregistration`: prompt 작성 전에 공개 동결한 split 배분, 실행·증거·통계 기준, reference revision
+- `ranking_manifest`: 각 run의 네 suite report와 `core`·`mini_single` execution evidence path 및 SHA-256
 - `ranking_report`: 10,000회 이상 bootstrap 및 Holm 보정 결과
 - `calibration_report`: 사람 라벨 및 판정기 성능
 - `split_audit`: practice/official 중복, 비공개 상태, 영역별 독립 원형 수
@@ -198,9 +198,9 @@ ko-redteam-validate-leaderboard release_manifest.json \
 ko-redteam-build-calibration private/calibration_labels.json \
   --output release/calibration_report.json
 ko-redteam-build-power-pilot private/reference/ranking_manifest.json \
-  --preregistration governance/SEASON_2026Q3_S3_PREREGISTRATION.json \
+  --preregistration governance/SEASON_2026Q3_S4_PREREGISTRATION.json \
   --preregistered-at "$(jq -r '.season.registered_at' \
-    governance/SEASON_2026Q3_S3_PREREGISTRATION.json)" \
+    governance/SEASON_2026Q3_S4_PREREGISTRATION.json)" \
   --output private/power_input.json
 ko-redteam-analyze-power private/power_input.json \
   --output release/power_analysis.json
@@ -209,9 +209,9 @@ ko-redteam-audit-splits --help
 
 비공개 입력 구조는 [`governance/EVIDENCE_INPUTS.md`](./governance/EVIDENCE_INPUTS.md)에 정의한다. 생성된
 JSON이 존재하는 것만으로 충분하지 않으며, release manifest가 각 상대경로와 SHA-256을 결합해야 한다.
-사전등록 artifact의 season, protocol commit, suite×domain×expected 그룹 행렬, generation settings, MDE, weight,
-reference model revision, semantic 감사 설정과 calibration 기준은 실제 artifact 및 run provenance와 정확히
-일치해야 한다. 사후 수정은 기존 season을 무효화하고 새 season ID로 다시 등록한다.
+사전등록 artifact의 season, protocol commit, suite×domain×expected 그룹 행렬, generation settings, execution
+evidence 계약, MDE, weight, reference model revision, semantic 감사 설정과 calibration 기준은 실제 artifact 및
+run provenance와 정확히 일치해야 한다. 사후 수정은 기존 season을 무효화하고 새 season ID로 다시 등록한다.
 
 종료 코드 `0`과 `status=publishable`이 함께 확인되어야 하며 audit은 사전등록과 일치하는 validator 코드
 SHA-256을 기록한다. 파일이 존재한다는 사실, self-report된 점수,
