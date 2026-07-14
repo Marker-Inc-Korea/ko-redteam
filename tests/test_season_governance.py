@@ -14,6 +14,7 @@ REPO = ROOT.parent
 sys.path.insert(0, str(ROOT / "analysis"))
 
 import ko_benchmark_identity as I  # noqa: E402
+import ko_familywise_power as F  # noqa: E402
 import ko_model_ranking as R  # noqa: E402
 import ko_power_pilot as P  # noqa: E402
 
@@ -25,12 +26,21 @@ S4_PATH = ROOT / "governance" / "SEASON_2026Q3_S4_PREREGISTRATION.json"
 INCIDENT_PATH = ROOT / "governance" / "SEASON_2026Q3_S1_INVALIDATION.json"
 S2_STOP_PATH = ROOT / "governance" / "SEASON_2026Q3_S2_STOP.json"
 S3_STOP_PATH = ROOT / "governance" / "SEASON_2026Q3_S3_STOP.json"
+S4_STOP_PATH = ROOT / "governance" / "SEASON_2026Q3_S4_STOP.json"
 S2_POWER_PATH = ROOT / "governance" / "SEASON_2026Q3_S2_POWER_ANALYSIS.json"
 S3_POWER_PATH = ROOT / "governance" / "SEASON_2026Q3_S3_POWER_ANALYSIS.json"
+S4_POWER_PATH = ROOT / "governance" / "SEASON_2026Q3_S4_POWER_ANALYSIS.json"
+S4_FAMILYWISE_PATH = (
+    ROOT / "governance" / "SEASON_2026Q3_S4_FAMILYWISE_POWER_AUDIT.json"
+)
 S1_REGISTRATION_COMMIT = "6de04e588d29fddb2cae5db1d4f481c68883f6f8"
 S2_REGISTRATION_COMMIT = "7d2eef959b8b039162d9bc89e1c77218d33000df"
 S3_REGISTRATION_COMMIT = "46ecc81d88e7437f22ef23a128d05894905d737f"
+S4_REGISTRATION_COMMIT = "0742bdd37b16fde426cb35b9d6053d1996a39be2"
 S2_POWER_SHA256 = "e01a1570a7ca298d34b17bd4fb743b7b6e1ea16be1588417e83d8aaca509dd11"
+S4_POWER_SHA256 = "7721fa0f33c4c5d41e136df16d53993ea0ecc9767a5b4c7b085f11f43aa8486e"
+S4_FAMILYWISE_SHA256 = "8eb3b380a2f0a222f769191817c83302824b94aa7ea7f9647c46190c89be4211"
+S4_STOP_SHA256 = "8c2610f43eaf8f7859bdd09673b0ba977f01ea0c22264e8451300241060d7e59"
 
 
 def _load(path: Path) -> dict:
@@ -66,6 +76,10 @@ def test_frozen_seasons_are_preserved_and_s4_supersedes_stopped_s3():
     assert S3_PATH.read_bytes() == _git_blob(
         S3_REGISTRATION_COMMIT,
         "governance/SEASON_2026Q3_S3_PREREGISTRATION.json",
+    )
+    assert S4_PATH.read_bytes() == _git_blob(
+        S4_REGISTRATION_COMMIT,
+        "governance/SEASON_2026Q3_S4_PREREGISTRATION.json",
     )
     assert s1["season"]["id"] == "ko-redteam-2026q3-s1"
     assert s2["season"]["id"] == "ko-redteam-2026q3-s2"
@@ -219,6 +233,106 @@ def test_s3_power_evidence_matches_the_frozen_324_group_design():
     assert power["raw_prompt_or_response_used"] is False
 
     public_text = S3_POWER_PATH.read_text("utf-8")
+    assert "/data1/" not in public_text
+    assert "192" + ".168." not in public_text
+
+
+def test_s4_power_evidence_uses_the_frozen_v3_execution_contract():
+    s4 = _load(S4_PATH)
+    power = _load(S4_POWER_PATH)
+    target_strata, _ = P._target_design(s4)
+    source = power["pilot_summary"]["source"]
+
+    assert hashlib.sha256(S4_POWER_PATH.read_bytes()).hexdigest() == S4_POWER_SHA256
+    assert power["target_power"] == s4["statistics"]["target_power"] == 0.8
+    assert power["minimum_detectable_effect"] == 5.0
+    assert power["actual_independence_groups"] == 324
+    assert power["required_independence_groups"] == 324
+    assert power["achieved_power"] == 0.8002
+    assert power["achieved_power"] >= power["target_power"]
+    assert power["simulation_iterations"] == 10000
+    assert power["preregistered_at"] == s4["season"]["registered_at"]
+    assert power["analysis_code_sha256"] == s4["statistics"][
+        "power_analysis_code_sha256"
+    ]
+    assert power["pilot_summary"]["target_strata"] == target_strata
+    assert power["pilot_summary"]["pilot_stratum_counts"] == {
+        key: 5 for key in target_strata
+    }
+    assert source["ranking_manifest_schema"] == R.RANKING_MANIFEST_SCHEMA
+    assert source["evaluator_git_commit"] == s4["season"]["protocol_git_commit"]
+    assert source["builder_code_sha256"] == s4["statistics"]["power_pilot"][
+        "builder_code_sha256"
+    ]
+    assert source["minimum_repeats"] == source["upper_runs"] == source[
+        "lower_runs"
+    ] == 3
+    assert source["upper_revision"] == s4["reference_models"][0]["revision"]
+    assert source["lower_revision"] == s4["reference_models"][1]["revision"]
+    assert source["benchmark_fingerprints"] == s4["statistics"]["power_pilot"][
+        "practice_benchmark_fingerprints"
+    ]
+    assert power["raw_prompt_or_response_used"] is False
+
+    public_text = S4_POWER_PATH.read_text("utf-8")
+    assert "/data1/" not in public_text
+    assert "192" + ".168." not in public_text
+
+
+def test_s4_multiplicity_audit_stops_the_official_design_before_data():
+    s4 = _load(S4_PATH)
+    audit = _load(S4_FAMILYWISE_PATH)
+    stop = _load(S4_STOP_PATH)
+
+    assert hashlib.sha256(S4_FAMILYWISE_PATH.read_bytes()).hexdigest() == (
+        S4_FAMILYWISE_SHA256
+    )
+    assert hashlib.sha256(S4_STOP_PATH.read_bytes()).hexdigest() == S4_STOP_SHA256
+    assert audit["status"] == "marginal_pass_official_ranking_power_fail"
+    assert audit["source"]["power_analysis_sha256"] == hashlib.sha256(
+        S4_POWER_PATH.read_bytes()
+    ).hexdigest()
+    assert audit["method"]["analysis_code_sha256"] == hashlib.sha256(
+        Path(F.__file__).read_bytes()
+    ).hexdigest()
+    assert audit["minimum_publication_cohort"]["model_count"] == 2
+    assert audit["minimum_publication_cohort"][
+        "required_independence_groups_per_comparison"
+    ] == 432
+    maximum = audit["maximum_season_cohort"]
+    assert maximum["model_count"] == 7
+    assert maximum["comparison_family_size"] == 63
+    assert maximum["actual_independence_groups"] == 324
+    assert maximum["required_independence_groups_per_comparison"] == 727
+    assert maximum["required_independence_groups_simultaneous"] == 1527
+    assert audit["decision"]["official_complete_ranking_design_supported"] is False
+
+    assert stop["id"] == "KO-RT-2026-004"
+    assert stop["affected_season"] == s4["season"]["id"]
+    assert stop["reason"] == (
+        "preregistered_power_scope_excludes_multiple_comparison_family"
+    )
+    assert stop["evidence"]["preregistration"]["sha256"] == hashlib.sha256(
+        S4_PATH.read_bytes()
+    ).hexdigest()
+    assert stop["evidence"]["marginal_power_analysis"]["sha256"] == (
+        S4_POWER_SHA256
+    )
+    assert stop["evidence"]["multiplicity_power_audit"]["sha256"] == (
+        S4_FAMILYWISE_SHA256
+    )
+    assert stop["evidence"]["official_split_constructed"] is False
+    assert stop["evidence"]["human_calibration_started"] is False
+    assert stop["evidence"]["official_model_submission_started"] is False
+    assert stop["evidence"]["official_release_published"] is False
+    assert stop["decision"]["thresholds_relaxed"] is False
+    assert stop["decision"]["scoring_changed"] is False
+    assert stop["decision"]["s4_results_publishable"] is False
+    assert stop["decision"]["successor_required"] is True
+
+    public_text = S4_FAMILYWISE_PATH.read_text("utf-8") + S4_STOP_PATH.read_text(
+        "utf-8"
+    )
     assert "/data1/" not in public_text
     assert "192" + ".168." not in public_text
 

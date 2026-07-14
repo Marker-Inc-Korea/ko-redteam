@@ -1,0 +1,70 @@
+{
+ "schema": "ko-redteam.familywise-power-audit.v1",
+ "status": "marginal_pass_official_ranking_power_fail",
+ "source": {
+  "power_analysis_sha256": "7721fa0f33c4c5d41e136df16d53993ea0ecc9767a5b4c7b085f11f43aa8486e",
+  "power_analysis_schema": "ko-redteam.power-analysis.v1",
+  "pilot_dataset_sha256": "1b8c5eaddaca6b89d92fe9654ef3dbb48ab114c3e99dd6d838442725289ba45a",
+  "pilot_standard_deviation": 32.105180010905606,
+  "minimum_detectable_effect": 5.0,
+  "marginal_alpha": 0.05,
+  "marginal_target_power": 0.8,
+  "marginal_achieved_power": 0.8002,
+  "actual_independence_groups": 324
+ },
+ "method": {
+  "name": "Bonferroni least-favorable threshold and union-bound simultaneous-power design",
+  "family": "all unordered model pairs multiplied by all inferential weight profiles",
+  "interpretation": "Per-comparison power uses the smallest Holm threshold. The stronger simultaneous design controls the sum of type-II errors so the union bound guarantees the target probability of detecting every MDE-or-larger comparison. It does not assume independent tests.",
+  "analysis_code_sha256": "3befcdc0c4896e9084dca43219c8e986f8923f3c1c6904c6abd80b19ef8de8a5"
+ },
+ "minimum_publication_cohort": {
+  "model_count": 2,
+  "pair_count": 1,
+  "weight_profile_count": 3,
+  "comparison_family_size": 3,
+  "familywise_alpha": 0.05,
+  "bonferroni_comparison_alpha": 0.016666666666666666,
+  "required_independence_groups_per_comparison": 432,
+  "required_independence_groups_simultaneous": 626,
+  "actual_independence_groups": 324,
+  "comparison_power_at_actual": 0.6588425992419448,
+  "per_comparison_target_for_simultaneous_bound": 0.9333333333333333,
+  "simultaneous_power_union_lower_bound_at_actual": 0.0,
+  "target_power": 0.8,
+  "groups_shortfall_per_comparison": 108,
+  "groups_shortfall_simultaneous": 302,
+  "per_comparison_status": "fail",
+  "simultaneous_status": "fail"
+ },
+ "maximum_season_cohort": {
+  "model_count": 7,
+  "pair_count": 21,
+  "weight_profile_count": 3,
+  "comparison_family_size": 63,
+  "familywise_alpha": 0.05,
+  "bonferroni_comparison_alpha": 0.0007936507936507937,
+  "required_independence_groups_per_comparison": 727,
+  "required_independence_groups_simultaneous": 1527,
+  "actual_independence_groups": 324,
+  "comparison_power_at_actual": 0.29057225429409883,
+  "per_comparison_target_for_simultaneous_bound": 0.9968253968253968,
+  "simultaneous_power_union_lower_bound_at_actual": 0.0,
+  "target_power": 0.8,
+  "groups_shortfall_per_comparison": 403,
+  "groups_shortfall_simultaneous": 1203,
+  "per_comparison_status": "fail",
+  "simultaneous_status": "fail"
+ },
+ "decision": {
+  "marginal_power_gate_passed": true,
+  "minimum_cohort_per_comparison_power_passed": false,
+  "maximum_cohort_per_comparison_power_passed": false,
+  "minimum_cohort_simultaneous_power_passed": false,
+  "maximum_cohort_simultaneous_power_passed": false,
+  "official_tier_design_supported": false,
+  "official_complete_ranking_design_supported": false,
+  "multiplicity_controlled_per_comparison_design_supported": false
+ },
+ "raw_prompt_or_response_used": false
+}

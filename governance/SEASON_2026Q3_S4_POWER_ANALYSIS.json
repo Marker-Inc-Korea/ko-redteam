@@ -1,0 +1,82 @@
+{
+ "schema": "ko-redteam.power-analysis.v1",
+ "method": "two-sided normal-approximation power with Monte Carlo verification from fixed-allocation stratified paired-cluster variance",
+ "alpha": 0.05,
+ "target_power": 0.8,
+ "estimand": "paired independence-group diagnostic score difference",
+ "achieved_power": 0.8002,
+ "minimum_detectable_effect": 5.0,
+ "required_independence_groups": 324,
+ "actual_independence_groups": 324,
+ "assumptions": [
+  "Paired reference-group influence values are exchangeable within each frozen suite/domain/expected stratum.",
+  "The public-practice within-stratum variance is applicable to the newly authored official split.",
+  "Official stratum allocation and the balanced diagnostic weights remain fixed for the season."
+ ],
+ "analysis_code_sha256": "0da0d36c6003a29ea8d005d11e395b8ff2eb19f9855c588c0cac02610fc54baf",
+ "input_sha256": "b9d7cc1dac653c9d6fa18de33ff49c046387714855918eeae468923edadfb499",
+ "preregistered_at": "2026-07-14T10:03:51+09:00",
+ "simulation_iterations": 10000,
+ "seed": 20260714,
+ "pilot_summary": {
+  "dataset_sha256": "1b8c5eaddaca6b89d92fe9654ef3dbb48ab114c3e99dd6d838442725289ba45a",
+  "cluster_count": 35,
+  "mean_difference": 39.86571428571428,
+  "standard_deviation": 32.105180010905606,
+  "source": {
+   "schema": "ko-redteam.power-pilot-source.v1",
+   "ranking_manifest_sha256": "176444836540fc91b04b9de69ea2ef45f419b982b88b4a6b2af1edc41db787e4",
+   "ranking_manifest_schema": "ko-redteam.ranking-manifest.v3",
+   "upper_model": "gemma-4-31B-it",
+   "lower_model": "TinyLlama-1.1B-Chat-v1.0",
+   "upper_model_id": "google/gemma-4-31B-it",
+   "lower_model_id": "TinyLlama/TinyLlama-1.1B-Chat-v1.0",
+   "upper_revision": "439edf5652646a0d1bd8b46bfdc1d3645761a445",
+   "lower_revision": "fe8a4ea1ffedaf415f4da2f062534de366a451e6",
+   "suites": [
+    "paperbench",
+    "mini_single",
+    "multiturn",
+    "agent_harness"
+   ],
+   "benchmark_fingerprints": {
+    "paperbench": "35fb13997644af6d77b46e089948b53064a5bfc531564aceeb2f0dd2d8cd571f",
+    "mini_single": "972550f415d5b71971dc0b2e65820d30ab45d6528f0556c7f4daf6b79ff1b984",
+    "multiturn": "d690b162758c141eaafbd445b6150c76d687c2502f3daa8a7bc43b48880ec448",
+    "agent_harness": "47a1532df408397d215036df4bb14df306129afaa80fa40d17d2fc51a8441307"
+   },
+   "minimum_repeats": 3,
+   "upper_runs": 3,
+   "lower_runs": 3,
+   "temperature": 0.0,
+   "max_tokens": 512,
+   "agent_tool_call_mode": "prompt_json_v1",
+   "weight_profile": "balanced",
+   "construction_method": "target-allocation linearized balanced diagnostic influence",
+   "builder_code_sha256": "f15b81c5c071e4ac1879809949006adc8f15e7d0b4839c9910262829e4556c13",
+   "evaluator_git_commit": "dfef7c5455b28fd41f8bf2f5e9750711f2964fd0"
+  },
+  "pilot_stratum_counts": {
+   "agent_harness:agent_rag:allow": 5,
+   "agent_harness:agent_rag:no_tool": 5,
+   "mini_single:korean_quality:allow": 5,
+   "mini_single:overrefusal:allow": 5,
+   "multiturn:prompt_security:refuse_or_redirect": 5,
+   "paperbench:privacy:no_leak": 5,
+   "paperbench:safety:refuse_or_redirect": 5
+  },
+  "target_strata": {
+   "agent_harness:agent_rag:allow": 27,
+   "agent_harness:agent_rag:no_tool": 27,
+   "mini_single:korean_quality:allow": 54,
+   "mini_single:overrefusal:allow": 54,
+   "multiturn:prompt_security:refuse_or_redirect": 54,
+   "paperbench:privacy:no_leak": 54,
+   "paperbench:safety:refuse_or_redirect": 54
+  }
+ },
+ "analytic_power_at_actual": 0.8004767514223532,
+ "simulated_power_standard_error": 0.003998499218456845,
+ "design_power_at_required": 0.8004767514223532,
+ "raw_prompt_or_response_used": false
+}

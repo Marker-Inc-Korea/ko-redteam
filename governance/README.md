@@ -14,8 +14,11 @@
 | [`SEASON_OPERATIONS.md`](./SEASON_OPERATIONS.md) | 시즌 준비부터 게시까지의 실행 순서 |
 | [`EVIDENCE_INPUTS.md`](./EVIDENCE_INPUTS.md) | 비공개 evidence JSON 입력 계약 |
 | [`PRACTICE_VALIDATION_2026Q3.md`](./PRACTICE_VALIDATION_2026Q3.md) | 7모델 공개 practice 판별력과 통계적 한계 |
-| [`SEASON_2026Q3.md`](./SEASON_2026Q3.md) | 현재 S4 candidate 상태와 S1·S2·S3 변경 이력 |
-| [`SEASON_2026Q3_S4_PREREGISTRATION.json`](./SEASON_2026Q3_S4_PREREGISTRATION.json) | 현재 324그룹 S4 동결 설계와 v3 실행 증거 계약 |
+| [`SEASON_2026Q3.md`](./SEASON_2026Q3.md) | S4 중단 상태와 S1·S2·S3 변경 이력 |
+| [`SEASON_2026Q3_S4_PREREGISTRATION.json`](./SEASON_2026Q3_S4_PREREGISTRATION.json) | 과거 324그룹 S4 동결 설계와 v3 실행 증거 계약 |
+| [`SEASON_2026Q3_S4_POWER_ANALYSIS.json`](./SEASON_2026Q3_S4_POWER_ANALYSIS.json) | S4 v3 reference 기반 단일 비교 검정력 증거 |
+| [`SEASON_2026Q3_S4_FAMILYWISE_POWER_AUDIT.json`](./SEASON_2026Q3_S4_FAMILYWISE_POWER_AUDIT.json) | S4 63-comparison 검정력 범위 감사와 중단 근거 |
+| [`SEASON_2026Q3_S4_STOP.json`](./SEASON_2026Q3_S4_STOP.json) | S4 다중비교 검정력 범위 불일치 중단 결정 |
 | [`SEASON_2026Q3_S3_STOP.json`](./SEASON_2026Q3_S3_STOP.json) | S3 동결 validator 불일치 중단 결정 |
 | [`SEASON_2026Q3_S3_PREREGISTRATION.json`](./SEASON_2026Q3_S3_PREREGISTRATION.json) | byte 보존된 과거 324그룹 S3 동결 설계 |
 | [`SEASON_2026Q3_S3_POWER_ANALYSIS.json`](./SEASON_2026Q3_S3_POWER_ANALYSIS.json) | S3 324그룹 aggregate-only 검정력 증거 |
@@ -26,5 +29,5 @@
 | [`SEASON_2026Q3_S1_INVALIDATION.json`](./SEASON_2026Q3_S1_INVALIDATION.json) | S1 측정 오류·영향·수정 commitment |
 
 현재 저장소의 공개 seed 및 비교 결과는 연구용 진단 자료다. 비공개 official split, 사람 라벨 기반
-calibration, 사전 power analysis, 불변 실행 provenance, 독립 외부 검토가 없는 결과에는 공식 순위 표현을
-사용하지 않는다.
+calibration, 검정력, 불변 실행 provenance와 독립 외부 검토가 모두 함께 충족되지 않은 결과에는 공식 순위
+표현을 사용하지 않는다.

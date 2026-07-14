@@ -36,6 +36,7 @@ def test_console_script_targets_are_importable():
         "ko-redteam-build-power-pilot",
         "ko-redteam-audit-splits",
         "ko-redteam-analyze-power",
+        "ko-redteam-analyze-familywise-power",
         "ko-redteam-compare-reports",
         "ko-redteam-check-regression",
     } <= set(scripts)
@@ -88,6 +89,15 @@ def test_package_data_paths_exist():
     assert (ROOT / "governance" / "SEASON_2026Q3_S2_POWER_ANALYSIS.md").exists()
     assert (ROOT / "governance" / "SEASON_2026Q3_S3_POWER_ANALYSIS.json").exists()
     assert (ROOT / "governance" / "SEASON_2026Q3_S3_POWER_ANALYSIS.md").exists()
+    assert (ROOT / "governance" / "SEASON_2026Q3_S4_POWER_ANALYSIS.json").exists()
+    assert (ROOT / "governance" / "SEASON_2026Q3_S4_POWER_ANALYSIS.md").exists()
+    assert (
+        ROOT / "governance" / "SEASON_2026Q3_S4_FAMILYWISE_POWER_AUDIT.json"
+    ).exists()
+    assert (
+        ROOT / "governance" / "SEASON_2026Q3_S4_FAMILYWISE_POWER_AUDIT.md"
+    ).exists()
+    assert (ROOT / "governance" / "SEASON_2026Q3_S4_STOP.json").exists()
     assert (ROOT / "governance" / "PRACTICE_VALIDATION_2026Q3.json").exists()
     assert (ROOT / "governance" / "PRACTICE_VALIDATION_2026Q3.md").exists()
     assert (ROOT / "gap_analysis" / "_vendor" / "mitigationbypass_substrings.txt").exists()

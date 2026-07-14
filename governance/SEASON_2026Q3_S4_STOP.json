@@ -1,0 +1,59 @@
+{
+ "schema": "ko-redteam.season-stop.v1",
+ "id": "KO-RT-2026-004",
+ "status": "closed_before_successor_preregistration",
+ "decided_at": "2026-07-14T12:45:42+09:00",
+ "affected_season": "ko-redteam-2026q3-s4",
+ "reason": "preregistered_power_scope_excludes_multiple_comparison_family",
+ "summary": "The frozen S4 calculation achieved its marginal single-comparison target, but it did not power the preregistered family of all model pairs across three inferential weight profiles. The mismatch was found before official split construction, calibration, or model submission.",
+ "evidence": {
+  "preregistration": {
+   "path": "SEASON_2026Q3_S4_PREREGISTRATION.json",
+   "sha256": "dc1cdb1c16152958245b5e60597a5437da4bf9ac46615b8c40a01d09c9faf9c5",
+   "protocol_git_commit": "dfef7c5455b28fd41f8bf2f5e9750711f2964fd0"
+  },
+  "marginal_power_analysis": {
+   "path": "SEASON_2026Q3_S4_POWER_ANALYSIS.json",
+   "sha256": "7721fa0f33c4c5d41e136df16d53993ea0ecc9767a5b4c7b085f11f43aa8486e",
+   "target_power": 0.8,
+   "achieved_power": 0.8002,
+   "minimum_detectable_effect": 5.0,
+   "planned_independence_groups": 324
+  },
+  "multiplicity_power_audit": {
+   "path": "SEASON_2026Q3_S4_FAMILYWISE_POWER_AUDIT.json",
+   "sha256": "8eb3b380a2f0a222f769191817c83302824b94aa7ea7f9647c46190c89be4211",
+   "analysis_code_sha256": "3befcdc0c4896e9084dca43219c8e986f8923f3c1c6904c6abd80b19ef8de8a5",
+   "maximum_models": 7,
+   "inferential_weight_profiles": 3,
+   "comparison_family_size": 63,
+   "comparison_power_at_324": 0.29057225429409883,
+   "required_groups_per_comparison_power": 727,
+   "required_groups_simultaneous_power": 1527
+  },
+  "official_split_constructed": false,
+  "human_calibration_started": false,
+  "official_model_submission_started": false,
+  "official_release_published": false,
+  "raw_prompt_or_response_included": false
+ },
+ "decision": {
+  "action": "stop_before_official_split",
+  "thresholds_relaxed": false,
+  "scoring_changed": false,
+  "reference_models_changed": false,
+  "s4_preregistration_preserved": true,
+  "marginal_power_evidence_preserved": true,
+  "s4_results_publishable": false,
+  "successor_required": true,
+  "successor_season": null,
+  "successor_must_preregister_comparison_family": true,
+  "successor_must_separate_ranking_and_deployment_claims": true
+ },
+ "impact": {
+  "invalidated_scope": "S4 as a candidate official multi-model leaderboard protocol.",
+  "retained_evidence": "Aggregate-only reference-run and marginal-power evidence remains a disclosed pilot for successor design, but it cannot produce an S4 official ranking.",
+  "research_preview_status": "Public-practice diagnostics remain non-official and cannot satisfy a successor publication gate."
+ },
+ "independent_reinspection": "pending"
+}

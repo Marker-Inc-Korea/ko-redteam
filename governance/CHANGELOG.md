@@ -14,6 +14,12 @@
   오류 0건 계약을 preregistration에 정확히 결합한다. 현재 시즌 power pilot은 v3 ranking manifest만 허용한다.
 - S4 power evidence는 Gemma 4 31B와 TinyLlama 1.1B를 동결된 S4 protocol로 다시 실행한 후에만 생성한다.
   과거 v2 reference manifest는 과거 시즌 재현 외에는 사용할 수 없다.
+- 두 reference model을 각각 3회 재실행한 v3 manifest에서 35개 paired pilot group을 구성했다. 324그룹
+  설계의 simulated power는 0.8002로 목표 0.80을 통과했고, aggregate-only 결과는
+  [`SEASON_2026Q3_S4_POWER_ANALYSIS.json`](./SEASON_2026Q3_S4_POWER_ANALYSIS.json)에 공개한다.
+- 위 결과가 단일 비교 검정력만 계산한 사실을 별도 감사했다. S4의 7모델 × 3개 profile은 63개 Holm family를
+  만들며, 324그룹의 보정 후 개별 MDE power는 0.2906이다. 개별 80%에는 727개, 모든 MDE 비교의 동시 80%
+  보장에는 1527개가 필요하므로 official split 작성 전에 S4를 중단한다.
 - 공개 practice 64개 그룹에서 7모델 판별력을 별도로 감사했다. Qwen 계열 점수는 모델 크기 순으로
   단조적이고 upper/lower anchor는 분리됐지만, 보정 후 인접 모델은 한 쌍도 분리되지 않아(0/6) 총순위를 지원하지
   않았다. aggregate-only 결과와 한계는 [`PRACTICE_VALIDATION_2026Q3.md`](./PRACTICE_VALIDATION_2026Q3.md)에

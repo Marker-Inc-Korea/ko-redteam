@@ -1,7 +1,9 @@
 # 2026 Q3 Candidate Season
 
-현재 후보는 `ko-redteam-2026q3-s4`다. 동결된 기계 판독 사전등록은
-[`SEASON_2026Q3_S4_PREREGISTRATION.json`](./SEASON_2026Q3_S4_PREREGISTRATION.json)에 있다. S3는 power가
+`ko-redteam-2026q3-s4`는 다중비교 검정력 범위 불일치로 official split 작성 전에 중단됐다. 현재 활성 official
+candidate는 없다. S4의 동결된 기계 판독 사전등록은
+[`SEASON_2026Q3_S4_PREREGISTRATION.json`](./SEASON_2026Q3_S4_PREREGISTRATION.json)에 보존하며 중단 결정은
+[`SEASON_2026Q3_S4_STOP.json`](./SEASON_2026Q3_S4_STOP.json)에 기록했다. S3는 power가
 요구한 영역별 54개 그룹을 사전등록했지만, 당시 동결 validator가 선언 최소값을 protocol floor 30과 같게
 요구해 실행할 수 없었다. official split 작성 전에 중단했고 결정은
 [`SEASON_2026Q3_S3_STOP.json`](./SEASON_2026Q3_S3_STOP.json)에 기록했다. S1·S2·S3 원본과 파생 증거는
@@ -17,13 +19,15 @@
 | S2 power 분석 | 0.5537, 목표 0.80 미달, 필요 그룹 324개 |
 | S3 324그룹 candidate protocol | `stopped_validator_inconsistency` |
 | S3 power 분석 | 0.801, 목표 0.80 충족, 공식 결과 사용 금지 |
-| S4 프로토콜·통계·reference model 사전등록 | Frozen candidate design |
-| S4 v3 reference power 실행 | 미실행 |
+| S4 프로토콜·통계·reference model 사전등록 | `stopped_power_scope_mismatch` |
+| S4 v3 reference power 실행 | 두 reference model 각 3회 완료, execution evidence 검증 통과 |
+| S4 marginal power 분석 | 0.8002, 단일 비교 목표 0.80 충족 |
+| S4 63-comparison power 감사 | 324그룹 개별 power 0.2906, 필요 727; 전체 동시 보장 필요 1527 |
 | Agent transport | `prompt_json_v1`, endpoint 오류 0건 hard gate |
 | 반복별 실행 증거 | `core`·`mini_single` v3 digest binding 필수 |
 | 공개 power-pilot practice target coverage | suite/domain/expected 7개 stratum, 각 5개 |
 | 7모델 공개 practice 판별력 | 먼 쌍 8/21 분리, 인접 쌍 0/6 분리, 공식 순위 사용 금지 |
-| 비공개 official split 324개 독립 그룹 | 미구성 |
+| S4 비공개 official split | 미구성, 작성 금지 |
 | 300개 blinded 사람 calibration | 미수집 |
 | BGE-M3 exact·semantic split audit | 미실행 |
 | 독립 외부 검토 | 미착수 |
@@ -49,6 +53,12 @@ S4는 S3 결과를 보고 threshold, weight, scoring, reference model 또는 324
 power-derived 표본 수를 허용하도록 validator를 수정하고 실행 artifact의 출처를 v3 증거로 결합했다. S4 power
 입력은 두 reference model을 동결된 S4 commit으로 다시 실행해야 하며 과거 v2 manifest를 대신 사용할 수 없다.
 공개 practice 모델 비교는 판별력 진단일 뿐 official split, calibration 또는 외부 검토를 대체하지 않는다.
+재실행 결과 S4의 단일 비교 simulated power는 0.8002로 목표를 통과했다. 그러나 7모델 × 3개 profile의
+63-comparison family를 반영하면 324그룹에서 개별 MDE 비교 power는 0.2906이고, 개별 80% 보장에는 727개,
+모든 비교의 동시 80% 보장에는 1527개가 필요하다. 집계 증거는
+[`SEASON_2026Q3_S4_POWER_ANALYSIS.json`](./SEASON_2026Q3_S4_POWER_ANALYSIS.json), 범위 감사는
+[`SEASON_2026Q3_S4_FAMILYWISE_POWER_AUDIT.json`](./SEASON_2026Q3_S4_FAMILYWISE_POWER_AUDIT.json)에 보존한다.
+S4는 official split 작성 전에 중단하며 publication status는 `not_publishable`이다.
 
 설계를 바꾸어야 하면 사전등록 파일을 덮어쓰지 않고 [`CHANGELOG.md`](./CHANGELOG.md)에 무효화 사유를
 남긴 뒤 새 season ID로 다시 사전등록한다.
