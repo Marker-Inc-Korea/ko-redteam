@@ -88,6 +88,32 @@ measurement integrity, report doctor 단계와 report 상대경로·SHA-256을 �
 
 ## Evaluator Calibration
 
+사람 라벨을 수집할 때는 완성된 `calibration-input.v1`을 손으로 편집하지 않는다.
+`ko-redteam.calibration-collection-spec.v1`을 coordinator-only `0700` workspace에 동결하고
+`ko-redteam-calibration-collection`으로 rater별 격리 handoff, 두 expert의 disagreement proposal, 최종
+commitment signing handoff를 생성한다. spec의 각 held-out item은 다음 필드만 사용한다.
+
+```json
+{
+  "id": "heldout-item-001",
+  "domain": "safety",
+  "prompt": "<blinded private prompt>",
+  "response": "<blinded private response>",
+  "source_record_sha256": "<private provenance record sha256>",
+  "evaluator_label": "critical"
+}
+```
+
+`source_record_sha256`의 원본 provenance는 별도 접근 통제 파일에 두며 source model 이름을 rater packet에 넣지
+않는다. spec은 정렬된 `raters` (`id`, `expert`), timezone 포함 `planned_at`, adjudication 절차, evaluator
+commit·protocol, paired controls와 limitations를 함께 포함한다. 공식 모드는 초기화 시 300개·영역별 30개,
+rater 3명·expert 2명 floor를 직접 검사한다. 생성된 collection receipt는 초기 human attestation, 독립 rater
+response commitment·SSHSIG와 expert proposal·SSHSIG를 최종 rater commitment의 `attestation_sha256`에
+결합한다. 상세 명령과 namespace는
+[`CALIBRATION_REVIEW_WORKFLOW.md`](./CALIBRATION_REVIEW_WORKFLOW.md)를 따른다.
+이 workflow가 생성한 최종 signature config의 `attestation_path`는 원본 human attestation과 초기 response·expert
+proposal 서명 증거를 포함한 rater별 collection receipt를 가리킨다.
+
 `ko-redteam-build-calibration`은 `ko-redteam.calibration-input.v1`을 받는다. 실제 공식 입력은 300개 이상,
 각 영역 30개 이상이어야 한다. `adjudication_records`는 rater label이 갈린 모든 item을 정확히 한 번씩
 포함해야 한다.

@@ -63,6 +63,10 @@ IMPLEMENTATION_PATHS = {
     "run_context": "analysis/ko_run_context.py",
     "split_audit_builder": "analysis/ko_split_evidence.py",
     "calibration_builder": "analysis/ko_calibration.py",
+    "calibration_evidence": "analysis/ko_calibration_evidence.py",
+    "calibration_collection": "analysis/ko_calibration_collection.py",
+    "calibration_collection_entrypoint": "probes/calibration_collection.py",
+    "calibration_response_entrypoint": "probes/calibration_response.py",
     "release_validator": "analysis/ko_leaderboard.py",
     "season_preregistration_builder": BUILDER_PATH,
     "season_build_entrypoint": BUILD_ENTRYPOINT_PATH,
@@ -74,12 +78,14 @@ PROTOCOL_SOURCE_PATHS = (
     "detectors",
     "gap_analysis/_vendor/mitigationbypass_substrings.txt",
     "governance/PRACTICE_REVIEW_WORKFLOW.md",
+    "governance/CALIBRATION_REVIEW_WORKFLOW.md",
     "pyproject.toml",
 )
 PROTOCOL_PACKAGE_ROOTS = ("analysis", "probes", "detectors")
 PROTOCOL_DATA_PATHS = (
     "gap_analysis/_vendor/mitigationbypass_substrings.txt",
     "governance/PRACTICE_REVIEW_WORKFLOW.md",
+    "governance/CALIBRATION_REVIEW_WORKFLOW.md",
     "probes/ko_jailbreak_templates.json",
 )
 

@@ -1,94 +1,206 @@
-# Signed Human Calibration Workflow
+# Independent Human Calibration Workflow
 
-이 절차는 공식 evaluator calibration의 사람 라벨, 전문가 자격 확인 자료와 최종 adjudication을 공개
-`evaluator-calibration.v3`에 암호학적으로 결합한다. 인원수와 성능값만 적은 JSON은 공식 calibration 증거가
-아니다.
+이 절차는 모델명에 blinded된 사람 라벨, 전문가 disagreement adjudication, private 신원·자격 자료와
+Ed25519 SSHSIG를 공개 `evaluator-calibration.v3`에 결합한다. 완성된 labels JSON을 coordinator가 손으로
+작성하거나 한 사람이 여러 rater 역할을 대신 수행한 결과는 공식 calibration 증거가 아니다.
 
-## 1. Evidence Boundary
+## Publication Boundary
 
-공식 calibration은 최소 300개 held-out 사례, 영역별 30개, 라벨러 3명, 도메인 전문가 2명을 사용한다. 모든
-라벨러가 모든 사례를 모델명에 blinded된 상태로 판정하고, 두 명 이상의 선언된 전문가가 불일치 기록과 최종
-집계 report를 함께 승인해야 한다.
+공식 calibration은 held-out 사례 300개 이상, 여섯 영역별 30개 이상, 서로 다른 실제 라벨러 3명 이상과
+도메인 전문가 2명 이상을 요구한다. 모든 라벨러가 모든 사례를 개별 판정하고 두 전문가는 disagreement만
+서로의 expert 결정을 보지 않은 상태에서 독립 adjudication한다. 두 proposal의 최종 label과 rationale code가
+정확히 일치하지 않으면 최종 입력을 만들지 않는다.
 
-서명은 다음 사실을 검증한다.
+도구가 검증하는 범위는 다음과 같다.
 
-- 각 key holder가 자신의 전체 rating subset, 입력·설정 digest와 private 신원·자격·attestation 파일 digest를 승인했다.
-- 두 명 이상의 expert key holder가 동일한 label matrix, adjudication log, evaluator 지표와 control 결과를 승인했다.
-- 서명 뒤 입력, 설정, 라벨, 집계 report 또는 evaluator commit을 바꾸면 공개 verifier가 실패한다.
+- 라벨러별 handoff에는 본인 packet만 있고 evaluator label, model identity metadata, peer label이 없다.
+- 각 항목은 `critical` 또는 `benign`을 한 번에 하나씩 명시적으로 기록하며 일괄 기본값 명령은 없다.
+- identity, credential, human attestation, response와 expert proposal의 digest 및 SSHSIG가 최종
+  collection receipt를 거쳐 공개 commitment에 결합된다.
+- 누락·추가 파일, symlink, 경로 탈출, 잘못된 권한, 중복 키, 변조, expert 불합의를 fail-closed로 거부한다.
 
-서로 다른 Ed25519 키는 서로 다른 실제 사람, 실명, 소속 또는 전문가 자격을 공개적으로 증명하지 않는다. 공개
-artifact의 `identity_assurance`도 이 한계를 명시한다. 권한이 있는 외부 검토자가 private 신원·자격 기록의 진위,
-서로 다른 사람 여부와 이해상충을 별도 확인해야 한다.
+서로 다른 키는 서로 다른 실제 사람, 실명, 소속 또는 전문가 자격을 스스로 증명하지 않는다. 권한 있는 외부
+검토자가 private 원본, 실제 인원, 자격, 이해상충과 개인키 직접 사용 여부를 별도로 확인해야 한다.
 
-## 2. Prepare The Private Workspace
+## 1. Freeze The Coordinator Workspace
 
-workspace는 Git과 release directory 밖에 만들고 디렉터리 권한을 `0700`, 입력·설정·신원·자격·attestation
-파일 권한을 `0600`으로 둔다. symlink, 절대경로, 상위 디렉터리 이동과 재사용된 evidence 파일은 허용하지 않는다.
-public report에는 실제 이름 대신 시즌 안에서만 쓰는 pseudonymous rater ID를 사용한다.
-
-각 라벨러는 자신의 Ed25519 개인키를 직접 보관하며 coordinator에게 전달하지 않는다. 설정에는 comment가 없는
-`ssh-ed25519 <base64>` 공개키와 `ssh-keygen -lf`로 확인한 fingerprint만 기록한다. 설정 schema는
-`ko-redteam.calibration-signature-config.v1`이며 다음 정보를 포함한다.
-
-- 공통 `calibration_id`, timezone이 있는 `planned_at`
-- 정렬된 전체 rater ID와 각자의 완료 시각
-- workspace-relative identity, credential, attestation, commitment, signature 경로
-- 각 rater의 공개키와 fingerprint
-- 정렬된 expert ID, adjudication 완료 시각, 공통 commitment와 expert별 signature 경로
-
-입력과 설정을 준비한 뒤 권한을 다시 확인한다.
+Git과 release directory 밖의 `0700` 디렉터리를 사용한다. 입력
+`ko-redteam.calibration-collection-spec.v1`에는 정렬된 rater 목록과 held-out 항목을 둔다. 각 항목은
+`id`, `domain`, blinded `prompt`·`response`, 원본 provenance의 `source_record_sha256`, 자동 판정기의
+`evaluator_label`만 포함한다. source model 이름은 spec에도 넣지 않고 접근 통제된 별도 provenance record에
+보존한다.
 
 ```bash
-chmod 700 "$CALIBRATION_WORKSPACE"
-chmod 600 "$CALIBRATION_WORKSPACE"/*
+chmod 700 "$PRIVATE_PARENT"
+ko-redteam-calibration-collection init \
+  "$PRIVATE_PARENT/calibration-collection-spec.json" \
+  --output-dir "$PRIVATE_PARENT/calibration-central"
 ```
 
-## 3. Freeze And Sign Commitments
+`init`은 300개·영역별 30개 floor, 3명·expert 2명, 중복 source·prompt-response, control 입력과 정렬·digest
+계약을 확인한다. 생성된 중앙
+workspace는 이후 비워 둔 template의 원본이며 라벨러가 직접 수정하지 않는다. `--development`는 작은 회귀
+fixture에만 허용하며 해당 결과는 공식 게시 자격이 없다.
 
-commitment builder는 labels-only 입력을 재계산하고 모든 라벨러가 모든 item을 판정했는지 확인한다. 각 rater
-commitment와 공통 adjudication commitment를 배타 생성하므로 기존 파일을 덮어쓰지 않는다.
+## 2. Collect Independent Rater Responses
+
+라벨러마다 별도 위치에 handoff를 생성한다. 서로의 디렉터리에 접근시키지 않는다.
 
 ```bash
-ko-redteam-build-calibration-commitments \
-  "$CALIBRATION_WORKSPACE/calibration-input.json" \
-  "$CALIBRATION_WORKSPACE/signature-config.json" \
-  --evidence-root "$CALIBRATION_WORKSPACE"
+PLAN="$PRIVATE_PARENT/calibration-central/calibration-collection-plan.json"
+ko-redteam-calibration-collection rater-handoff "$PLAN" \
+  --rater-id calibration-rater-a \
+  --output-dir "$PRIVATE_PARENT/calibration-rater-a"
 ```
 
-각 라벨러는 본인의 commitment bytes를 본인 키로 직접 서명한다.
+각 라벨러는 본인 packet과 response만 사용한다. `review`는 한 항목을 대화형으로 보여주며 `record`도 한 ID만
+받는다.
 
 ```bash
-ssh-keygen -Y sign \
-  -f "$RATER_PRIVATE_KEY" \
+ko-redteam-calibration-response rater \
+  "$PRIVATE_PARENT/calibration-rater-a/rater-01.packet.json" \
+  "$PRIVATE_PARENT/calibration-rater-a/rater-01.response.json" \
+  review
+```
+
+모든 항목을 완료한 뒤 본인의 identity·credential 파일과 공개키를 넣고 네 문장을 각각 명시적으로 attest한다.
+개인키는 handoff, coordinator, Git에 전달하지 않는다.
+
+```bash
+ko-redteam-calibration-response rater \
+  "$PRIVATE_PARENT/calibration-rater-a/rater-01.packet.json" \
+  "$PRIVATE_PARENT/calibration-rater-a/rater-01.response.json" \
+  attest \
+  --completed-at 2026-07-20T14:00:00+09:00 \
+  --signing-public-key-file "$RATER_A_PUBLIC_KEY" \
+  --attest-blind-to-model-identity \
+  --attest-reviewed-without-other-rater-labels \
+  --attest-all-items-individually-reviewed \
+  --attest-private-key-not-shared
+
+ko-redteam-calibration-response rater \
+  "$PRIVATE_PARENT/calibration-rater-a/rater-01.packet.json" \
+  "$PRIVATE_PARENT/calibration-rater-a/rater-01.response.json" \
+  freeze
+
+ssh-keygen -Y sign -f "$RATER_A_PRIVATE_KEY" \
+  -n ko-redteam-calibration-response@marker-inc-korea \
+  < "$PRIVATE_PARENT/calibration-rater-a/rater-01.response-commitment.json" \
+  > "$PRIVATE_PARENT/calibration-rater-a/rater-01.response-commitment.json.sig"
+chmod 600 "$PRIVATE_PARENT/calibration-rater-a/rater-01.response-commitment.json.sig"
+```
+
+세 라벨러를 각각 완료한 뒤 제출물을 단독 검증한다. 완료 handoff에는 manifest가 선언한 정확한 파일만 있어야
+하며 개인키나 보조 파일을 반환하면 거부한다.
+
+```bash
+ko-redteam-calibration-collection verify-rater "$PLAN" \
+  --rater-id calibration-rater-a \
+  --submission "$PRIVATE_PARENT/calibration-rater-a"
+```
+
+## 3. Resolve Disagreements Independently
+
+모든 rater 제출이 유효해야 expert packet을 만들 수 있다. packet은 disagreement의 blinded 내용과 pseudonymous
+rater label만 포함하고 evaluator label과 다른 expert 결정은 포함하지 않는다.
+
+```bash
+ko-redteam-calibration-collection adjudication-handoff "$PLAN" \
+  --rater-submission calibration-rater-a="$PRIVATE_PARENT/calibration-rater-a" \
+  --rater-submission calibration-rater-b="$PRIVATE_PARENT/calibration-rater-b" \
+  --rater-submission calibration-rater-c="$PRIVATE_PARENT/calibration-rater-c" \
+  --expert-rater-id calibration-rater-a \
+  --output-dir "$PRIVATE_PARENT/adjudication-expert-a"
+```
+
+각 expert는 disagreement를 한 건씩 결정하고 비어 있지 않은 rationale code를 기록한다. disagreement가 0건이어도
+`complete`와 proposal 서명은 수행한다.
+
+```bash
+ko-redteam-calibration-response adjudication \
+  "$PRIVATE_PARENT/adjudication-expert-a/rater-01.adjudication-packet.json" \
+  "$PRIVATE_PARENT/adjudication-expert-a/rater-01.adjudication-response.json" \
+  review
+
+ko-redteam-calibration-response adjudication \
+  "$PRIVATE_PARENT/adjudication-expert-a/rater-01.adjudication-packet.json" \
+  "$PRIVATE_PARENT/adjudication-expert-a/rater-01.adjudication-response.json" \
+  complete \
+  --completed-at 2026-07-20T16:00:00+09:00 \
+  --attest-blind-to-model-identity \
+  --attest-blind-to-evaluator-labels \
+  --attest-reviewed-without-other-expert-decisions \
+  --attest-all-disagreements-individually-reviewed \
+  --attest-private-key-not-shared
+
+ko-redteam-calibration-response adjudication \
+  "$PRIVATE_PARENT/adjudication-expert-a/rater-01.adjudication-packet.json" \
+  "$PRIVATE_PARENT/adjudication-expert-a/rater-01.adjudication-response.json" \
+  freeze --signing-public-key-file "$RATER_A_PUBLIC_KEY"
+
+ssh-keygen -Y sign -f "$RATER_A_PRIVATE_KEY" \
+  -n ko-redteam-calibration-adjudication-proposal@marker-inc-korea \
+  < "$PRIVATE_PARENT/adjudication-expert-a/rater-01.adjudication-proposal.json" \
+  > "$PRIVATE_PARENT/adjudication-expert-a/rater-01.adjudication-proposal.json.sig"
+chmod 600 "$PRIVATE_PARENT/adjudication-expert-a/rater-01.adjudication-proposal.json.sig"
+```
+
+두 expert가 독립 제출을 마친 뒤에만 조립한다. label 또는 rationale가 하나라도 다르면 output directory를 만들지
+않는다.
+
+```bash
+ko-redteam-calibration-collection assemble "$PLAN" \
+  --rater-submission calibration-rater-a="$PRIVATE_PARENT/calibration-rater-a" \
+  --rater-submission calibration-rater-b="$PRIVATE_PARENT/calibration-rater-b" \
+  --rater-submission calibration-rater-c="$PRIVATE_PARENT/calibration-rater-c" \
+  --adjudication-submission calibration-rater-a="$PRIVATE_PARENT/adjudication-expert-a" \
+  --adjudication-submission calibration-rater-b="$PRIVATE_PARENT/adjudication-expert-b" \
+  --completed-at 2026-07-20T17:00:00+09:00 \
+  --output-dir "$PRIVATE_PARENT/calibration-unsigned"
+```
+
+## 4. Sign The Final Frozen Commitments
+
+조립기는 기존 `ko-redteam.calibration-signature-config.v1`과 rater별 최종 commitment, 공통 adjudication
+commitment를 생성한다. 각 최종 rater commitment는 본인의 초기 응답·SSHSIG, human attestation과 expert인 경우
+독립 proposal·SSHSIG를 담은 collection receipt의 digest를 포함한다.
+
+라벨러별 signing handoff에는 본인 최종 commitment, 본인 receipt, expert인 경우 공통 adjudication commitment만
+들어간다. identity·credential 원본이나 peer commitment는 포함하지 않는다.
+
+```bash
+ko-redteam-calibration-collection signing-handoff \
+  "$PRIVATE_PARENT/calibration-unsigned" \
+  --rater-id calibration-rater-a \
+  --output-dir "$PRIVATE_PARENT/calibration-signing-a"
+
+ssh-keygen -Y sign -f "$RATER_A_PRIVATE_KEY" \
   -n ko-redteam-calibration-rater@marker-inc-korea \
-  < "$CALIBRATION_WORKSPACE/rater-01.commitment.json" \
-  > "$CALIBRATION_WORKSPACE/rater-01.commitment.json.sig"
-chmod 600 "$CALIBRATION_WORKSPACE/rater-01.commitment.json.sig"
-```
+  < "$PRIVATE_PARENT/calibration-signing-a/rater-01.commitment.json" \
+  > "$PRIVATE_PARENT/calibration-signing-a/rater-01.commitment.json.sig"
 
-설정에 선언된 모든 expert는 동일한 adjudication commitment를 각각 서명한다.
-
-```bash
-ssh-keygen -Y sign \
-  -f "$EXPERT_PRIVATE_KEY" \
+ssh-keygen -Y sign -f "$RATER_A_PRIVATE_KEY" \
   -n ko-redteam-calibration-adjudication@marker-inc-korea \
-  < "$CALIBRATION_WORKSPACE/adjudication.commitment.json" \
-  > "$CALIBRATION_WORKSPACE/adjudication.expert-01.sig"
-chmod 600 "$CALIBRATION_WORKSPACE/adjudication.expert-01.sig"
+  < "$PRIVATE_PARENT/calibration-signing-a/adjudication.commitment.json" \
+  > "$PRIVATE_PARENT/calibration-signing-a/adjudication.calibration-rater-a.sig"
+chmod 600 "$PRIVATE_PARENT/calibration-signing-a"/*.sig
 ```
 
-namespace가 다르거나 한 사람의 키를 여러 rater ID에 재사용한 서명은 인정하지 않는다.
-
-## 4. Build And Publicly Verify
-
-모든 서명이 도착한 뒤에만 metadata-only v3 report를 만든다. 생성기는 private 파일 digest, 입력·설정,
-commitment bytes와 모든 SSHSIG를 다시 검증한다.
+expert가 아닌 rater는 본인 commitment만 서명한다. 모든 signing handoff를 회수한 뒤 finalizer가 각각을 독립
+검증하고 새 signed workspace에서 공개 report를 재생성한다.
 
 ```bash
+ko-redteam-calibration-collection finalize \
+  "$PRIVATE_PARENT/calibration-unsigned" \
+  --signing-submission calibration-rater-a="$PRIVATE_PARENT/calibration-signing-a" \
+  --signing-submission calibration-rater-b="$PRIVATE_PARENT/calibration-signing-b" \
+  --signing-submission calibration-rater-c="$PRIVATE_PARENT/calibration-signing-c" \
+  --output-dir "$PRIVATE_PARENT/calibration-signed"
+
 ko-redteam-build-calibration \
-  "$CALIBRATION_WORKSPACE/calibration-input.json" \
-  --signature-config "$CALIBRATION_WORKSPACE/signature-config.json" \
-  --evidence-root "$CALIBRATION_WORKSPACE" \
+  "$PRIVATE_PARENT/calibration-signed/calibration-input.json" \
+  --signature-config "$PRIVATE_PARENT/calibration-signed/signature-config.json" \
+  --evidence-root "$PRIVATE_PARENT/calibration-signed" \
   --output release/calibration_report.json \
   --markdown-output release/calibration_report.md
 
@@ -97,25 +209,16 @@ ko-redteam-verify-calibration-signatures \
   --output release/calibration_signature_audit.json
 ```
 
-공개 report는 개별 item ID, 개별 라벨, 원문 prompt·response와 신원·자격 문서 내용을 포함하지 않는다. 대신
-집계 confusion matrix, label/adjudication commitment, pseudonymous ID, 공개키와 서명을 포함한다. 공개키와
-서명도 개인정보가 될 수 있으므로 라벨러의 공개 동의를 받아야 한다.
+## 5. Independent Inspection
 
-## 5. Independent Inspection And Release
+외부 검토자는 접근 통제된 환경에서 다음을 재검증한다.
 
-외부 검토자는 접근 통제된 환경에서 다음을 확인한다.
+1. 세 rater ID가 서로 다른 실제 사람이고 expert 자격과 private 신원·자격 원본이 맞는지 확인한다.
+2. 각 handoff의 exact file set, packet blindness, 항목별 response와 초기 SSHSIG를 재생한다.
+3. 두 expert proposal이 서로의 결정을 보지 않고 작성됐으며 exact consensus인지 확인한다.
+4. collection receipt가 초기 attestation·response·proposal digest와 일치하고 최종 rater commitment에 결합됐는지 확인한다.
+5. frozen builder로 label matrix, adjudication log, confusion matrix, control separation과 공개 report를 재생한다.
+6. 최소 alpha·F1·recall·specificity와 control separation gate가 모두 통과하는지 확인한다.
 
-1. commitment의 identity·credential·attestation SHA-256이 실제 private 파일과 일치한다.
-2. 세 rater ID가 서로 다른 실제 사람이며 expert flag와 자격 자료가 일치한다.
-3. 라벨러가 모델 ID에 접근하지 않았고 개인키를 직접 보관·사용했다.
-4. frozen builder로 private 입력을 다시 계산했을 때 rater별 rating subset, label matrix, adjudication log,
-   confusion count와 공개 report의 모든 commitment·집계값이 일치한다.
-5. 모든 불일치가 adjudication log에 있고 두 expert가 동일 최종 commitment를 승인했다.
-6. 공개 v3 report와 standalone signature audit이 재현되고 calibration 최저 지표가 통과한다.
-
-검토 결과와 남은 한계는 signed external review report에 기록한다. private evidence를 보지 않은 공개키 검증만으로
-실제 신원 확인을 완료했다고 주장하지 않는다. 최종 release validator의
-`calibration.signed_human_evidence`와 외부 검토 gate가 모두 통과해야 게시할 수 있다.
-
-입력, 설정, 신원 자료, evaluator code 또는 adjudication이 바뀌면 기존 commitment와 서명을 재사용하지 않는다.
-기존 파일을 덮어쓰지 말고 새 calibration ID와 workspace에서 전 과정을 다시 수행한다.
+입력, evaluator code, rater 응답, adjudication 또는 private evidence가 바뀌면 기존 commitment와 서명을 재사용하지
+않는다. 새 calibration ID와 새 workspace에서 전 과정을 다시 수행한다.

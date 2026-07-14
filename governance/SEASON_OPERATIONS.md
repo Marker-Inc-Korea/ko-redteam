@@ -33,8 +33,9 @@
    `ko-redteam-build-season-preregistration`으로만 `season-preregistration.v3`를 만들고 별도 commit/push한 뒤
    official prompt를 작성한다. evidence commit이 pilot evaluator commit보다 뒤인 것은 정상이나, 그 사이 protocol
    구현 파일 변경은 허용하지 않는다.
-6. 모델명에 blinded된 held-out 사람 라벨로 evaluator를 calibration한다. 각 rater와 두 expert 이상의 서명,
-   private 신원·자격 evidence binding을 검증하고 기준 미달 시 중단한다. calibration은 season 등록 뒤 시작해 첫
+6. 모델명에 blinded된 held-out 사람 라벨로 evaluator를 calibration한다. rater별 격리 handoff와 항목별 판정,
+   두 expert의 독립 disagreement proposal·exact consensus, collection receipt와 최종 서명을 검증한다. private
+   신원·자격 evidence binding을 확인하고 기준 미달 시 중단한다. calibration은 season 등록 뒤 시작해 첫
    제출 전에 expert adjudication까지 끝낸다.
 7. practice와 official split의 exact·semantic overlap을 감사한다.
 8. official split과 모든 scoring/evaluator 설정을 첫 제출 전에 동결한다.

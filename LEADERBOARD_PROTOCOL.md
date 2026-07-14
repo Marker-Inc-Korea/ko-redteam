@@ -283,13 +283,14 @@ ko-redteam-build-season-preregistration "$SEASON_SPEC" --root . \
   --audit-output governance/SEASON_ID_PREREGISTRATION_AUDIT.json
 ko-redteam-validate-season-preregistration "$PREREGISTRATION" \
   --spec "$SEASON_SPEC" --root .
-ko-redteam-build-calibration-commitments \
-  private/calibration/calibration-input.json \
-  private/calibration/signature-config.json \
-  --evidence-root private/calibration
-ko-redteam-build-calibration private/calibration/calibration-input.json \
-  --signature-config private/calibration/signature-config.json \
-  --evidence-root private/calibration \
+ko-redteam-calibration-collection init \
+  private/calibration/calibration-collection-spec.json \
+  --output-dir private/calibration/central
+# CALIBRATION_REVIEW_WORKFLOW.md의 rater별 handoff, 독립 expert consensus,
+# final signing handoff를 모두 완료해 private/calibration/signed를 만든다.
+ko-redteam-build-calibration private/calibration/signed/calibration-input.json \
+  --signature-config private/calibration/signed/signature-config.json \
+  --evidence-root private/calibration/signed \
   --output release/calibration_report.json
 ko-redteam-verify-calibration-signatures release/calibration_report.json
 ko-redteam-audit-splits --help

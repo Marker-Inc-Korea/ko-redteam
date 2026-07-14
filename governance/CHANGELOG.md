@@ -5,6 +5,12 @@
 
 ## Unreleased - Evidence-Eligible Ranking Protocol
 
+- 완성된 calibration JSON을 coordinator가 수작업으로 조립하던 운영 공백을 제거한다. 3명 이상의 rater에게
+  evaluator label·model metadata·peer label이 없는 `0700` handoff를 각각 만들고, 300개 항목을 한 건씩만
+  기록하게 한다. 모든 독립 response SSHSIG가 유효한 뒤에만 두 expert의 disagreement packet을 만들며 두
+  proposal의 label·rationale exact consensus 없이는 최종 입력을 생성하지 않는다. 초기 attestation·response·
+  proposal 서명 chain은 collection receipt를 거쳐 최종 rater commitment에 결합하고, 별도 signing handoff가
+  identity·credential 원본이나 peer commitment를 노출하지 않으면서 기존 `evaluator-calibration.v3`를 완성한다.
 - blind reviewer 둘이 중앙 workspace를 공유하지 않도록 reviewer별 plan·packet·빈 template만 `0700` handoff로
   반출하고, 완료된 evidence·commitment·SSHSIG의 정확한 파일 집합을 단독 검증한 뒤 새 merge workspace로
   조립하는 CLI를 추가한다. 동일 signing key·중복 identity commitment·symlink·미등록 파일을 거부하고 reject는
