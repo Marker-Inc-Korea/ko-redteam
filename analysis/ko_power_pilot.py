@@ -195,8 +195,8 @@ def build_power_pilot_input(
         raise ValueError(f"preregistration schema must be {PREREGISTRATION_SCHEMA}")
     manifest_path = Path(ranking_manifest_path).resolve()
     manifest, runs_by_model, suites = ranking.load_ranking_manifest(manifest_path)
-    if manifest.get("schema") != ranking.RANKING_MANIFEST_SCHEMA:
-        raise ValueError("power pilot requires a v2 hashed ranking manifest")
+    if manifest.get("schema") not in ranking.POWER_PILOT_RANKING_MANIFEST_SCHEMAS:
+        raise ValueError("power pilot requires a v2 or v3 hashed ranking manifest")
     if suites != ranking.OFFICIAL_SUITES:
         raise ValueError("power pilot requires all four official suites")
     for model_name, runs in runs_by_model.items():

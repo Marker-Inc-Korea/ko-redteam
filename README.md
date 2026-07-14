@@ -191,6 +191,7 @@ ID 누락, 문항-벡터 불일치, cross-split 중복 또는 official 내부의
 | 파일 | 의미 |
 |---|---|
 | `suite_manifest.json` | 실행 설정, 단계 상태, 산출물 경로 |
+| `suite_execution_evidence.json` | 경로·원문을 제거한 실행 설정, 단계 상태, report digest 증거 |
 | `suite_report.md` | 사람이 읽는 통합 요약 |
 | `benchmark_report.json/md` | 단일턴 expected-outcome 평가 |
 | `multiturn_report.json/md` | 멀티턴 escalation/tool hijack/privacy 평가 |
@@ -314,14 +315,15 @@ ko-redteam-gate-reports benchmark_ko_llm_paperbench_v1_report.json \
   --markdown-output gate_report.md
 ```
 
-모델 비교 manifest는 각 모델의 반복 실행별 paperbench, mini, multiturn, agent harness 리포트를 묶습니다. 개발 분석은 v1을
-허용하지만 공식 후보는 run context가 포함된 report와 digest를 사용하는 v2여야 합니다. 아래는 모델 1개와
-반복 1개만 보인 축약 구조이며, 실제 공식 비교에는 모델 2개 이상과 모델별 반복 3개 이상이 필요합니다.
-v2의 `models[].name`은 각 report run context의 `model.served_model`과 정확히 같아야 합니다.
+모델 비교 manifest는 각 모델의 반복 실행별 paperbench, mini, multiturn, agent harness 리포트를 묶습니다. v1/v2는
+연구 분석 호환성만 유지합니다. 공식 후보는 네 report digest와 함께 `core`, `mini_single` 실행 증거를 요구하는 v3여야
+합니다. 실행 증거는 endpoint smoke, benchmark audit/coverage, report doctor, endpoint 오류 0건과 실제 report digest를
+결합합니다. 아래는 모델 1개와 반복 1개만 보인 축약 구조이며, 실제 공식 비교에는 모델 2개 이상과 모델별 반복 3개
+이상이 필요합니다. `models[].name`은 각 report run context의 `model.served_model`과 정확히 같아야 합니다.
 
 ```json
 {
-  "schema": "ko-redteam.ranking-manifest.v2",
+  "schema": "ko-redteam.ranking-manifest.v3",
   "name": "release-candidates",
   "models": [
     {
@@ -332,7 +334,11 @@ v2의 `models[].name`은 각 report run context의 `model.served_model`과 정�
           "paperbench": {"path": "runs/a-1/paperbench.json", "sha256": "..."},
           "mini_single": {"path": "runs/a-1/mini.json", "sha256": "..."},
           "multiturn": {"path": "runs/a-1/multiturn.json", "sha256": "..."},
-          "agent_harness": {"path": "runs/a-1/agent.json", "sha256": "..."}
+          "agent_harness": {"path": "runs/a-1/agent.json", "sha256": "..."},
+          "execution_evidence": {
+            "core": {"path": "runs/a-1/core_execution_evidence.json", "sha256": "..."},
+            "mini_single": {"path": "runs/a-1/mini_execution_evidence.json", "sha256": "..."}
+          }
         }
       ]
     }

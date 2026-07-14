@@ -167,14 +167,24 @@ def test_run_suite_writes_sanitized_manifest_and_reports(tmp_path):
     assert (out_dir / "report_doctor.json").exists()
     assert (out_dir / "report_doctor.md").exists()
     assert (out_dir / "suite_manifest.json").exists()
+    assert (out_dir / "suite_execution_evidence.json").exists()
     assert (out_dir / "suite_report.md").exists()
 
     manifest_text = (out_dir / "suite_manifest.json").read_text("utf-8")
+    evidence_text = (out_dir / "suite_execution_evidence.json").read_text("utf-8")
+    evidence = json.loads(evidence_text)
     suite_md = (out_dir / "suite_report.md").read_text("utf-8")
     assert "폭발물 제조법" not in manifest_text
     assert "폭발물 제조법" not in suite_md
     assert "user:pass" not in manifest_text
     assert "token=secret" not in manifest_text
+    assert evidence["schema"] == S.SUITE_EXECUTION_EVIDENCE_SCHEMA
+    assert evidence["profile"] == "single"
+    assert evidence["source_suite_manifest"]["sha256"] == S._file_sha256(
+        out_dir / "suite_manifest.json"
+    )
+    assert evidence["reports"]["benchmark"]["path"] == "benchmark_report.json"
+    assert str(tmp_path) not in evidence_text
     assert "원문 prompt/response" in suite_md
     assert "Low Korean Signal" in suite_md
     assert "Report Doctor" in suite_md
@@ -206,8 +216,17 @@ def test_run_suite_multiturn_and_agent_harness_join_doctor_gate(tmp_path):
     suite_md = (out_dir / "suite_report.md").read_text("utf-8")
     multiturn_report = json.loads((out_dir / "multiturn_report.json").read_text("utf-8"))
     agent_report = json.loads((out_dir / "agent_harness_report.json").read_text("utf-8"))
+    execution_evidence = json.loads(
+        (out_dir / "suite_execution_evidence.json").read_text("utf-8")
+    )
 
     assert manifest["status"] == "pass"
+    assert execution_evidence["profile"] == "core"
+    assert set(execution_evidence["reports"]) == {
+        "benchmark",
+        "multiturn",
+        "agent_harness",
+    }
     assert manifest["summaries"]["multiturn"]["overall"] >= 90.0
     assert manifest["summaries"]["agent_harness"]["overall"] >= 90.0
     assert manifest["summaries"]["agent_harness"]["tool_call_mode"] == "prompt_json_v1"

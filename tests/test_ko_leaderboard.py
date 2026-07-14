@@ -171,6 +171,150 @@ def _report(
     }
 
 
+def _execution_evidence(
+    root: Path,
+    run_dir: Path,
+    model: str,
+    context: dict,
+    run: dict,
+) -> dict[str, dict[str, str]]:
+    common_config = {
+        "expand": False,
+        "include_raw": False,
+        "timeout": 60,
+        "max_tokens": 512,
+        "coverage": {"enabled": True, "min_total": 1},
+        "endpoint_smoke": {
+            "enabled": True,
+            "required_phrase": None,
+            "min_hangul_ratio": 0.35,
+            "max_tokens": 96,
+        },
+        "doctor": {"enabled": True, "warnings_fail": True, "allow_raw": False},
+        "gate": {"enabled": False},
+        "measurement_integrity": {"endpoint_errors_allowed": 0},
+    }
+    profile_reports = {
+        "core": {
+            "benchmark": "paperbench",
+            "multiturn": "multiturn",
+            "agent_harness": "agent_harness",
+        },
+        "mini_single": {"benchmark": "mini_single"},
+    }
+    profile_steps = {
+        "core": {
+            "source_audit": "pass",
+            "multiturn_audit": "pass",
+            "agent_audit": "pass",
+            "benchmark_coverage": "pass",
+            "endpoint_smoke": "pass",
+            "benchmark_scan": "pass",
+            "multiturn_benchmark": "pass",
+            "agent_harness": "pass",
+            "measurement_integrity": "pass",
+            "report_doctor": "pass",
+            "gate": "skipped",
+        },
+        "mini_single": {
+            "source_audit": "pass",
+            "benchmark_coverage": "pass",
+            "endpoint_smoke": "pass",
+            "benchmark_scan": "pass",
+            "multiturn_benchmark": "skipped",
+            "agent_harness": "skipped",
+            "measurement_integrity": "pass",
+            "report_doctor": "pass",
+            "gate": "skipped",
+        },
+    }
+    references = {}
+    for profile, report_mapping in profile_reports.items():
+        enabled = profile == "core"
+        integrity_names = (
+            ("benchmark", "multiturn", "agent_harness")
+            if enabled
+            else ("benchmark",)
+        )
+        evidence = {
+            "schema": R.SUITE_EXECUTION_EVIDENCE_SCHEMA,
+            "profile": "core" if profile == "core" else "single",
+            "status": "pass",
+            "created_at": "2026-07-13T00:00:00Z",
+            "completed_at": "2026-07-13T00:10:00Z",
+            "model": model,
+            "run_context": {
+                "run_id": context["run_id"],
+                "context_sha256": C.canonical_sha256(context),
+            },
+            "source_suite_manifest": {
+                "schema": "ko-redteam.suite-manifest.v1",
+                "sha256": "f" * 64,
+            },
+            "config": {
+                **common_config,
+                "multiturn": {"enabled": enabled},
+                "agent_harness": {
+                    "enabled": enabled,
+                    "tool_call_mode": "prompt_json_v1",
+                },
+            },
+            "steps": [
+                {"name": name, "status": status}
+                for name, status in profile_steps[profile].items()
+            ],
+            "summaries": {
+                "endpoint_smoke": {
+                    "status": "pass",
+                    "checks": 4,
+                    "passed": 4,
+                    "failed": 0,
+                    "chars": 20,
+                    "hangul_ratio": 1.0,
+                    "quality_flags": [],
+                    "error_category": None,
+                    "prompt_sha256_16": "0" * 16,
+                },
+                "measurement_integrity": {
+                    "status": "pass",
+                    "endpoint_errors": 0,
+                    "endpoint_errors_allowed": 0,
+                    "suites": {
+                        name: {
+                            "status": "pass",
+                            "endpoint_errors": 0,
+                            "error_categories": {},
+                            "counts_consistent": True,
+                        }
+                        for name in integrity_names
+                    },
+                },
+                "doctor": {
+                    "status": "pass",
+                    "files": 6 if enabled else 2,
+                    "failed": 0,
+                    "passed": 6 if enabled else 2,
+                    "errors": 0,
+                    "warnings": 0,
+                },
+            },
+            "reports": {
+                evidence_name: {
+                    "path": f"{suite}.json",
+                    "sha256": run[suite]["sha256"],
+                }
+                for evidence_name, suite in report_mapping.items()
+            },
+        }
+        evidence_path = run_dir / f"{profile}_execution_evidence.json"
+        _write_json(evidence_path, evidence)
+        references[profile] = {
+            "path": str(evidence_path.relative_to(root)),
+            "sha256": _sha_file(evidence_path),
+        }
+    return references
+
+
 def _ranking_bundle(
     root: Path, *, full_official: bool = False, groups_per_domain: int = 30
 ) -> tuple[Path, Path, dict]:
@@ -197,6 +341,13 @@ def _ranking_bundle(
                     "path": str(report_path.relative_to(root)),
                     "sha256": _sha_file(report_path),
                 }
+            run["execution_evidence"] = _execution_evidence(
+                root,
+                root / "runs" / model / f"run-{run_index}",
+                model,
+                context,
+                run,
+            )
             runs.append(run)
         entries.append({"name": model, "runs": runs})
 
@@ -771,6 +922,46 @@ def test_power_derived_design_above_protocol_floor_is_publishable(tmp_path):
     assert "preregistration.split_design" in failed_ids
 
 
+def test_v3_ranking_rejects_execution_evidence_tampering(tmp_path):
+    manifest_path, _, _ = _ranking_bundle(tmp_path / "ranking", full_official=True)
+    manifest = json.loads(manifest_path.read_text("utf-8"))
+    reference = manifest["models"][0]["runs"][0]["execution_evidence"]["core"]
+    evidence_path = manifest_path.parent / reference["path"]
+    evidence = json.loads(evidence_path.read_text("utf-8"))
+    evidence["config"]["endpoint_smoke"]["required_phrase"] = "접수되었습니다"
+    _write_json(evidence_path, evidence)
+    reference["sha256"] = _sha_file(evidence_path)
+    _write_json(manifest_path, manifest)
+
+    with pytest.raises(ValueError, match="endpoint smoke protocol mismatch"):
+        R.analyze_ranking_manifest(manifest_path, iterations=200)
+
+
+def test_v2_hashed_manifest_remains_valid_for_historical_power_pilots(tmp_path):
+    release_path = _valid_release(tmp_path)
+    release = json.loads(release_path.read_text("utf-8"))
+    manifest_path = tmp_path / release["artifacts"]["ranking_manifest"]["path"]
+    manifest = json.loads(manifest_path.read_text("utf-8"))
+    manifest["schema"] = R.RANKING_MANIFEST_V2_SCHEMA
+    for model in manifest["models"]:
+        for run in model["runs"]:
+            run.pop("execution_evidence")
+    _write_json(manifest_path, manifest)
+    preregistration = json.loads(
+        (tmp_path / release["artifacts"]["preregistration"]["path"]).read_text("utf-8")
+    )
+
+    power_input = PP.build_power_pilot_input(
+        manifest_path,
+        preregistration,
+        preregistered_at="2026-06-01T00:00:00+09:00",
+    )
+
+    assert power_input["pilot_source"]["ranking_manifest_schema"] == (
+        R.RANKING_MANIFEST_V2_SCHEMA
+    )
+
+
 def test_power_pilot_rejects_endpoint_error_rows(tmp_path):
     release_path = _valid_release(tmp_path)
     release = json.loads(release_path.read_text("utf-8"))
@@ -785,6 +976,12 @@ def test_power_pilot_rejects_endpoint_error_rows(tmp_path):
     report["scorecard"]["case_scores"][0]["outcome"] = "error"
     _write_json(report_path, report)
     artifact["sha256"] = _sha_file(report_path)
+    evidence_reference = manifest["models"][0]["runs"][0]["execution_evidence"]["core"]
+    evidence_path = manifest_path.parent / evidence_reference["path"]
+    evidence = json.loads(evidence_path.read_text("utf-8"))
+    evidence["reports"]["agent_harness"]["sha256"] = artifact["sha256"]
+    _write_json(evidence_path, evidence)
+    evidence_reference["sha256"] = _sha_file(evidence_path)
     _write_json(manifest_path, manifest)
 
     with pytest.raises(ValueError, match="rejects endpoint errors"):
@@ -870,7 +1067,7 @@ def test_malformed_preregistration_domains_fail_closed(tmp_path):
     assert "preregistration.split_design" in failed_ids
 
 
-def test_v2_ranking_rejects_relabeling_and_tampered_context(tmp_path):
+def test_v3_ranking_rejects_relabeling_and_tampered_context(tmp_path):
     ranking_manifest_path, _, _ = _ranking_bundle(tmp_path)
     manifest = json.loads(ranking_manifest_path.read_text("utf-8"))
     original_name = manifest["models"][0]["name"]
@@ -893,7 +1090,7 @@ def test_v2_ranking_rejects_relabeling_and_tampered_context(tmp_path):
         R.analyze_ranking_manifest(ranking_manifest_path, iterations=100)
 
 
-def test_v2_ranking_rejects_cross_suite_independence_group_reuse(tmp_path):
+def test_v3_ranking_rejects_cross_suite_independence_group_reuse(tmp_path):
     ranking_manifest_path, _, _ = _ranking_bundle(tmp_path)
     manifest = json.loads(ranking_manifest_path.read_text("utf-8"))
     for model in manifest["models"]:
@@ -906,6 +1103,12 @@ def test_v2_ranking_rejects_cross_suite_independence_group_reuse(tmp_path):
             )
             _write_json(report_path, report)
             reference["sha256"] = _sha_file(report_path)
+            evidence_reference = run["execution_evidence"]["mini_single"]
+            evidence_path = tmp_path / evidence_reference["path"]
+            evidence = json.loads(evidence_path.read_text("utf-8"))
+            evidence["reports"]["benchmark"]["sha256"] = reference["sha256"]
+            _write_json(evidence_path, evidence)
+            evidence_reference["sha256"] = _sha_file(evidence_path)
     _write_json(ranking_manifest_path, manifest)
 
     with pytest.raises(ValueError, match="reused across suites"):

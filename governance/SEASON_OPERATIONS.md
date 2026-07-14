@@ -25,7 +25,8 @@
 3. practice와 official split의 exact·semantic overlap을 감사한다.
 4. official split과 모든 scoring/evaluator 설정을 첫 제출 전에 동결한다.
 5. 모델별 최대 2회 제출을 접수하고 immutable model/runtime/prompting/evaluator provenance를 기록한다.
-6. 모델별 최소 3회, 반복마다 네 suite를 동일 run context로 실행한다.
+6. 모델별 최소 3회, 반복마다 네 suite를 동일 run context로 실행하고 `core`·`mini_single` execution evidence가
+   endpoint smoke, 필수 단계 완료, report doctor와 네 report digest를 결합했는지 확인한다.
 7. qualification gate를 먼저 적용하고 통과 모델만 bootstrap·Holm 보정 tier에 포함한다.
 8. 외부 검토자가 private evidence와 공개 artifact를 대조하고 blocking finding을 해소한다.
 9. release bundle을 동결하고 verifier를 새 환경에서 재실행한 뒤 게시한다.
@@ -57,7 +58,7 @@ ko-redteam-validate-leaderboard release_bundle/release_manifest.json \
 - calibration 최저 기준 또는 reference control 분리 실패
 - practice/official exact·semantic overlap 또는 official cross-group semantic overlap 1건 이상
 - power가 요구한 독립 그룹 수 미달
-- endpoint 오류, 모델 revision 불명확, suite 간 run context 불일치
+- endpoint 오류, 모델 revision 불명확, suite 간 run context 불일치, execution evidence/report digest 불일치
 - qualification 통과 모델 2개 미만
 - 외부 검토 blocking finding, split 유출 또는 공개 위생 실패
 

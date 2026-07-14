@@ -11,16 +11,27 @@ import re
 from typing import Any
 
 try:
-    from ko_model_ranking import OFFICIAL_SUITES, analyze_ranking_manifest
+    from ko_model_ranking import (
+        OFFICIAL_SUITES,
+        POWER_PILOT_RANKING_MANIFEST_SCHEMAS,
+        RANKING_MANIFEST_SCHEMA,
+        SUITE_EXECUTION_EVIDENCE_SCHEMA,
+        analyze_ranking_manifest,
+    )
     from ko_run_context import canonical_sha256, validate_run_context
 except ModuleNotFoundError:  # package import path
-    from .ko_model_ranking import OFFICIAL_SUITES, analyze_ranking_manifest
+    from .ko_model_ranking import (
+        OFFICIAL_SUITES,
+        POWER_PILOT_RANKING_MANIFEST_SCHEMAS,
+        RANKING_MANIFEST_SCHEMA,
+        SUITE_EXECUTION_EVIDENCE_SCHEMA,
+        analyze_ranking_manifest,
+    )
     from .ko_run_context import canonical_sha256, validate_run_context
 
 
 RELEASE_SCHEMA = "ko-redteam.leaderboard-release.v1"
 RANKING_SCHEMA = "ko-redteam.model-ranking.v2"
-RANKING_MANIFEST_SCHEMA = "ko-redteam.ranking-manifest.v2"
 CALIBRATION_SCHEMA = "ko-redteam.evaluator-calibration.v1"
 CALIBRATION_INPUT_SCHEMA = "ko-redteam.calibration-input.v1"
 SPLIT_AUDIT_SCHEMA = "ko-redteam.benchmark-split-audit.v1"
@@ -689,6 +700,7 @@ def _audit_run_provenance(
     artifact_errors = 0
     raw_reports = 0
     absolute_benchmark_paths = 0
+    execution_evidence_errors = 0
     unique_run_ids: set[str] = set()
     total_runs = 0
 
@@ -709,6 +721,7 @@ def _audit_run_provenance(
             declared_run_id = run.get("run_id")
             suite_hashes: set[str] = set()
             suite_contexts: list[dict[str, Any]] = []
+            report_digests: dict[str, str] = {}
             for suite in SUITES:
                 reference = run.get(suite)
                 path = _artifact_ref_path(run_root, reference)
@@ -743,12 +756,97 @@ def _audit_run_provenance(
                     continue
                 suite_hashes.add(str(declared_hash))
                 suite_contexts.append(context)
+                report_digests[suite] = str(digest)
             if len(suite_hashes) != 1 or len(suite_contexts) != len(SUITES):
                 artifact_errors += 1
                 continue
             context = suite_contexts[0]
             run_id = str(context.get("run_id") or "")
             if declared_run_id != run_id or run_id in unique_run_ids:
+                artifact_errors += 1
+                continue
+            evidence_references = run.get("execution_evidence")
+            evidence_valid = (
+                isinstance(evidence_references, dict)
+                and set(evidence_references) == {"core", "mini_single"}
+            )
+            evidence_profiles = {
+                "core": {
+                    "evidence_profile": "core",
+                    "reports": {
+                        "benchmark": "paperbench",
+                        "multiturn": "multiturn",
+                        "agent_harness": "agent_harness",
+                    },
+                },
+                "mini_single": {
+                    "evidence_profile": "single",
+                    "reports": {"benchmark": "mini_single"},
+                },
+            }
+            if evidence_valid:
+                for profile, profile_contract in evidence_profiles.items():
+                    report_mapping = profile_contract["reports"]
+                    reference = evidence_references.get(profile)
+                    evidence_path = _artifact_ref_path(run_root, reference)
+                    digest = reference.get("sha256") if isinstance(reference, dict) else None
+                    if (
+                        evidence_path is None
+                        or not evidence_path.is_file()
+                        or not isinstance(digest, str)
+                        or _sha256_file(evidence_path) != digest
+                    ):
+                        evidence_valid = False
+                        break
+                    try:
+                        evidence = _load_json(evidence_path)
+                    except (OSError, ValueError, json.JSONDecodeError):
+                        evidence_valid = False
+                        break
+                    evidence_context = evidence.get("run_context") or {}
+                    evidence_reports = evidence.get("reports") or {}
+                    source_manifest = evidence.get("source_suite_manifest") or {}
+                    if (
+                        evidence.get("schema") != SUITE_EXECUTION_EVIDENCE_SCHEMA
+                        or evidence.get("profile")
+                        != profile_contract["evidence_profile"]
+                        or evidence.get("status") != "pass"
+                        or evidence.get("model") != name
+                        or evidence_context.get("run_id") != run_id
+                        or evidence_context.get("context_sha256")
+                        != next(iter(suite_hashes))
+                        or source_manifest.get("schema")
+                        != "ko-redteam.suite-manifest.v1"
+                        or not SHA256_RE.fullmatch(
+                            str(source_manifest.get("sha256") or "")
+                        )
+                        or set(evidence_reports) != set(report_mapping)
+                        or _absolute_path_present(evidence)
+                    ):
+                        evidence_valid = False
+                        break
+                    for evidence_name, suite in report_mapping.items():
+                        report_reference = evidence_reports.get(evidence_name)
+                        report_path = _artifact_ref_path(
+                            evidence_path.parent, report_reference
+                        )
+                        report_digest = (
+                            report_reference.get("sha256")
+                            if isinstance(report_reference, dict)
+                            else None
+                        )
+                        if (
+                            report_path is None
+                            or not report_path.is_file()
+                            or report_digest != report_digests.get(suite)
+                            or _sha256_file(report_path) != report_digest
+                        ):
+                            evidence_valid = False
+                            break
+                    if not evidence_valid:
+                        break
+            if not evidence_valid:
+                execution_evidence_errors += 1
                 artifact_errors += 1
                 continue
             unique_run_ids.add(run_id)
@@ -779,8 +877,15 @@ def _audit_run_provenance(
         "provenance.run_artifacts",
         "provenance",
         total_runs > 0 and artifact_errors == 0,
-        "every run must bind four hashed suite reports to one valid run context",
+        "every run must bind four hashed suite reports and two execution evidence artifacts to one valid run context",
         actual={"runs": total_runs, "errors": artifact_errors},
+    )
+    audit.check(
+        "provenance.execution_evidence",
+        "provenance",
+        total_runs > 0 and execution_evidence_errors == 0,
+        "every run must prove endpoint readiness, required suite steps, report doctor results, and report digests",
+        actual={"runs": total_runs, "errors": execution_evidence_errors},
     )
     audit.check(
         "provenance.unique_runs",
@@ -1405,7 +1510,7 @@ def _audit_power(audit: _Audit, power: dict[str, Any]) -> None:
             )
         )
         and pilot_source.get("ranking_manifest_schema")
-        == RANKING_MANIFEST_SCHEMA
+        in POWER_PILOT_RANKING_MANIFEST_SCHEMAS
         and pilot_source.get("suites") == list(SUITES)
         and set(pilot_benchmarks) == set(SUITES)
         and all(

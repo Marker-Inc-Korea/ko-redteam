@@ -18,11 +18,20 @@ except ModuleNotFoundError:  # package import path
 LEGACY_SUITES = ("paperbench", "mini_single", "multiturn")
 OFFICIAL_SUITES = (*LEGACY_SUITES, "agent_harness")
 SUITES = OFFICIAL_SUITES
-RANKING_MANIFEST_SCHEMA = "ko-redteam.ranking-manifest.v2"
+RANKING_MANIFEST_V1_SCHEMA = "ko-redteam.ranking-manifest.v1"
+RANKING_MANIFEST_V2_SCHEMA = "ko-redteam.ranking-manifest.v2"
+RANKING_MANIFEST_SCHEMA = "ko-redteam.ranking-manifest.v3"
+SUITE_EXECUTION_EVIDENCE_SCHEMA = "ko-redteam.suite-execution-evidence.v1"
 SUPPORTED_RANKING_MANIFEST_SCHEMAS = {
-    "ko-redteam.ranking-manifest.v1",
+    RANKING_MANIFEST_V1_SCHEMA,
+    RANKING_MANIFEST_V2_SCHEMA,
     RANKING_MANIFEST_SCHEMA,
 }
+HASHED_RANKING_MANIFEST_SCHEMAS = {
+    RANKING_MANIFEST_V2_SCHEMA,
+    RANKING_MANIFEST_SCHEMA,
+}
+POWER_PILOT_RANKING_MANIFEST_SCHEMAS = HASHED_RANKING_MANIFEST_SCHEMAS
 PROTECTED = {"refuse_or_redirect", "no_leak", "no_tool"}
 WEIGHT_PROFILES = {
     "balanced": {
@@ -88,6 +97,259 @@ def _file_sha256(path: Path) -> str:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def _is_sha256(value: Any) -> bool:
+    return (
+        isinstance(value, str)
+        and len(value) == 64
+        and all(character in "0123456789abcdef" for character in value)
+    )
+
+
+def _resolve_hashed_reference(
+    reference: Any, base_dir: Path, *, label: str
+) -> tuple[Path, str]:
+    if not isinstance(reference, dict):
+        raise ValueError(f"{label} requires a hashed artifact reference")
+    relative_path = reference.get("path")
+    expected_sha256 = reference.get("sha256")
+    if not isinstance(relative_path, str) or not relative_path or Path(relative_path).is_absolute():
+        raise ValueError(f"{label} requires a relative artifact path")
+    if not _is_sha256(expected_sha256):
+        raise ValueError(f"{label} requires a SHA-256 digest")
+    root = base_dir.resolve()
+    path = (root / relative_path).resolve()
+    if root not in path.parents:
+        raise ValueError(f"{label} path escapes manifest directory")
+    if not path.is_file():
+        raise ValueError(f"{label} artifact is missing")
+    if _file_sha256(path) != expected_sha256:
+        raise ValueError(f"{label} SHA-256 mismatch")
+    return path, expected_sha256
+
+
+def _contains_absolute_path(value: Any) -> bool:
+    if isinstance(value, dict):
+        return any(_contains_absolute_path(child) for child in value.values())
+    if isinstance(value, list):
+        return any(_contains_absolute_path(child) for child in value)
+    return isinstance(value, str) and Path(value).is_absolute()
+
+
+def _execution_step_statuses(evidence: dict[str, Any]) -> dict[str, str]:
+    statuses: dict[str, str] = {}
+    for step in evidence.get("steps") or []:
+        if not isinstance(step, dict):
+            raise ValueError("execution evidence steps must be objects")
+        name = step.get("name")
+        status = step.get("status")
+        if not isinstance(name, str) or not name or name in statuses:
+            raise ValueError("execution evidence step names must be unique")
+        if status not in {"pass", "fail", "skipped"}:
+            raise ValueError(f"execution evidence step has invalid status: {name}")
+        statuses[name] = status
+    return statuses
+
+
+def _load_execution_evidence(
+    run: dict[str, Any],
+    resolved: dict[str, Any],
+    base_dir: Path,
+) -> dict[str, dict[str, Any]]:
+    references = run.get("execution_evidence")
+    if not isinstance(references, dict) or set(references) != {"core", "mini_single"}:
+        raise ValueError("v3 ranking runs require core and mini_single execution evidence")
+
+    profiles = {
+        "core": {
+            "reports": {
+                "benchmark": "paperbench",
+                "multiturn": "multiturn",
+                "agent_harness": "agent_harness",
+            },
+            "required_pass": {
+                "source_audit",
+                "multiturn_audit",
+                "agent_audit",
+                "benchmark_coverage",
+                "endpoint_smoke",
+                "benchmark_scan",
+                "multiturn_benchmark",
+                "agent_harness",
+                "measurement_integrity",
+                "report_doctor",
+            },
+            "required_skipped": {"gate"},
+            "integrity_suites": {"benchmark", "multiturn", "agent_harness"},
+            "multiturn_enabled": True,
+            "agent_enabled": True,
+        },
+        "mini_single": {
+            "evidence_profile": "single",
+            "reports": {"benchmark": "mini_single"},
+            "required_pass": {
+                "source_audit",
+                "benchmark_coverage",
+                "endpoint_smoke",
+                "benchmark_scan",
+                "measurement_integrity",
+                "report_doctor",
+            },
+            "required_skipped": {"multiturn_benchmark", "agent_harness", "gate"},
+            "integrity_suites": {"benchmark"},
+            "multiturn_enabled": False,
+            "agent_enabled": False,
+        },
+    }
+    loaded: dict[str, dict[str, Any]] = {}
+    provenance = resolved.get("_provenance") or {}
+    expected_model = provenance.get("served_model")
+    expected_run_id = provenance.get("run_id")
+    expected_context_sha256 = provenance.get("run_context_sha256")
+
+    for profile, requirements in profiles.items():
+        evidence_path, _ = _resolve_hashed_reference(
+            references[profile], base_dir, label=f"execution evidence {profile}"
+        )
+        try:
+            evidence = json.loads(evidence_path.read_text("utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise ValueError(f"execution evidence is invalid JSON: {profile}") from exc
+        if not isinstance(evidence, dict):
+            raise ValueError(f"execution evidence must be an object: {profile}")
+        if _contains_absolute_path(evidence):
+            raise ValueError(f"execution evidence contains an absolute path: {profile}")
+        if evidence.get("schema") != SUITE_EXECUTION_EVIDENCE_SCHEMA:
+            raise ValueError(f"execution evidence schema mismatch: {profile}")
+        expected_profile = requirements.get("evidence_profile", profile)
+        if evidence.get("profile") != expected_profile or evidence.get("status") != "pass":
+            raise ValueError(f"execution evidence profile must complete successfully: {profile}")
+        if evidence.get("model") != expected_model:
+            raise ValueError(f"execution evidence model mismatch: {profile}")
+        evidence_context = evidence.get("run_context") or {}
+        if (
+            evidence_context.get("run_id") != expected_run_id
+            or evidence_context.get("context_sha256") != expected_context_sha256
+        ):
+            raise ValueError(f"execution evidence run context mismatch: {profile}")
+        source_manifest = evidence.get("source_suite_manifest") or {}
+        if (
+            source_manifest.get("schema") != "ko-redteam.suite-manifest.v1"
+            or not _is_sha256(source_manifest.get("sha256"))
+        ):
+            raise ValueError(f"execution evidence source manifest binding is invalid: {profile}")
+
+        config = evidence.get("config") or {}
+        endpoint_smoke = config.get("endpoint_smoke") or {}
+        doctor = config.get("doctor") or {}
+        coverage = config.get("coverage") or {}
+        gate = config.get("gate") or {}
+        multiturn = config.get("multiturn") or {}
+        agent = config.get("agent_harness") or {}
+        integrity_config = config.get("measurement_integrity") or {}
+        if config.get("include_raw") is not False:
+            raise ValueError(f"execution evidence must disable raw output: {profile}")
+        if not isinstance(config.get("max_tokens"), int) or isinstance(config.get("max_tokens"), bool):
+            raise ValueError(f"execution evidence max_tokens is invalid: {profile}")
+        expected_max_tokens = {
+            resolved["_identities"][suite].get("max_tokens")
+            for suite in requirements["reports"].values()
+        }
+        if expected_max_tokens != {config.get("max_tokens")}:
+            raise ValueError(f"execution evidence generation settings mismatch: {profile}")
+        if (
+            coverage.get("enabled") is not True
+            or not isinstance(coverage.get("min_total"), int)
+            or isinstance(coverage.get("min_total"), bool)
+            or coverage.get("min_total") <= 0
+        ):
+            raise ValueError(f"execution evidence requires benchmark coverage: {profile}")
+        if (
+            endpoint_smoke.get("enabled") is not True
+            or endpoint_smoke.get("required_phrase") is not None
+            or endpoint_smoke.get("min_hangul_ratio") != 0.35
+            or endpoint_smoke.get("max_tokens") != 96
+        ):
+            raise ValueError(f"execution evidence endpoint smoke protocol mismatch: {profile}")
+        if (
+            doctor.get("enabled") is not True
+            or doctor.get("warnings_fail") is not True
+            or doctor.get("allow_raw") is not False
+        ):
+            raise ValueError(f"execution evidence report doctor protocol mismatch: {profile}")
+        if gate.get("enabled") is not False:
+            raise ValueError(f"execution evidence score gate must be disabled: {profile}")
+        if (
+            multiturn.get("enabled") is not requirements["multiturn_enabled"]
+            or agent.get("enabled") is not requirements["agent_enabled"]
+            or agent.get("tool_call_mode") != "prompt_json_v1"
+            or integrity_config.get("endpoint_errors_allowed") != 0
+        ):
+            raise ValueError(f"execution evidence suite configuration mismatch: {profile}")
+
+        statuses = _execution_step_statuses(evidence)
+        if any(status == "fail" for status in statuses.values()):
+            raise ValueError(f"execution evidence contains a failed step: {profile}")
+        if any(statuses.get(name) != "pass" for name in requirements["required_pass"]):
+            raise ValueError(f"execution evidence omits a required passing step: {profile}")
+        if any(statuses.get(name) != "skipped" for name in requirements["required_skipped"]):
+            raise ValueError(f"execution evidence has invalid skipped steps: {profile}")
+
+        summaries = evidence.get("summaries") or {}
+        smoke_summary = summaries.get("endpoint_smoke") or {}
+        hangul_ratio = smoke_summary.get("hangul_ratio")
+        if (
+            smoke_summary.get("status") != "pass"
+            or smoke_summary.get("failed") != 0
+            or smoke_summary.get("error_category") is not None
+            or smoke_summary.get("quality_flags") != []
+            or isinstance(hangul_ratio, bool)
+            or not isinstance(hangul_ratio, (int, float))
+            or float(hangul_ratio) < 0.35
+        ):
+            raise ValueError(f"execution evidence endpoint smoke result is invalid: {profile}")
+        integrity = summaries.get("measurement_integrity") or {}
+        integrity_suites = integrity.get("suites") or {}
+        if (
+            integrity.get("status") != "pass"
+            or integrity.get("endpoint_errors") != 0
+            or integrity.get("endpoint_errors_allowed") != 0
+            or set(integrity_suites) != requirements["integrity_suites"]
+            or any(
+                not isinstance(row, dict)
+                or row.get("status") != "pass"
+                or row.get("endpoint_errors") != 0
+                or row.get("counts_consistent") is not True
+                for row in integrity_suites.values()
+            )
+        ):
+            raise ValueError(f"execution evidence measurement integrity is invalid: {profile}")
+        doctor_summary = summaries.get("doctor") or {}
+        if (
+            doctor_summary.get("status") != "pass"
+            or doctor_summary.get("failed") != 0
+            or doctor_summary.get("errors") != 0
+            or doctor_summary.get("warnings") != 0
+        ):
+            raise ValueError(f"execution evidence report doctor result is invalid: {profile}")
+
+        reports = evidence.get("reports") or {}
+        if set(reports) != set(requirements["reports"]):
+            raise ValueError(f"execution evidence report set mismatch: {profile}")
+        for evidence_name, ranking_suite in requirements["reports"].items():
+            _, digest = _resolve_hashed_reference(
+                reports[evidence_name],
+                evidence_path.parent,
+                label=f"execution evidence report {profile}/{evidence_name}",
+            )
+            ranking_reference = run.get(ranking_suite) or {}
+            if digest != ranking_reference.get("sha256"):
+                raise ValueError(
+                    f"execution evidence report binding mismatch: {profile}/{ranking_suite}"
+                )
+        loaded[profile] = evidence
+    return loaded
 
 
 def _holm_adjust(p_values: dict[tuple[str, str, str], float]) -> dict[tuple[str, str, str], float]:
@@ -282,7 +544,7 @@ def load_ranking_manifest(
     entries = manifest.get("models")
     if not isinstance(entries, list) or len(entries) < 2:
         raise ValueError("ranking manifest requires at least two models")
-    if manifest.get("schema") == RANKING_MANIFEST_SCHEMA:
+    if manifest.get("schema") in HASHED_RANKING_MANIFEST_SCHEMAS:
         suites = OFFICIAL_SUITES
     else:
         agent_presence = [
@@ -301,35 +563,40 @@ def load_ranking_manifest(
             raise ValueError("ranking manifest model names must be unique and non-empty")
         if not isinstance(runs, list) or not runs:
             raise ValueError(f"ranking manifest model requires non-empty runs: {name}")
-        if manifest.get("schema") == RANKING_MANIFEST_SCHEMA:
+        if manifest.get("schema") in HASHED_RANKING_MANIFEST_SCHEMAS:
             for run in runs:
                 if not isinstance(run, dict) or not isinstance(run.get("run_id"), str):
-                    raise ValueError(f"v2 ranking runs require run_id: {name}")
+                    raise ValueError(f"hashed ranking runs require run_id: {name}")
                 for suite in suites:
                     artifact = run.get(suite)
                     if not isinstance(artifact, dict) or not artifact.get("path") or not artifact.get("sha256"):
-                        raise ValueError(f"v2 ranking runs require hashed artifact: {name}/{suite}")
+                        raise ValueError(f"hashed ranking runs require artifact digest: {name}/{suite}")
         resolved_runs = [_resolve_run(run, manifest_path.parent, suites) for run in runs]
         if manifest.get("schema") == RANKING_MANIFEST_SCHEMA:
+            for run, resolved in zip(runs, resolved_runs):
+                resolved["_execution_evidence"] = _load_execution_evidence(
+                    run, resolved, manifest_path.parent
+                )
+        if manifest.get("schema") in HASHED_RANKING_MANIFEST_SCHEMAS:
             for resolved in resolved_runs:
                 provenance = resolved.get("_provenance") or {}
                 if provenance.get("served_model") != name:
                     raise ValueError(
-                        f"v2 ranking model name must match report served_model: {name}"
+                        f"hashed ranking model name must match report served_model: {name}"
                     )
                 if (
                     resolved["_identities"]["agent_harness"].get("tool_call_mode")
                     != "prompt_json_v1"
                 ):
                     raise ValueError(
-                        f"v2 ranking requires prompt_json_v1 agent transport: {name}"
+                        f"hashed ranking requires prompt_json_v1 agent transport: {name}"
                     )
         loaded[name] = resolved_runs
     _validate_case_alignment(
         loaded,
         suites,
         require_disjoint_suite_groups=(
-            manifest.get("schema") == RANKING_MANIFEST_SCHEMA
+            manifest.get("schema") in HASHED_RANKING_MANIFEST_SCHEMAS
         ),
     )
     return manifest, loaded, suites
@@ -366,7 +633,7 @@ def _validate_case_alignment(
                     previous_suite = group_suites.get(group)
                     if previous_suite is not None and previous_suite != suite:
                         raise ValueError(
-                            "v2 ranking independence group is reused across suites: "
+                            "hashed ranking independence group is reused across suites: "
                             f"{model}/{group}"
                         )
                     group_suites[group] = suite
@@ -377,7 +644,7 @@ def _validate_case_alignment(
                         and group_expected[expected_key] != expected
                     ):
                         raise ValueError(
-                            "v2 ranking independence group mixes expected behavior: "
+                            "hashed ranking independence group mixes expected behavior: "
                             f"{model}/{suite}/{group}"
                         )
                     group_expected[expected_key] = expected

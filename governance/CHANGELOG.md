@@ -45,6 +45,10 @@
   suite/domain matrix의 실제 최소값과 정확히 일치하도록 수정했다.
 - 통합 suite endpoint smoke의 exact-phrase 검사를 opt-in으로 바꿨다. 기본 readiness gate는 API 성공,
   비어 있지 않은 응답, 한글 신호와 문자 깨짐 여부를 유지한다.
+- 공식 ranking manifest를 v3로 올리고 반복별 `core`·`mini_single` execution evidence를 필수화했다. 각 evidence는
+  endpoint smoke, benchmark coverage, report doctor, endpoint 오류 0건과 실제 report digest를 결합한다.
+- v1/v2 ranking manifest는 연구 분석과 기존 power pilot 재현에만 허용하며 공식 release validator는 v3에서만
+  `publishable`을 반환한다.
 
 ## Change Control
 

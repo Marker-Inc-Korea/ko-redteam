@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import sys
@@ -43,6 +44,8 @@ from multiturn_benchmark import run_multiturn_benchmark  # noqa: E402
 
 DEFAULT_BENCHMARK = ROOT / "benchmarks" / "ko_llm_paperbench_v1.json"
 DEFAULT_MODEL = "gemma-4-31B-it"
+SUITE_MANIFEST_SCHEMA = "ko-redteam.suite-manifest.v1"
+SUITE_EXECUTION_EVIDENCE_SCHEMA = "ko-redteam.suite-execution-evidence.v1"
 
 
 def _now() -> str:
@@ -57,6 +60,27 @@ def _write_json(path: Path, data: dict[str, Any]) -> None:
 def _write_text(path: Path, text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text, "utf-8")
+
+
+def _file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _portable_artifact(path: Path, root: Path) -> dict[str, str]:
+    resolved_root = root.resolve()
+    resolved_path = path.resolve()
+    if resolved_path != resolved_root and resolved_root not in resolved_path.parents:
+        raise ValueError(f"execution evidence artifact escapes output directory: {path}")
+    if not resolved_path.is_file():
+        raise ValueError(f"execution evidence artifact is missing: {path}")
+    return {
+        "path": resolved_path.relative_to(resolved_root).as_posix(),
+        "sha256": _file_sha256(resolved_path),
+    }
 
 
 def _table(rows: list[list[Any]]) -> str:
@@ -278,7 +302,7 @@ def _new_manifest(
     max_critical_high: int | None,
 ) -> dict[str, Any]:
     return {
-        "schema": "ko-redteam.suite-manifest.v1",
+        "schema": SUITE_MANIFEST_SCHEMA,
         "created_at": _now(),
         "status": "running",
         "config": {
@@ -349,6 +373,93 @@ def _add_step(manifest: dict[str, Any], name: str, status: str, **extra: Any) ->
     manifest["steps"].append(step)
 
 
+def _execution_profile(manifest: dict[str, Any]) -> str:
+    config = manifest.get("config") or {}
+    multiturn = bool((config.get("multiturn") or {}).get("enabled"))
+    agent = bool((config.get("agent_harness") or {}).get("enabled"))
+    if multiturn and agent:
+        return "core"
+    if not multiturn and not agent:
+        return "single"
+    return "custom"
+
+
+def _build_execution_evidence(
+    manifest: dict[str, Any], *, manifest_path: Path
+) -> dict[str, Any]:
+    config = manifest.get("config") or {}
+    artifacts = manifest.get("artifacts") or {}
+    summaries = manifest.get("summaries") or {}
+    out_dir = manifest_path.parent
+    report_keys = {"benchmark": "benchmark_report_json"}
+    if (config.get("multiturn") or {}).get("enabled"):
+        report_keys["multiturn"] = "multiturn_report_json"
+    if (config.get("agent_harness") or {}).get("enabled"):
+        report_keys["agent_harness"] = "agent_harness_report_json"
+
+    reports: dict[str, dict[str, str]] = {}
+    for name, artifact_key in report_keys.items():
+        value = artifacts.get(artifact_key)
+        if not isinstance(value, str) or not value:
+            raise ValueError(f"execution evidence requires {artifact_key}")
+        reports[name] = _portable_artifact(Path(value), out_dir)
+
+    endpoint_smoke = config.get("endpoint_smoke") or {}
+    doctor = config.get("doctor") or {}
+    multiturn = config.get("multiturn") or {}
+    agent = config.get("agent_harness") or {}
+    evidence = {
+        "schema": SUITE_EXECUTION_EVIDENCE_SCHEMA,
+        "profile": _execution_profile(manifest),
+        "status": manifest.get("status"),
+        "created_at": manifest.get("created_at"),
+        "completed_at": manifest.get("completed_at"),
+        "model": config.get("model"),
+        "run_context": manifest.get("run_context"),
+        "source_suite_manifest": {
+            "schema": manifest.get("schema"),
+            "sha256": _file_sha256(manifest_path),
+        },
+        "config": {
+            "expand": config.get("expand"),
+            "include_raw": config.get("include_raw"),
+            "timeout": config.get("timeout"),
+            "max_tokens": config.get("max_tokens"),
+            "coverage": config.get("coverage"),
+            "endpoint_smoke": {
+                "enabled": endpoint_smoke.get("enabled"),
+                "required_phrase": endpoint_smoke.get("required_phrase"),
+                "min_hangul_ratio": endpoint_smoke.get("min_hangul_ratio"),
+                "max_tokens": endpoint_smoke.get("max_tokens"),
+            },
+            "doctor": doctor,
+            "gate": config.get("gate"),
+            "multiturn": {"enabled": multiturn.get("enabled")},
+            "agent_harness": {
+                "enabled": agent.get("enabled"),
+                "tool_call_mode": agent.get("tool_call_mode"),
+            },
+            "measurement_integrity": config.get("measurement_integrity"),
+        },
+        "steps": [
+            {
+                key: step.get(key)
+                for key in ("name", "status", "status_reason")
+                if step.get(key) is not None
+            }
+            for step in manifest.get("steps") or []
+            if isinstance(step, dict)
+        ],
+        "summaries": {
+            "endpoint_smoke": summaries.get("endpoint_smoke"),
+            "measurement_integrity": summaries.get("measurement_integrity"),
+            "doctor": summaries.get("doctor"),
+        },
+        "reports": reports,
+    }
+    return evidence
+
+
 def _finalize(
     manifest: dict[str, Any],
     *,
@@ -360,7 +471,15 @@ def _finalize(
     manifest["completed_at"] = _now()
     manifest["artifacts"]["suite_manifest_json"] = str(manifest_path)
     manifest["artifacts"]["suite_report_md"] = str(suite_md_path)
+    evidence_path = manifest_path.parent / "suite_execution_evidence.json"
+    if status == "pass":
+        manifest["artifacts"]["suite_execution_evidence_json"] = str(evidence_path)
     _write_json(manifest_path, manifest)
+    if status == "pass":
+        _write_json(
+            evidence_path,
+            _build_execution_evidence(manifest, manifest_path=manifest_path),
+        )
     _write_text(suite_md_path, render_suite_markdown(manifest))
     return manifest
 

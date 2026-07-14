@@ -12,6 +12,14 @@ upper/lower reference의 immutable revision, semantic overlap 설정, 사람 cal
 JSON을 상대경로와 SHA-256으로 결합하며 validator가 이후 split, ranking, power pilot builder, calibration 및 run context와
 대조한다. 변경이 필요하면 기존 파일을 덮어쓰지 않고 새 season ID를 등록한다.
 
+## Official Execution Evidence
+
+성공한 `ko-redteam-suite` 실행은 `ko-redteam.suite-execution-evidence.v1`을 함께 만든다. 이 파일은 endpoint나
+benchmark의 절대경로와 원문을 제외하고, 실행 profile, endpoint smoke 설정·결과, benchmark audit/coverage,
+measurement integrity, report doctor 단계와 report 상대경로·SHA-256을 보존한다. 공식 ranking manifest v3는 각
+반복에서 `core`와 `mini_single` evidence를 모두 해시로 참조해야 한다. evidence와 ranking report digest가 다르거나
+필수 단계가 실패·생략됐으면 공식 분석을 시작하지 않는다.
+
 ## Evaluator Calibration
 
 `ko-redteam-build-calibration`은 `ko-redteam.calibration-input.v1`을 받는다. 실제 공식 입력은 300개 이상,
