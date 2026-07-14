@@ -114,7 +114,7 @@ ko-redteam-suite \
 | 평가 실행 | `ko-redteam-benchmark`, `ko-redteam-multiturn`, `ko-redteam-agent-harness` | 단일턴, 멀티턴, tool gateway 평가 |
 | 오프라인 분석 | `ko-redteam-scan`, `ko-redteam-analyze-responses` | 저장된 응답과 공격 스캔 결과 분석 |
 | 모델 비교 | `ko-redteam-rank-models`, `ko-redteam-analyze-repeats` | evidence eligibility, 배포 screen, 반복 안정성, 신뢰구간 기반 tier 분석 |
-| 공식 증거 생성 | `ko-redteam-validate-pilot-registration`, `ko-redteam-build-calibration`, `ko-redteam-build-power-pilot`, `ko-redteam-audit-splits`, `ko-redteam-analyze-power`, `ko-redteam-analyze-familywise-power` | practice 검토·등록, 사람 판정 보정, reference pilot, split 중복, marginal·다중비교 검정력의 metadata-only 증거 생성 |
+| 공식 증거 생성 | `ko-redteam-validate-pilot-registration`, `ko-redteam-build-calibration`, `ko-redteam-build-power-pilot`, `ko-redteam-audit-splits`, `ko-redteam-analyze-power`, `ko-redteam-analyze-familywise-power`, `ko-redteam-build-power-design` | practice 검토·등록, 사람 판정 보정, reference pilot, split 중복, marginal·다중비교 검정력과 공식 분할 규모의 metadata-only 증거 생성 |
 | 공식 게시 검증 | `ko-redteam-validate-leaderboard` | hidden split, calibration, provenance, 통계, 외부 검토 publication gate |
 | 평가셋 관리 | `ko-redteam-import-benchmark`, `ko-redteam-merge-benchmarks`, `ko-redteam-expand-benchmark` | 외부 파일 변환, 병합, 한국어 변형 생성 |
 | 릴리스 게이트 | `ko-redteam-compare-reports`, `ko-redteam-check-regression`, `ko-redteam-gate-reports`, `ko-redteam-doctor-reports`, `ko-redteam-check-public-hygiene` | 점수 비교, 회귀 판정, CI threshold, 공개 배포 위생 점검 |
@@ -128,8 +128,9 @@ commitment와 집계값만 출력합니다. 실제 사람 라벨, official promp
 통제된 저장소에 유지해야 합니다.
 
 reference 출력 전에 practice 검토, benchmark fingerprint, anchor revision, 실행·power 방법을 별도 등록합니다.
-power gate 통과 뒤 정확한 model cohort와 불변 revision, split 배분 및 통계 기준을 official prompt 작성 전에
-시즌 사전등록하고 release bundle의 hashed artifact로 모두 결합합니다. 현재 활성 official candidate는 없습니다.
+파일럿 분산 정밀도 gate 통과 뒤 고정 MDE·alpha·target power로 공식 split 규모를 자동 산출합니다. 정확한 model
+cohort와 불변 revision, 이 split 배분 및 통계 기준을 official prompt 작성 전에 `season-preregistration.v3`로
+등록하고 release v3 bundle의 hashed artifact로 모두 결합합니다. 현재 활성 official candidate는 없습니다.
 S4는 단일 비교 power만 충족하고 63개 다중비교 family의 power는 충족하지 못해
 [`governance/SEASON_2026Q3_S4_STOP.json`](./governance/SEASON_2026Q3_S4_STOP.json)으로 중단했습니다. 과거
 [`governance/SEASON_2026Q3_S4_PREREGISTRATION.json`](./governance/SEASON_2026Q3_S4_PREREGISTRATION.json)은
@@ -220,15 +221,20 @@ ko-redteam-analyze-familywise-power release/power_analysis.json \
   --output release/multiplicity_power_audit.json \
   --markdown-output release/multiplicity_power_audit.md
 
-# 5. Freeze the official season registration after both power gates pass.
+# 5. Derive the official split without using the observed mean difference.
+ko-redteam-build-power-design release/multiplicity_power_audit.json \
+  --output release/power_derived_split_design.json \
+  --markdown-output release/power_derived_split_design.md
+
+# 6. Freeze season-preregistration.v3 after the derived design passes.
 PREREGISTRATION=governance/SEASON_ID_PREREGISTRATION.json
 
-# 6. Calibrate the evaluator with blinded human labels.
+# 7. Calibrate the evaluator with blinded human labels.
 ko-redteam-build-calibration private/calibration_labels.json \
   --output release/calibration_report.json \
   --markdown-output release/calibration_report.md
 
-# 7. Audit practice/official split overlap.
+# 8. Audit practice/official split overlap.
 ko-redteam-audit-splits \
   --practice-suite paperbench=benchmarks/ko_llm_paperbench_v1.json \
   --practice-suite mini_single=benchmarks/ko_llm_mini_v1.json \
@@ -562,7 +568,7 @@ Agent report의 `expected=no_tool`은 schema 하위 호환을 위한 식별자�
 | 점수화 | `analysis/ko_scorecard.py` |
 | 모델 tier·배포 screen | `analysis/ko_model_ranking.py`, `probes/rank_models.py` |
 | 공식 리더보드 gate | `analysis/ko_leaderboard.py`, `probes/validate_leaderboard.py` |
-| 공식 증거 생성 | `analysis/ko_calibration.py`, `analysis/ko_split_evidence.py`, `analysis/ko_power_evidence.py`, `analysis/ko_familywise_power.py` |
+| 공식 증거 생성 | `analysis/ko_calibration.py`, `analysis/ko_split_evidence.py`, `analysis/ko_power_evidence.py`, `analysis/ko_familywise_power.py`, `analysis/ko_power_design.py` |
 | 시즌 거버넌스 | `governance/README.md`, `governance/SEASON_OPERATIONS.md` |
 | 실행 provenance | `analysis/ko_run_context.py` |
 | 평가셋 식별 | `analysis/ko_benchmark_identity.py` |

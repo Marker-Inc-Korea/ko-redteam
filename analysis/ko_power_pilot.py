@@ -33,9 +33,11 @@ except ModuleNotFoundError:  # package import path
 
 
 LEGACY_PREREGISTRATION_SCHEMA = "ko-redteam.season-preregistration.v1"
-PREREGISTRATION_SCHEMA = "ko-redteam.season-preregistration.v2"
+SEASON_PREREGISTRATION_V2_SCHEMA = "ko-redteam.season-preregistration.v2"
+PREREGISTRATION_SCHEMA = "ko-redteam.season-preregistration.v3"
 SUPPORTED_PREREGISTRATION_SCHEMAS = {
     LEGACY_PREREGISTRATION_SCHEMA,
+    SEASON_PREREGISTRATION_V2_SCHEMA,
     PREREGISTRATION_SCHEMA,
     pilot_registration.PILOT_REGISTRATION_SCHEMA,
 }
@@ -247,12 +249,13 @@ def build_power_pilot_input(
         manifest.get("schema") in ranking.SEPARATED_RANKING_MANIFEST_SCHEMAS
         and preregistration_schema
         not in {
+            SEASON_PREREGISTRATION_V2_SCHEMA,
             PREREGISTRATION_SCHEMA,
             pilot_registration.PILOT_REGISTRATION_SCHEMA,
         }
     ):
         raise ValueError(
-            "v4-v5 power pilots require season preregistration v2 or a frozen pilot registration"
+            "v4-v5 power pilots require season preregistration v2-v3 or a frozen pilot registration"
         )
     for model_name, runs in runs_by_model.items():
         for run_index, run in enumerate(runs, 1):
@@ -289,6 +292,7 @@ def build_power_pilot_input(
     registration_time: datetime | None = None
     power_frozen_time: datetime | None = None
     if preregistration_schema in {
+        SEASON_PREREGISTRATION_V2_SCHEMA,
         PREREGISTRATION_SCHEMA,
         pilot_registration.PILOT_REGISTRATION_SCHEMA,
     }:

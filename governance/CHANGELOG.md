@@ -5,6 +5,10 @@
 
 ## Unreleased - Evidence-Eligible Ranking Protocol
 
+- precision-qualified 파일럿의 baseline 표본 수가 부족해도 고정 MDE·alpha·target power를 유지한 채 공식 split을
+  확대할 수 있도록 `power-derived-split-design.v1`을 추가한다. 최대 7모델의 최소 Holm 임계값에서 필요한 수와
+  baseline 중 큰 값을 여섯 영역에 균등 배분하고 Agent 기대행동을 정수 반분할한다. 관측 평균 차이는 배분에
+  사용하지 않는다. 이 breaking 계약을 `leaderboard-release.v3`와 `season-preregistration.v3`로 올린다.
 - reference 결과로 표본 수를 정해야 하는데 공식 season을 먼저 등록하던 순서 의존성을 제거한다. 공개 practice의
   사례별 2인 검토와 `power-pilot-registration.v2`를 먼저 동결하고, power 통과 뒤에만
   `season-preregistration.v2`를 등록한다. release v2는 pilot registration과 review artifact를 필수화한다.

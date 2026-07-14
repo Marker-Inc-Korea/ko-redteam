@@ -32,12 +32,12 @@ equal-domain baseline allocation뿐이며, 과거 output·score·분산·power·
 
 ## Public Season Preregistration
 
-`ko-redteam.season-preregistration.v2`는 비공개 입력이 아니라 power gate 통과 후 official prompt 작성 전에
-공개하는 동결 설계다. 최소
+`ko-redteam.season-preregistration.v3`는 비공개 입력이 아니라 precision-qualified power audit과
+`power-derived-split-design.v1` 통과 후 official prompt 작성 전에 공개하는 동결 설계다. 최소
 suite×domain×expected 독립 그룹 행렬, Agent transport, generation settings, primary·sensitivity profile,
 최대 모델 수와 comparison family, 통계 기준과 weight,
 upper/lower reference의 immutable revision, semantic overlap 설정, 사람 calibration 기준과 publication gate를 포함한다. release manifest는 이
-JSON을 상대경로와 SHA-256으로 결합하며 validator가 이전 pilot registration·review·power와 이후 split,
+JSON을 상대경로와 SHA-256으로 결합하며 validator가 이전 pilot registration·review·power·derived design과 이후 split,
 ranking, calibration 및 run context를 대조한다. 변경이 필요하면 기존 파일을 덮어쓰지 않고 새 season ID를
 등록한다.
 S1-S4의 `v1` 등록은 불변 이력이며 신규 v5 ranking 또는 공식 release 계약으로 재사용하지 않는다.
@@ -123,8 +123,8 @@ manifest의 run context와 이름·model ID·불변 revision이 일치해야 한
 
 `difference`는 `estimand`에 적은 동일한 paired independence-group 단위의 파일럿 차이다. 최소 10개 그룹과
 10,000회 simulation이 필요하다. 공식 입력은 `ko-redteam-build-power-pilot`으로 만들며 네 suite와 frozen
-suite/domain/expected 7개 stratum을 모두 포함하고 stratum마다 최소 20개 pilot group이 필요하다. 실제
-official group 수는 split audit의 여섯 영역 합계와 같아야 한다.
+suite/domain/expected 7개 stratum을 모두 포함하고 stratum마다 최소 20개 pilot group이 필요하다. 실제 official
+group 수는 `power-derived-split-design.v1`의 계획값 및 split audit의 여섯 영역 합계와 같아야 한다.
 현재 입력의 `pilot_source`는 `ko-redteam.power-pilot-source.v2`여야 하며 pilot registration, practice review,
 benchmark fingerprint, anchor revision과 evaluator commit의 digest, `first_run_started_at`,
 `last_run_started_at`, `last_execution_completed_at`을 함께 포함한다. `preregistered_at`은 과거 필드명을
@@ -133,9 +133,11 @@ benchmark fingerprint, anchor revision과 evaluator commit의 digest, `first_run
 
 `ko-redteam-analyze-power`의 단일 비교 결과만으로 publication power gate를 통과할 수 없다. 이어서
 `ko-redteam-analyze-familywise-power --power-input private/power_input.json --maximum-models 7
---weight-profiles 1 --variance-confidence-level 0.95 --minimum-pilot-groups-per-stratum 20`을 실행하고, 최대 cohort의 모든
-primary 모델 쌍에서 `official_tier_design_supported=true`인 aggregate-only artifact를 release bundle에
-결합한다. complete-order power는 별도 진단이며 공식 tier는 완전한 순서를 주장하지 않는다.
+--weight-profiles 1 --variance-confidence-level 0.95 --minimum-pilot-groups-per-stratum 20`을 실행해 최대 cohort의
+baseline power를 aggregate-only artifact로 공개한다. precision gate가 통과하면
+`ko-redteam-build-power-design`이 필요한 개별 비교 표본 수와 기존 baseline 중 큰 값을 여섯 영역에 균등 배분하고,
+계획값에서 `planned_tier_design_supported=true`인지 재검증한다. 이 derived artifact를 release bundle과
+season-preregistration.v3에 모두 결합한다. complete-order power는 별도 진단이며 공식 tier는 완전한 순서를 주장하지 않는다.
 공식 artifact는 층별 sample variance와 target weight만 공개하고 개별 pilot 차이는 공개하지 않는다. 이 집계에서
 95% 단측 Welch-Satterthwaite 근사 분산 상한을 재계산할 수 있어야 하며, 표본 수는 관측 SD가 아니라 상한 SD를
 사용한다. `power_input_sha256`은 접근 통제된 원본 pilot input과 결합한다.

@@ -19,6 +19,8 @@ try:
     )
     import ko_familywise_power as familywise_power
     import ko_pilot_registration as pilot_registration
+    import ko_power_design as power_design
+    import ko_power_evidence as power_evidence
     from ko_familywise_power import (
         OFFICIAL_MIN_PILOT_GROUPS_PER_STRATUM,
         OFFICIAL_VARIANCE_CONFIDENCE_LEVEL,
@@ -26,6 +28,10 @@ try:
         VARIANCE_UNCERTAINTY_ASSUMPTIONS,
         build_power_scenario,
         variance_uncertainty_is_consistent,
+    )
+    from ko_power_design import (
+        OUTPUT_SCHEMA as POWER_DESIGN_SCHEMA,
+        power_derived_split_design_is_consistent,
     )
     from ko_model_ranking import (
         EXECUTION_EVIDENCE_CONTRACT,
@@ -48,6 +54,8 @@ except ModuleNotFoundError:  # package import path
     )
     from . import ko_familywise_power as familywise_power
     from . import ko_pilot_registration as pilot_registration
+    from . import ko_power_design as power_design
+    from . import ko_power_evidence as power_evidence
     from .ko_familywise_power import (
         OFFICIAL_MIN_PILOT_GROUPS_PER_STRATUM,
         OFFICIAL_VARIANCE_CONFIDENCE_LEVEL,
@@ -55,6 +63,10 @@ except ModuleNotFoundError:  # package import path
         VARIANCE_UNCERTAINTY_ASSUMPTIONS,
         build_power_scenario,
         variance_uncertainty_is_consistent,
+    )
+    from .ko_power_design import (
+        OUTPUT_SCHEMA as POWER_DESIGN_SCHEMA,
+        power_derived_split_design_is_consistent,
     )
     from .ko_model_ranking import (
         EXECUTION_EVIDENCE_CONTRACT,
@@ -70,14 +82,14 @@ except ModuleNotFoundError:  # package import path
     from .ko_run_context import canonical_sha256, validate_run_context
 
 
-RELEASE_SCHEMA = "ko-redteam.leaderboard-release.v2"
+RELEASE_SCHEMA = "ko-redteam.leaderboard-release.v3"
 RANKING_SCHEMA = MODEL_RANKING_SCHEMA
 CALIBRATION_INPUT_SCHEMA = "ko-redteam.calibration-input.v1"
 SPLIT_AUDIT_SCHEMA = "ko-redteam.benchmark-split-audit.v1"
 POWER_SCHEMA = "ko-redteam.power-analysis.v1"
 MULTIPLICITY_POWER_SCHEMA = FAMILYWISE_POWER_SCHEMA
 EXTERNAL_REVIEW_SCHEMA = "ko-redteam.external-review.v1"
-PREREGISTRATION_SCHEMA = "ko-redteam.season-preregistration.v2"
+PREREGISTRATION_SCHEMA = "ko-redteam.season-preregistration.v3"
 LEGACY_POWER_PILOT_SOURCE_SCHEMA = "ko-redteam.power-pilot-source.v1"
 POWER_PILOT_SOURCE_SCHEMA = "ko-redteam.power-pilot-source.v2"
 PILOT_REGISTRATION_SCHEMA = pilot_registration.PILOT_REGISTRATION_SCHEMA
@@ -1721,6 +1733,98 @@ def _audit_power(audit: _Audit, power: dict[str, Any]) -> None:
     actual = power.get("actual_independence_groups")
     estimand = power.get("estimand")
     pilot = power.get("pilot_summary") if isinstance(power.get("pilot_summary"), dict) else {}
+    pilot_sd = _number(pilot.get("standard_deviation"))
+    analytic_power = _number(power.get("analytic_power_at_actual"))
+    design_power = _number(power.get("design_power_at_required"))
+    simulation_se = _number(power.get("simulated_power_standard_error"))
+    simulations = power.get("simulation_iterations")
+    seed = power.get("seed")
+    marginal_replay_matches = False
+    try:
+        if (
+            alpha is not None
+            and 0.0 < alpha <= PUBLIC_REQUIREMENTS["maximum_alpha"]
+            and target is not None
+            and PUBLIC_REQUIREMENTS["minimum_power"] <= target < 1.0
+            and effect is not None
+            and effect > 0.0
+            and pilot_sd is not None
+            and pilot_sd > 0.0
+            and isinstance(required, int)
+            and not isinstance(required, bool)
+            and 2 <= required <= power_evidence.MAX_REQUIRED_GROUPS
+            and isinstance(actual, int)
+            and not isinstance(actual, bool)
+            and 2 <= actual <= power_evidence.MAX_REQUIRED_GROUPS
+            and isinstance(simulations, int)
+            and not isinstance(simulations, bool)
+            and PUBLIC_REQUIREMENTS["minimum_power_simulations"]
+            <= simulations
+            <= PUBLIC_REQUIREMENTS["maximum_bootstrap_iterations"]
+            and isinstance(seed, int)
+            and not isinstance(seed, bool)
+        ):
+            expected_required = power_evidence._required_sample_size(
+                effect,
+                pilot_sd,
+                alpha,
+                target,
+            )
+            expected_analytic = power_evidence._two_sided_normal_power(
+                effect,
+                pilot_sd,
+                actual,
+                alpha,
+            )
+            expected_design = power_evidence._two_sided_normal_power(
+                effect,
+                pilot_sd,
+                required,
+                alpha,
+            )
+            expected_simulated, expected_simulation_se = (
+                power_evidence._simulate_power(
+                    effect=effect,
+                    standard_deviation=pilot_sd,
+                    sample_size=actual,
+                    alpha=alpha,
+                    iterations=simulations,
+                    seed=seed,
+                )
+            )
+            marginal_replay_matches = (
+                required == expected_required
+                and analytic_power is not None
+                and math.isclose(
+                    analytic_power,
+                    expected_analytic,
+                    rel_tol=1e-12,
+                    abs_tol=1e-12,
+                )
+                and design_power is not None
+                and math.isclose(
+                    design_power,
+                    expected_design,
+                    rel_tol=1e-12,
+                    abs_tol=1e-12,
+                )
+                and achieved is not None
+                and math.isclose(
+                    achieved,
+                    expected_simulated,
+                    rel_tol=0.0,
+                    abs_tol=1e-12,
+                )
+                and simulation_se is not None
+                and math.isclose(
+                    simulation_se,
+                    expected_simulation_se,
+                    rel_tol=1e-12,
+                    abs_tol=1e-12,
+                )
+            )
+    except (ArithmeticError, TypeError, ValueError):
+        marginal_replay_matches = False
     audit.check(
         "power.estimand",
         "statistics",
@@ -1730,8 +1834,8 @@ def _audit_power(audit: _Audit, power: dict[str, Any]) -> None:
         and isinstance(pilot.get("cluster_count"), int)
         and not isinstance(pilot.get("cluster_count"), bool)
         and pilot.get("cluster_count") >= 10
-        and _number(pilot.get("standard_deviation")) is not None
-        and float(pilot.get("standard_deviation")) > 0,
+        and pilot_sd is not None
+        and pilot_sd > 0,
         "power analysis must define its estimand and bind a non-degenerate paired-cluster pilot dataset",
     )
     audit.check(
@@ -1879,7 +1983,15 @@ def _audit_power(audit: _Audit, power: dict[str, Any]) -> None:
     )
     audit.check("power.alpha", "statistics", alpha is not None and 0 < alpha <= PUBLIC_REQUIREMENTS["maximum_alpha"], f"power analysis alpha must be at most {PUBLIC_REQUIREMENTS['maximum_alpha']}", actual=alpha)
     audit.check("power.target", "statistics", target is not None and PUBLIC_REQUIREMENTS["minimum_power"] <= target <= 1.0, f"target power must be between {PUBLIC_REQUIREMENTS['minimum_power']} and 1.0", actual=target)
-    audit.check("power.achieved", "statistics", achieved is not None and PUBLIC_REQUIREMENTS["minimum_power"] <= achieved <= 1.0, f"achieved power must be between {PUBLIC_REQUIREMENTS['minimum_power']} and 1.0", actual=achieved)
+    audit.check(
+        "power.achieved",
+        "statistics",
+        achieved is not None
+        and 0.0 <= achieved <= 1.0
+        and marginal_replay_matches,
+        "baseline analytic and seeded Monte Carlo power evidence must replay exactly",
+        actual=achieved,
+    )
     audit.check("power.effect", "statistics", effect is not None and effect > 0, "minimum detectable effect must be pre-registered and positive", actual=effect)
     audit.check(
         "power.sample_size",
@@ -1889,8 +2001,9 @@ def _audit_power(audit: _Audit, power: dict[str, Any]) -> None:
         and isinstance(actual, int)
         and not isinstance(actual, bool)
         and required > 0
-        and actual >= required,
-        "actual independent groups must meet the power-derived requirement",
+        and actual > 0
+        and marginal_replay_matches,
+        "baseline marginal sample-size evidence must replay; publication power is evaluated at the derived official design",
         actual={"required": required, "actual": actual},
     )
     assumptions = power.get("assumptions")
@@ -1902,13 +2015,13 @@ def _audit_power(audit: _Audit, power: dict[str, Any]) -> None:
         and all(isinstance(item, str) and item.strip() for item in assumptions),
         "power analysis assumptions must be documented as non-empty statements",
     )
-    simulations = power.get("simulation_iterations")
     audit.check(
         "power.reproducibility",
         "artifact_integrity",
         isinstance(power.get("method"), str)
         and bool(power.get("method", "").strip())
-        and bool(SHA256_RE.fullmatch(str(power.get("analysis_code_sha256") or "")))
+        and power.get("analysis_code_sha256")
+        == _sha256_file(Path(power_evidence.__file__).resolve())
         and bool(SHA256_RE.fullmatch(str(power.get("input_sha256") or "")))
         and _iso_with_timezone(power.get("preregistered_at"))
         and isinstance(simulations, int)
@@ -2278,6 +2391,25 @@ def _audit_multiplicity_power(
 
     actual = maximum.get("actual_independence_groups")
     required = maximum.get("required_independence_groups_per_comparison")
+    minimum_per_comparison_passed = (
+        minimum.get("per_comparison_status") == "pass"
+    )
+    maximum_per_comparison_passed = (
+        maximum.get("per_comparison_status") == "pass"
+    )
+    minimum_simultaneous_passed = minimum.get("simultaneous_status") == "pass"
+    maximum_simultaneous_passed = maximum.get("simultaneous_status") == "pass"
+    precision_passed = decision.get("pilot_variance_precision_passed") is True
+    expected_tier_supported = (
+        precision_passed
+        and minimum_per_comparison_passed
+        and maximum_per_comparison_passed
+    )
+    expected_complete_supported = (
+        precision_passed
+        and minimum_simultaneous_passed
+        and maximum_simultaneous_passed
+    )
     audit.check(
         "multiplicity_power.tier_design",
         "statistics",
@@ -2291,15 +2423,25 @@ def _audit_multiplicity_power(
         and not isinstance(actual, bool)
         and isinstance(required, int)
         and not isinstance(required, bool)
-        and actual >= required > 0
-        and maximum.get("per_comparison_status") == "pass"
-        and decision.get("official_tier_design_supported") is True
+        and required > 0
+        and decision.get("minimum_cohort_per_comparison_power_passed")
+        is minimum_per_comparison_passed
+        and decision.get("maximum_cohort_per_comparison_power_passed")
+        is maximum_per_comparison_passed
+        and decision.get("minimum_cohort_simultaneous_power_passed")
+        is minimum_simultaneous_passed
+        and decision.get("maximum_cohort_simultaneous_power_passed")
+        is maximum_simultaneous_passed
+        and decision.get("official_tier_design_supported")
+        is expected_tier_supported
+        and decision.get("official_complete_ranking_design_supported")
+        is expected_complete_supported
         and decision.get(
             "multiplicity_controlled_per_comparison_design_supported"
         )
-        is True
+        is expected_tier_supported
         and replay_matches,
-        "maximum-cohort primary comparisons must meet multiplicity-controlled MDE power before tier publication",
+        "the precision-qualified baseline power audit must replay without changing its observed support decision",
         actual={"required": required, "actual": actual},
     )
     audit.check(
@@ -2307,6 +2449,8 @@ def _audit_multiplicity_power(
         "statistics",
         report.get("status")
         in {
+            "marginal_and_official_ranking_power_fail",
+            "marginal_pass_official_ranking_power_fail",
             "multiplicity_controlled_tier_power_pass_complete_order_not_guaranteed",
             "official_complete_ranking_power_pass",
         }
@@ -2324,6 +2468,153 @@ def _audit_multiplicity_power(
     )
 
 
+def _audit_power_design(
+    audit: _Audit,
+    report: dict[str, Any],
+    multiplicity_power: dict[str, Any] | None,
+) -> None:
+    source = report.get("source") if isinstance(report.get("source"), dict) else {}
+    allocation = (
+        report.get("allocation")
+        if isinstance(report.get("allocation"), dict)
+        else {}
+    )
+    official_design = (
+        report.get("official_split_design")
+        if isinstance(report.get("official_split_design"), dict)
+        else {}
+    )
+    planned_power = (
+        report.get("planned_power")
+        if isinstance(report.get("planned_power"), dict)
+        else {}
+    )
+    maximum = (
+        planned_power.get("maximum_season_cohort")
+        if isinstance(planned_power.get("maximum_season_cohort"), dict)
+        else {}
+    )
+    method = report.get("method") if isinstance(report.get("method"), dict) else {}
+    decision = (
+        report.get("decision") if isinstance(report.get("decision"), dict) else {}
+    )
+    multiplicity_method = (
+        multiplicity_power.get("method")
+        if isinstance(multiplicity_power, dict)
+        and isinstance(multiplicity_power.get("method"), dict)
+        else {}
+    )
+    multiplicity_source = (
+        multiplicity_power.get("source")
+        if isinstance(multiplicity_power, dict)
+        and isinstance(multiplicity_power.get("source"), dict)
+        else {}
+    )
+    multiplicity_uncertainty = (
+        multiplicity_power.get("pilot_variance_uncertainty")
+        if isinstance(multiplicity_power, dict)
+        and isinstance(multiplicity_power.get("pilot_variance_uncertainty"), dict)
+        else {}
+    )
+    multiplicity_artifact = audit.artifacts.get("multiplicity_power_audit") or {}
+    source_digest = multiplicity_artifact.get("sha256")
+
+    audit.check(
+        "power_design.schema",
+        "statistics",
+        report.get("schema") == POWER_DESIGN_SCHEMA,
+        f"power-derived split design schema must be {POWER_DESIGN_SCHEMA}",
+    )
+    audit.check(
+        "power_design.source_binding",
+        "artifact_integrity",
+        isinstance(multiplicity_power, dict)
+        and isinstance(source_digest, str)
+        and source.get("familywise_power_audit_sha256") == source_digest
+        and source.get("familywise_power_audit_schema")
+        == MULTIPLICITY_POWER_SCHEMA
+        and source.get("familywise_power_analysis_code_sha256")
+        == multiplicity_method.get("analysis_code_sha256")
+        and source.get("power_analysis_sha256")
+        == multiplicity_source.get("power_analysis_sha256")
+        and source.get("pilot_variance_uncertainty_sha256")
+        == canonical_sha256(multiplicity_uncertainty),
+        "official split design must bind the exact precision-qualified familywise audit",
+    )
+    replay_matches = (
+        isinstance(multiplicity_power, dict)
+        and isinstance(source_digest, str)
+        and power_derived_split_design_is_consistent(
+            report,
+            multiplicity_power,
+            source_familywise_sha256=source_digest,
+        )
+    )
+    audit.check(
+        "power_design.replay",
+        "statistics",
+        replay_matches,
+        "official split allocation must exactly replay from the frozen MDE, alpha, target power, and variance upper bound",
+    )
+
+    planned_groups = allocation.get("planned_independence_groups")
+    required_groups = allocation.get(
+        "required_independence_groups_per_comparison"
+    )
+    groups_per_domain = allocation.get("groups_per_domain")
+    audit.check(
+        "power_design.tier_power",
+        "statistics",
+        isinstance(planned_groups, int)
+        and not isinstance(planned_groups, bool)
+        and isinstance(required_groups, int)
+        and not isinstance(required_groups, bool)
+        and planned_groups >= required_groups > 0
+        and isinstance(groups_per_domain, int)
+        and not isinstance(groups_per_domain, bool)
+        and groups_per_domain >= PUBLIC_REQUIREMENTS["minimum_groups_per_domain"]
+        and groups_per_domain % 2 == 0
+        and planned_groups == groups_per_domain * len(REQUIRED_DOMAINS)
+        and official_design.get("minimum_independence_groups") == planned_groups
+        and official_design.get("minimum_groups_per_domain") == groups_per_domain
+        and maximum.get("actual_independence_groups") == planned_groups
+        and maximum.get("required_independence_groups_per_comparison")
+        == required_groups
+        and maximum.get("per_comparison_status") == "pass"
+        and decision.get("pilot_variance_precision_passed") is True
+        and decision.get("source_thresholds_preserved") is True
+        and decision.get("planned_tier_design_supported") is True
+        and decision.get("official_claim_scope")
+        == "multiplicity_controlled_tiers",
+        "planned maximum-cohort comparisons must meet the frozen multiplicity-controlled tier-power requirement",
+        actual={"required": required_groups, "planned": planned_groups},
+    )
+    audit.check(
+        "power_design.claim_scope",
+        "statistics",
+        report.get("status")
+        in {
+            "tier_design_supported_complete_order_not_guaranteed",
+            "complete_order_design_supported",
+        }
+        and method.get("observed_mean_difference_used_for_allocation") is False
+        and method.get("threshold_relaxation_allowed") is False
+        and method.get("complete_order_claimed") is False
+        and RANKING_POLICY["complete_order_claimed"] is False,
+        "sample-size planning must not optimize on observed effects, relax thresholds, or imply a complete order",
+    )
+    audit.check(
+        "power_design.reproducibility",
+        "artifact_integrity",
+        method.get("analysis_code_sha256")
+        == _sha256_file(Path(power_design.__file__).resolve())
+        and method.get("familywise_power_analysis_code_sha256")
+        == _sha256_file(Path(familywise_power.__file__).resolve())
+        and report.get("raw_prompt_or_response_used") is False,
+        "power-derived design must bind both installed implementations and remain aggregate-only",
+    )
+
+
 def _audit_preregistration(
     audit: _Audit,
     preregistration: dict[str, Any],
@@ -2332,6 +2623,7 @@ def _audit_preregistration(
     split: dict[str, Any] | None,
     power: dict[str, Any] | None,
     multiplicity_power: dict[str, Any] | None,
+    derived_power_design: dict[str, Any] | None,
     calibration: dict[str, Any] | None,
     evaluator_config: dict[str, Any] | None,
     contexts: list[dict[str, Any]],
@@ -2561,10 +2853,18 @@ def _audit_preregistration(
         if isinstance(split, dict) and isinstance(split.get("official"), dict)
         else {}
     )
+    frozen_power_design = (
+        derived_power_design.get("official_split_design")
+        if isinstance(derived_power_design, dict)
+        and isinstance(derived_power_design.get("official_split_design"), dict)
+        else {}
+    )
     audit.check(
         "preregistration.split_design",
         "benchmark_integrity",
         design_valid
+        and bool(frozen_power_design)
+        and design == frozen_power_design
         and official.get("suite_domain_independence_groups") == matrix
         and official.get("suite_domain_expected_independence_groups")
         == expected_matrix
@@ -2692,6 +2992,38 @@ def _audit_preregistration(
         and isinstance(multiplicity_power.get("pilot_variance_uncertainty"), dict)
         else {}
     )
+    derived_method = (
+        derived_power_design.get("method")
+        if isinstance(derived_power_design, dict)
+        and isinstance(derived_power_design.get("method"), dict)
+        else {}
+    )
+    derived_source = (
+        derived_power_design.get("source")
+        if isinstance(derived_power_design, dict)
+        and isinstance(derived_power_design.get("source"), dict)
+        else {}
+    )
+    derived_allocation = (
+        derived_power_design.get("allocation")
+        if isinstance(derived_power_design, dict)
+        and isinstance(derived_power_design.get("allocation"), dict)
+        else {}
+    )
+    derived_planned_power = (
+        derived_power_design.get("planned_power")
+        if isinstance(derived_power_design, dict)
+        and isinstance(derived_power_design.get("planned_power"), dict)
+        else {}
+    )
+    derived_maximum = (
+        derived_planned_power.get("maximum_season_cohort")
+        if isinstance(
+            derived_planned_power.get("maximum_season_cohort"), dict
+        )
+        else {}
+    )
+    derived_artifact = audit.artifacts.get("power_derived_split_design") or {}
     statistics_valid = (
         isinstance(power, dict)
         and bool(
@@ -2732,8 +3064,11 @@ def _audit_preregistration(
         and statistics.get("estimand") == power.get("estimand")
         and statistics.get("minimum_detectable_effect")
         == power.get("minimum_detectable_effect")
+        == derived_source.get("minimum_detectable_effect")
         and statistics.get("alpha") == power.get("alpha")
+        == derived_source.get("familywise_alpha")
         and statistics.get("target_power") == power.get("target_power")
+        == derived_source.get("target_power")
         and statistics.get("bootstrap_iterations") == ranking_method.get("iterations")
         and statistics.get("randomization_iterations")
         == ranking_method.get("pairwise_randomization_iterations")
@@ -2762,6 +3097,9 @@ def _audit_preregistration(
         == multiplicity_maximum.get(
             "required_independence_groups_per_comparison"
         )
+        == derived_allocation.get(
+            "required_independence_groups_per_comparison"
+        )
         and statistics.get("pilot_variance_confidence_level")
         == multiplicity_uncertainty.get("confidence_level")
         == OFFICIAL_VARIANCE_CONFIDENCE_LEVEL
@@ -2773,8 +3111,16 @@ def _audit_preregistration(
         and statistics.get("design_standard_deviation_upper_bound")
         == multiplicity_source.get("design_standard_deviation")
         == multiplicity_uncertainty.get("design_standard_deviation_upper_bound")
+        == derived_source.get("design_standard_deviation_upper_bound")
+        and statistics.get("power_derived_split_design_schema")
+        == POWER_DESIGN_SCHEMA
+        and statistics.get("power_derived_split_design_sha256")
+        == derived_artifact.get("sha256")
+        and statistics.get("power_design_analysis_code_sha256")
+        == derived_method.get("analysis_code_sha256")
         and statistics.get("planned_independence_groups")
-        == multiplicity_maximum.get("actual_independence_groups")
+        == derived_allocation.get("planned_independence_groups")
+        == derived_maximum.get("actual_independence_groups")
     )
     audit.check(
         "preregistration.statistics",
@@ -2882,6 +3228,33 @@ def _audit_preregistration(
     lower_pilot_runs = power_pilot_source.get("lower_runs")
     pilot_temperature = _number(power_pilot_source.get("temperature"))
     frozen_pilot_temperature = _number(execution.get("temperature"))
+    target_allocations_valid = (
+        set(power_target_strata) == set(frozen_target_strata)
+        and bool(power_target_strata)
+        and all(
+            isinstance(power_target_strata[key], int)
+            and not isinstance(power_target_strata[key], bool)
+            and power_target_strata[key] > 0
+            and isinstance(frozen_target_strata[key], int)
+            and not isinstance(frozen_target_strata[key], bool)
+            and frozen_target_strata[key] > 0
+            for key in power_target_strata
+        )
+    )
+    power_target_total = (
+        sum(power_target_strata.values()) if target_allocations_valid else 0
+    )
+    frozen_target_total = (
+        sum(frozen_target_strata.values()) if target_allocations_valid else 0
+    )
+    target_weights_preserved = (
+        target_allocations_valid
+        and all(
+            power_target_strata[key] * frozen_target_total
+            == frozen_target_strata[key] * power_target_total
+            for key in power_target_strata
+        )
+    )
     power_pilot_valid = (
         references_valid
         and power_pilot_design.get("source_schema")
@@ -2948,7 +3321,11 @@ def _audit_preregistration(
         == preregistration_by_role["upper_anchor"].get("revision")
         and power_pilot_source.get("lower_revision")
         == preregistration_by_role["lower_anchor"].get("revision")
-        and power_target_strata == frozen_target_strata
+        and target_weights_preserved
+        and derived_source.get("baseline_independence_groups")
+        == power_target_total
+        and derived_allocation.get("planned_independence_groups")
+        == frozen_target_total
         and isinstance(pilot_minimum, int)
         and not isinstance(pilot_minimum, bool)
         and pilot_minimum == OFFICIAL_MIN_PILOT_GROUPS_PER_STRATUM
@@ -3444,6 +3821,9 @@ def audit_leaderboard_release(path: str | Path) -> dict[str, Any]:
     split = audit.artifact(manifest, "split_audit")
     power = audit.artifact(manifest, "power_analysis")
     multiplicity_power = audit.artifact(manifest, "multiplicity_power_audit")
+    derived_power_design = audit.artifact(
+        manifest, "power_derived_split_design"
+    )
     pilot_registration_artifact = audit.artifact(manifest, "pilot_registration")
     practice_review = audit.artifact(manifest, "practice_review")
     review = audit.artifact(manifest, "external_review")
@@ -3474,6 +3854,8 @@ def audit_leaderboard_release(path: str | Path) -> dict[str, Any]:
         _audit_power(audit, power)
     if multiplicity_power is not None:
         _audit_multiplicity_power(audit, multiplicity_power, power)
+    if derived_power_design is not None:
+        _audit_power_design(audit, derived_power_design, multiplicity_power)
     if pilot_registration_artifact is not None and practice_review is not None:
         _audit_pilot_evidence(
             audit,
@@ -3493,13 +3875,19 @@ def audit_leaderboard_release(path: str | Path) -> dict[str, Any]:
             split,
             power,
             multiplicity_power,
+            derived_power_design,
             calibration,
             evaluator_config,
             run_contexts,
         )
-    if split is not None and power is not None:
+    if split is not None and derived_power_design is not None:
         official = split.get("official") if isinstance(split.get("official"), dict) else {}
         groups = official.get("domain_independence_groups") if isinstance(official.get("domain_independence_groups"), dict) else {}
+        derived_allocation = (
+            derived_power_design.get("allocation")
+            if isinstance(derived_power_design.get("allocation"), dict)
+            else {}
+        )
         split_group_total = sum(
             value for domain in REQUIRED_DOMAINS
             if isinstance((value := groups.get(domain)), int) and not isinstance(value, bool)
@@ -3507,9 +3895,14 @@ def audit_leaderboard_release(path: str | Path) -> dict[str, Any]:
         audit.check(
             "power.split_binding",
             "artifact_integrity",
-            split_group_total > 0 and power.get("actual_independence_groups") == split_group_total,
-            "power analysis actual sample size must equal official split independent groups",
-            actual={"power": power.get("actual_independence_groups"), "split": split_group_total},
+            split_group_total > 0
+            and derived_allocation.get("planned_independence_groups")
+            == split_group_total,
+            "power-derived planned sample size must equal official split independent groups",
+            actual={
+                "planned": derived_allocation.get("planned_independence_groups"),
+                "split": split_group_total,
+            },
         )
     if (
         preregistration is not None

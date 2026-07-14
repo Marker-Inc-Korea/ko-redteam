@@ -52,6 +52,7 @@ ko-redteam-validate-pilot-registration = "probes.validate_pilot_registration:mai
 ko-redteam-audit-splits = "probes.audit_splits:main"
 ko-redteam-analyze-power = "probes.analyze_power:main"
 ko-redteam-analyze-familywise-power = "probes.analyze_familywise_power:main"
+ko-redteam-build-power-design = "probes.build_power_design:main"
 ko-redteam-compare-reports = "probes.compare_reports:main"
 ko-redteam-check-regression = "probes.check_regression:main"
 ko-redteam-gate-reports = "probes.gate_reports:main"

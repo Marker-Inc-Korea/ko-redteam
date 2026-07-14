@@ -41,6 +41,7 @@ def test_console_script_targets_are_importable():
         "ko-redteam-audit-splits",
         "ko-redteam-analyze-power",
         "ko-redteam-analyze-familywise-power",
+        "ko-redteam-build-power-design",
         "ko-redteam-compare-reports",
         "ko-redteam-check-regression",
     } <= set(scripts)
@@ -161,6 +162,7 @@ def test_analysis_package_imports_without_flat_pythonpath():
                 "from analysis.ko_calibration import build_calibration_report;"
                 "from analysis.ko_split_evidence import build_split_audit;"
                 "from analysis.ko_power_evidence import build_power_report;"
+                "from analysis.ko_power_design import build_power_derived_split_design;"
                 "from analysis.ko_power_pilot import build_power_pilot_input;"
                 "from analysis.ko_pilot_registration import validate_pilot_registration;"
                 "from analysis.ko_pilot_registration_builder import build_pilot_registration;"
@@ -177,6 +179,7 @@ def test_analysis_package_imports_without_flat_pythonpath():
                 "assert callable(build_calibration_report);"
                 "assert callable(build_split_audit);"
                 "assert callable(build_power_report);"
+                "assert callable(build_power_derived_split_design);"
                 "assert callable(build_power_pilot_input);"
                 "assert callable(validate_pilot_registration);"
                 "assert callable(build_pilot_registration);"

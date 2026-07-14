@@ -16,7 +16,7 @@ from ko_leaderboard import audit_leaderboard_release, render_leaderboard_audit_m
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("manifest", help="ko-redteam.leaderboard-release.v2 JSON")
+    parser.add_argument("manifest", help="ko-redteam.leaderboard-release.v3 JSON")
     parser.add_argument("--output", help="optional JSON audit output")
     parser.add_argument("--markdown-output", help="optional Markdown audit output")
     args = parser.parse_args()

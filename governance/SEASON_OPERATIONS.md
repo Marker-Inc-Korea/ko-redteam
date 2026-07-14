@@ -24,22 +24,24 @@
 2. protocol commit, benchmark fingerprint, 정확한 upper/lower immutable revision, generation settings,
    execution evidence 계약, MDE, alpha, target power와 분산·다중비교 방법을 `power-pilot-registration.v2`로
    동결한다.
-3. 두 reference model을 실행하고 95% 단측 pilot-variance 상한으로 최대 cohort power를 계산한다. 미달하면
-   official season과 split을 만들기 전에 중단한다.
-4. 통과한 표본 수, 정확한 immutable model cohort, suite×domain 배분, 실행 설정과 제출 한도를
-   `season-preregistration.v2`로 공개 동결한다.
-5. 모델명에 blinded된 held-out 사람 라벨로 evaluator를 calibration하고 기준 미달 시 중단한다.
-6. practice와 official split의 exact·semantic overlap을 감사한다.
-7. official split과 모든 scoring/evaluator 설정을 첫 제출 전에 동결한다.
-8. 모델별 최대 2회 제출을 접수하고 immutable model/runtime/prompting/evaluator provenance를 기록한다.
-9. 모델별 최소 3회, 반복마다 네 suite를 동일 run context로 실행하고 `core`·`mini_single` execution evidence가
+3. 두 reference model을 실행하고 95% 단측 pilot-variance 상한으로 최대 cohort power를 계산한다. 층별 정밀도
+   gate가 미달하면 official season과 split을 만들기 전에 중단한다.
+4. 고정 MDE·alpha·target power와 최대 7모델의 최소 Holm 임계값으로 `power-derived-split-design.v1`을 만들고,
+   계획 표본 수에서 tier power를 재생한다. 관측 평균 차이로 표본 수를 줄이거나 threshold를 완화하지 않는다.
+5. 통과한 표본 수, 정확한 immutable model cohort, suite×domain 배분, 실행 설정과 제출 한도를
+   `season-preregistration.v3`로 공개 동결한다.
+6. 모델명에 blinded된 held-out 사람 라벨로 evaluator를 calibration하고 기준 미달 시 중단한다.
+7. practice와 official split의 exact·semantic overlap을 감사한다.
+8. official split과 모든 scoring/evaluator 설정을 첫 제출 전에 동결한다.
+9. 모델별 최대 2회 제출을 접수하고 immutable model/runtime/prompting/evaluator provenance를 기록한다.
+10. 모델별 최소 3회, 반복마다 네 suite를 동일 run context로 실행하고 `core`·`mini_single` execution evidence가
    endpoint smoke, 필수 단계 완료, report doctor와 네 report digest를 결합했는지 확인한다.
-10. 실행·provenance evidence gate를 적용하고 eligible 모델 전체를 primary bootstrap·Holm 보정 tier에
+11. 실행·provenance evidence gate를 적용하고 eligible 모델 전체를 primary bootstrap·Holm 보정 tier에
    포함한다. critical·privacy·불안정성의 엄격 배포 screen은 별도로 공개하며 tier 포함 여부를 바꾸지 않는다.
-11. 외부 검토자가 private evidence와 공개 artifact를 대조하고 blocking finding을 해소한다.
-12. release bundle을 동결하고 verifier를 새 환경에서 재실행한 뒤 게시한다.
+12. 외부 검토자가 private evidence와 공개 artifact를 대조하고 blocking finding을 해소한다.
+13. release bundle을 동결하고 verifier를 새 환경에서 재실행한 뒤 게시한다.
 
-프로토콜 검증기는 `pilot 등록·review -> anchor 실행·evidence 완료 -> power 분석 -> season 사전등록 ->
+프로토콜 검증기는 `pilot 등록·review -> anchor 실행·evidence 완료 -> power 분석 -> derived split 설계 -> season 사전등록 ->
 split 감사 -> split 동결 -> 첫 제출 -> 공식 실행 -> 외부 검토 -> release 동결` 시각 순서를 확인한다.
 현재 활성 후보는 없다.
 S4는 [`SEASON_2026Q3_S4_STOP.json`](./SEASON_2026Q3_S4_STOP.json)에 기록된 다중비교 검정력 범위 불일치로
@@ -72,7 +74,7 @@ ko-redteam-validate-leaderboard release_bundle/release_manifest.json \
 
 - calibration 최저 기준 또는 reference control 분리 실패
 - practice/official exact·semantic overlap 또는 official cross-group semantic overlap 1건 이상
-- target stratum별 pilot 20개 미달, pilot 분산 95% 상한 검증 실패, 또는 최대 cohort 다중비교 power 미달
+- target stratum별 pilot 20개 미달, pilot 분산 95% 상한 검증 실패, derived split의 최대 cohort 다중비교 power 미달 또는 실제 split 불일치
 - endpoint 오류, 모델 revision 불명확, suite 간 run context 불일치, execution evidence/report digest 불일치
 - ranking evidence-eligible 모델 2개 미만
 - 외부 검토 blocking finding, split 유출 또는 공개 위생 실패

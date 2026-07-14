@@ -20,6 +20,8 @@ import ko_familywise_power as F  # noqa: E402
 import ko_model_ranking as R  # noqa: E402
 import ko_pilot_registration as PR  # noqa: E402
 import ko_power_pilot as PP  # noqa: E402
+import ko_power_design as D  # noqa: E402
+import ko_power_evidence as PE  # noqa: E402
 import ko_run_context as C  # noqa: E402
 
 
@@ -515,12 +517,25 @@ def _valid_release(
     tmp_path: Path,
     *,
     groups_per_domain: int = 30,
+    power_baseline_groups_per_domain: int | None = None,
+    pilot_difference: float = math.sqrt(60.8),
     unsafe_lower: bool = False,
 ) -> Path:
     assert groups_per_domain >= L.PUBLIC_REQUIREMENTS["minimum_groups_per_domain"]
     assert groups_per_domain % 2 == 0
     total_groups = groups_per_domain * len(L.REQUIRED_DOMAINS)
     agent_half = groups_per_domain // 2
+    power_groups_per_domain = (
+        groups_per_domain
+        if power_baseline_groups_per_domain is None
+        else power_baseline_groups_per_domain
+    )
+    assert power_groups_per_domain >= L.PUBLIC_REQUIREMENTS[
+        "minimum_groups_per_domain"
+    ]
+    assert power_groups_per_domain % 2 == 0
+    power_total_groups = power_groups_per_domain * len(L.REQUIRED_DOMAINS)
+    power_agent_half = power_groups_per_domain // 2
     official_suite_counts = {
         "paperbench": groups_per_domain * 2,
         "mini_single": groups_per_domain * 2,
@@ -690,13 +705,13 @@ def _valid_release(
     })
 
     power_target_strata = {
-        "paperbench:privacy:no_leak": groups_per_domain,
-        "paperbench:safety:refuse_or_redirect": groups_per_domain,
-        "mini_single:korean_quality:allow": groups_per_domain,
-        "mini_single:overrefusal:allow": groups_per_domain,
-        "multiturn:prompt_security:refuse_or_redirect": groups_per_domain,
-        "agent_harness:agent_rag:no_tool": agent_half,
-        "agent_harness:agent_rag:allow": agent_half,
+        "paperbench:privacy:no_leak": power_groups_per_domain,
+        "paperbench:safety:refuse_or_redirect": power_groups_per_domain,
+        "mini_single:korean_quality:allow": power_groups_per_domain,
+        "mini_single:overrefusal:allow": power_groups_per_domain,
+        "multiturn:prompt_security:refuse_or_redirect": power_groups_per_domain,
+        "agent_harness:agent_rag:no_tool": power_agent_half,
+        "agent_harness:agent_rag:allow": power_agent_half,
     }
     practice_target_counts = {
         "paperbench:privacy:no_leak": 40,
@@ -715,7 +730,6 @@ def _valid_release(
         )
         for suite in R.SUITES
     }
-    pilot_difference = math.sqrt(60.8)
     pilot_clusters = [
         {
             "id": f"{stratum}:{index}",
@@ -728,7 +742,7 @@ def _valid_release(
         for index in range(count)
     ]
     pilot_standard_deviation = math.sqrt(sum(
-        (count / total_groups) * variance([
+        (count / power_total_groups) * variance([
             cluster["difference"]
             for cluster in pilot_clusters
             if cluster["stratum"] == stratum
@@ -815,33 +829,38 @@ def _valid_release(
             },
         ],
         "baseline_design": {
-            "candidate_independence_groups": total_groups,
+            "candidate_independence_groups": power_total_groups,
             "suite_domain_independence_groups": {
                 "paperbench": {
-                    "privacy": groups_per_domain,
-                    "safety": groups_per_domain,
+                    "privacy": power_groups_per_domain,
+                    "safety": power_groups_per_domain,
                 },
                 "mini_single": {
-                    "korean_quality": groups_per_domain,
-                    "overrefusal": groups_per_domain,
+                    "korean_quality": power_groups_per_domain,
+                    "overrefusal": power_groups_per_domain,
                 },
-                "multiturn": {"prompt_security": groups_per_domain},
-                "agent_harness": {"agent_rag": groups_per_domain},
+                "multiturn": {"prompt_security": power_groups_per_domain},
+                "agent_harness": {"agent_rag": power_groups_per_domain},
             },
             "suite_domain_expected_independence_groups": {
                 "paperbench": {
-                    "privacy": {"no_leak": groups_per_domain},
-                    "safety": {"refuse_or_redirect": groups_per_domain},
+                    "privacy": {"no_leak": power_groups_per_domain},
+                    "safety": {"refuse_or_redirect": power_groups_per_domain},
                 },
                 "mini_single": {
-                    "korean_quality": {"allow": groups_per_domain},
-                    "overrefusal": {"allow": groups_per_domain},
+                    "korean_quality": {"allow": power_groups_per_domain},
+                    "overrefusal": {"allow": power_groups_per_domain},
                 },
                 "multiturn": {
-                    "prompt_security": {"refuse_or_redirect": groups_per_domain},
+                    "prompt_security": {
+                        "refuse_or_redirect": power_groups_per_domain
+                    },
                 },
                 "agent_harness": {
-                    "agent_rag": {"allow": agent_half, "no_tool": agent_half},
+                    "agent_rag": {
+                        "allow": power_agent_half,
+                        "no_tool": power_agent_half,
+                    },
                 },
             },
         },
@@ -903,7 +922,7 @@ def _valid_release(
                 F.OFFICIAL_MIN_PILOT_GROUPS_PER_STRATUM
             ),
             "builder_code_sha256": _sha_file(Path(PP.__file__)),
-            "power_analysis_code_sha256": "7" * 64,
+            "power_analysis_code_sha256": _sha_file(Path(PE.__file__)),
             "multiplicity_power_analysis_code_sha256": _sha_file(Path(F.__file__)),
         },
         "stopping_rules": {
@@ -914,6 +933,27 @@ def _valid_release(
         },
     }
     _write_json(pilot_registration_path, pilot_registration)
+    power_seed = 20260713
+    power_required_groups = PE._required_sample_size(
+        5.0,
+        pilot_standard_deviation,
+        0.05,
+        0.8,
+    )
+    power_analytic = PE._two_sided_normal_power(
+        5.0,
+        pilot_standard_deviation,
+        power_total_groups,
+        0.05,
+    )
+    power_simulated, power_simulation_se = PE._simulate_power(
+        effect=5.0,
+        standard_deviation=pilot_standard_deviation,
+        sample_size=power_total_groups,
+        alpha=0.05,
+        iterations=10_000,
+        seed=power_seed,
+    )
     power_path = tmp_path / "power.json"
     power_report = {
         "schema": L.POWER_SCHEMA,
@@ -926,14 +966,15 @@ def _valid_release(
         "estimand": "paired balanced diagnostic profile score difference",
         "analysis_target_pairwise_test": R.PAIRWISE_TEST,
         "analysis_target_randomization_iterations": 10_000,
-        "achieved_power": 0.85,
+        "achieved_power": power_simulated,
         "minimum_detectable_effect": 5.0,
-        "required_independence_groups": total_groups,
-        "actual_independence_groups": total_groups,
-        "analysis_code_sha256": "7" * 64,
+        "required_independence_groups": power_required_groups,
+        "actual_independence_groups": power_total_groups,
+        "analysis_code_sha256": _sha_file(Path(PE.__file__)),
         "input_sha256": C.canonical_sha256(variance_power_input),
         "preregistered_at": "2026-06-01T00:00:00+09:00",
         "simulation_iterations": 10000,
+        "seed": power_seed,
         "pilot_summary": {
             "dataset_sha256": "9" * 64,
             "cluster_count": sum(practice_target_counts.values()),
@@ -978,6 +1019,14 @@ def _valid_release(
             "target_strata": power_target_strata,
         },
         "assumptions": ["Independent groups are exchangeable within pre-registered strata."],
+        "analytic_power_at_actual": power_analytic,
+        "simulated_power_standard_error": power_simulation_se,
+        "design_power_at_required": PE._two_sided_normal_power(
+            5.0,
+            pilot_standard_deviation,
+            power_required_groups,
+            0.05,
+        ),
         "raw_prompt_or_response_used": False,
     }
     _write_json(power_path, power_report)
@@ -995,6 +1044,16 @@ def _valid_release(
         ),
     )
     _write_json(multiplicity_power_path, multiplicity_power)
+    power_design_path = tmp_path / "power_design.json"
+    derived_power_design = D.build_power_derived_split_design(
+        multiplicity_power,
+        source_familywise_sha256=_sha_file(multiplicity_power_path),
+    )
+    assert (
+        derived_power_design["allocation"]["planned_independence_groups"]
+        == total_groups
+    )
+    _write_json(power_design_path, derived_power_design)
 
     review_path = tmp_path / "external_review.json"
     _write_json(review_path, {
@@ -1070,50 +1129,9 @@ def _valid_release(
                 for name in ("upper-model", "lower-model")
             ],
         },
-        "official_split_design": {
-            "public_during_season": False,
-            "minimum_independence_groups": total_groups,
-            "minimum_groups_per_domain": groups_per_domain,
-            "domains": sorted(L.REQUIRED_DOMAINS),
-            "suite_domain_independence_groups": {
-                "paperbench": {
-                    "privacy": groups_per_domain,
-                    "safety": groups_per_domain,
-                },
-                "mini_single": {
-                    "korean_quality": groups_per_domain,
-                    "overrefusal": groups_per_domain,
-                },
-                "multiturn": {"prompt_security": groups_per_domain},
-                "agent_harness": {"agent_rag": groups_per_domain},
-            },
-            "suite_domain_expected_independence_groups": {
-                "paperbench": {
-                    "privacy": {"no_leak": groups_per_domain},
-                    "safety": {"refuse_or_redirect": groups_per_domain},
-                },
-                "mini_single": {
-                    "korean_quality": {"allow": groups_per_domain},
-                    "overrefusal": {"allow": groups_per_domain},
-                },
-                "multiturn": {
-                    "prompt_security": {"refuse_or_redirect": groups_per_domain},
-                },
-                "agent_harness": {
-                    "agent_rag": {"allow": agent_half, "no_tool": agent_half},
-                },
-            },
-            "construction": {
-                "new_human_authored_groups": True,
-                "public_practice_prompts_reused": False,
-                "public_dataset_records_reused": False,
-                "variants_share_parent_group": True,
-                "cross_suite_group_ids_disjoint": True,
-                "exact_cross_split_overlap_allowed": 0,
-                "semantic_cross_split_overlap_allowed": 0,
-                "official_cross_group_semantic_overlap_allowed": 0,
-            },
-        },
+        "official_split_design": json.loads(
+            json.dumps(derived_power_design["official_split_design"])
+        ),
         "execution": {
             "suites": list(R.SUITES),
             "minimum_repeats": 3,
@@ -1133,7 +1151,7 @@ def _valid_release(
             "ranking_analysis_code_sha256": ranking["method"][
                 "analysis_code_sha256"
             ],
-            "power_analysis_code_sha256": "7" * 64,
+            "power_analysis_code_sha256": _sha_file(Path(PE.__file__)),
             "minimum_detectable_effect": 5.0,
             "alpha": 0.05,
             "target_power": 0.8,
@@ -1167,6 +1185,11 @@ def _valid_release(
             "design_standard_deviation_upper_bound": multiplicity_power[
                 "pilot_variance_uncertainty"
             ]["design_standard_deviation_upper_bound"],
+            "power_derived_split_design_schema": D.OUTPUT_SCHEMA,
+            "power_derived_split_design_sha256": _sha_file(power_design_path),
+            "power_design_analysis_code_sha256": derived_power_design["method"][
+                "analysis_code_sha256"
+            ],
             "planned_independence_groups": total_groups,
             "power_pilot": {
                 "source_schema": L.POWER_PILOT_SOURCE_SCHEMA,
@@ -1288,6 +1311,9 @@ def _valid_release(
             "power_analysis": _artifact(power_path, tmp_path),
             "multiplicity_power_audit": _artifact(
                 multiplicity_power_path, tmp_path
+            ),
+            "power_derived_split_design": _artifact(
+                power_design_path, tmp_path
             ),
             "pilot_registration": _artifact(pilot_registration_path, tmp_path),
             "practice_review": _artifact(practice_review_path, tmp_path),
@@ -1424,6 +1450,43 @@ def test_complete_release_bundle_is_publishable(tmp_path):
     }
     assert tampered["status"] == "not_publishable"
     assert "split.ranking_coverage_binding" in failed_ids
+
+
+def test_release_accepts_power_derived_scale_up_from_underpowered_baseline(
+    tmp_path,
+):
+    release_path = _valid_release(
+        tmp_path,
+        groups_per_domain=60,
+        power_baseline_groups_per_domain=54,
+        pilot_difference=22.2,
+    )
+    manifest = json.loads(release_path.read_text("utf-8"))
+    multiplicity = json.loads(
+        (
+            tmp_path
+            / manifest["artifacts"]["multiplicity_power_audit"]["path"]
+        ).read_text("utf-8")
+    )
+    design = json.loads(
+        (
+            tmp_path
+            / manifest["artifacts"]["power_derived_split_design"]["path"]
+        ).read_text("utf-8")
+    )
+
+    result = L.audit_leaderboard_release(release_path)
+
+    assert multiplicity["maximum_season_cohort"]["actual_independence_groups"] == 324
+    assert multiplicity["maximum_season_cohort"][
+        "required_independence_groups_per_comparison"
+    ] == 359
+    assert multiplicity["decision"]["official_tier_design_supported"] is False
+    assert design["allocation"]["planned_independence_groups"] == 360
+    assert design["decision"]["planned_tier_design_supported"] is True
+    failed = [check for check in result["checks"] if check["status"] == "fail"]
+    assert result["status"] == "publishable", failed
+    assert result["summary"]["failed"] == 0
 
 
 def test_v4_power_pilot_accepts_frozen_pilot_registration_before_season(tmp_path):
@@ -2024,6 +2087,38 @@ def test_release_requires_passing_multiplicity_power_artifact(tmp_path):
     }
     assert failed["status"] == "not_publishable"
     assert "multiplicity_power.tier_design" in failed_ids
+
+
+def test_release_requires_replayable_power_derived_split_design(tmp_path):
+    release_path = _valid_release(tmp_path)
+    manifest = json.loads(release_path.read_text("utf-8"))
+    reference = manifest["artifacts"].pop("power_derived_split_design")
+    _write_json(release_path, manifest)
+
+    missing = L.audit_leaderboard_release(release_path)
+    missing_ids = {
+        check["id"] for check in missing["checks"] if check["status"] == "fail"
+    }
+    assert missing["status"] == "not_publishable"
+    assert "artifact.power_derived_split_design.reference" in missing_ids
+
+    manifest["artifacts"]["power_derived_split_design"] = reference
+    design_path = tmp_path / reference["path"]
+    design = json.loads(design_path.read_text("utf-8"))
+    design["allocation"]["rounding_overage_groups"] += 12
+    _write_json(design_path, design)
+    reference["sha256"] = _sha_file(design_path)
+    _write_json(release_path, manifest)
+
+    tampered = L.audit_leaderboard_release(release_path)
+    tampered_ids = {
+        check["id"]
+        for check in tampered["checks"]
+        if check["status"] == "fail"
+    }
+    assert tampered["status"] == "not_publishable"
+    assert "power_design.replay" in tampered_ids
+    assert "preregistration.statistics" in tampered_ids
 
 
 def test_preregistration_tamper_fails_closed(tmp_path):
