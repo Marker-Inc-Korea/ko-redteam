@@ -11,19 +11,23 @@ from typing import Any
 try:
     from ko_familywise_power import OFFICIAL_MIN_PILOT_GROUPS_PER_STRATUM
     import ko_model_ranking as ranking
+    import ko_pilot_registration as pilot_registration
     from ko_power_evidence import (
         INPUT_SCHEMA,
         MIN_PILOT_CLUSTERS_PER_STRATUM,
         PILOT_SOURCE_SCHEMA,
+        PILOT_SOURCE_V2_SCHEMA,
     )
     from ko_run_context import canonical_sha256
 except ModuleNotFoundError:  # package import path
     from .ko_familywise_power import OFFICIAL_MIN_PILOT_GROUPS_PER_STRATUM
     from . import ko_model_ranking as ranking
+    from . import ko_pilot_registration as pilot_registration
     from .ko_power_evidence import (
         INPUT_SCHEMA,
         MIN_PILOT_CLUSTERS_PER_STRATUM,
         PILOT_SOURCE_SCHEMA,
+        PILOT_SOURCE_V2_SCHEMA,
     )
     from .ko_run_context import canonical_sha256
 
@@ -33,6 +37,7 @@ PREREGISTRATION_SCHEMA = "ko-redteam.season-preregistration.v2"
 SUPPORTED_PREREGISTRATION_SCHEMAS = {
     LEGACY_PREREGISTRATION_SCHEMA,
     PREREGISTRATION_SCHEMA,
+    pilot_registration.PILOT_REGISTRATION_SCHEMA,
 }
 CONSTRUCTION_METHOD = "target-allocation linearized balanced diagnostic influence"
 PROTECTED_DOMAINS = {"safety", "privacy", "prompt_security", "agent_rag"}
@@ -63,7 +68,7 @@ def _timestamp(value: Any, context: str) -> datetime:
     if not isinstance(value, str):
         raise ValueError(f"{context} must be a timezone-aware ISO timestamp")
     try:
-        parsed = datetime.fromisoformat(value)
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
     except ValueError as exc:
         raise ValueError(
             f"{context} must be a timezone-aware ISO timestamp"
@@ -210,6 +215,7 @@ def build_power_pilot_input(
     preregistration: dict[str, Any],
     *,
     preregistered_at: str,
+    practice_review: dict[str, Any] | None = None,
     simulation_iterations: int = 10_000,
     seed: int = 20260713,
 ) -> dict[str, Any]:
@@ -217,6 +223,19 @@ def build_power_pilot_input(
     if preregistration_schema not in SUPPORTED_PREREGISTRATION_SCHEMAS:
         raise ValueError(
             "preregistration schema must be a supported season registration"
+        )
+    is_pilot_registration = (
+        preregistration_schema == pilot_registration.PILOT_REGISTRATION_SCHEMA
+    )
+    pilot_audit: dict[str, Any] | None = None
+    if is_pilot_registration:
+        if practice_review is None:
+            raise ValueError(
+                "power pilot registration requires practice review evidence"
+            )
+        pilot_audit = pilot_registration.validate_pilot_registration(
+            preregistration,
+            practice_review,
         )
     manifest_path = Path(ranking_manifest_path).resolve()
     manifest, runs_by_model, suites = ranking.load_ranking_manifest(manifest_path)
@@ -226,9 +245,15 @@ def build_power_pilot_input(
         raise ValueError("power pilot requires all four official suites")
     if (
         manifest.get("schema") == ranking.RANKING_MANIFEST_SCHEMA
-        and preregistration_schema != PREREGISTRATION_SCHEMA
+        and preregistration_schema
+        not in {
+            PREREGISTRATION_SCHEMA,
+            pilot_registration.PILOT_REGISTRATION_SCHEMA,
+        }
     ):
-        raise ValueError("v4 power pilots require season preregistration v2")
+        raise ValueError(
+            "v4 power pilots require season preregistration v2 or a frozen pilot registration"
+        )
     for model_name, runs in runs_by_model.items():
         for run_index, run in enumerate(runs, 1):
             for suite in suites:
@@ -255,24 +280,50 @@ def build_power_pilot_input(
     ):
         raise ValueError("both anchors must meet the pre-registered repeat count")
 
-    season = _object(preregistration.get("season"), "preregistration.season")
-    if preregistration_schema == PREREGISTRATION_SCHEMA:
-        season_registered_at = _timestamp(
-            season.get("registered_at"),
-            "preregistration.season.registered_at",
+    protocol = _object(
+        preregistration.get("pilot" if is_pilot_registration else "season"),
+        "preregistration.pilot"
+        if is_pilot_registration
+        else "preregistration.season",
+    )
+    registration_time: datetime | None = None
+    power_frozen_time: datetime | None = None
+    if preregistration_schema in {
+        PREREGISTRATION_SCHEMA,
+        pilot_registration.PILOT_REGISTRATION_SCHEMA,
+    }:
+        registration_time = _timestamp(
+            protocol.get("registered_at"),
+            "preregistration.pilot.registered_at"
+            if is_pilot_registration
+            else "preregistration.season.registered_at",
         )
-        power_preregistered_at = _timestamp(
+        power_frozen_time = _timestamp(
             preregistered_at,
             "power pilot preregistered_at",
         )
-        if power_preregistered_at < season_registered_at:
+        if power_frozen_time < registration_time:
             raise ValueError(
-                "power pilot preregistered_at must not precede season registration"
+                "power pilot preregistered_at must not precede "
+                + ("pilot registration" if is_pilot_registration else "season registration")
             )
     statistics = _object(preregistration.get("statistics"), "preregistration.statistics")
-    power_pilot_design = _object(
-        statistics.get("power_pilot"), "preregistration.statistics.power_pilot"
+    power_pilot_design = (
+        _object(
+            preregistration.get("practice_design"),
+            "preregistration.practice_design",
+        )
+        if is_pilot_registration
+        else _object(
+            statistics.get("power_pilot"),
+            "preregistration.statistics.power_pilot",
+        )
     )
+    if is_pilot_registration and (
+        simulation_iterations != statistics.get("simulation_iterations")
+        or seed != statistics.get("seed")
+    ):
+        raise ValueError("power analysis simulation settings changed after registration")
     frozen_execution_evidence = execution.get("execution_evidence")
     required_manifest_schema = power_pilot_design.get("ranking_manifest_schema")
     if frozen_execution_evidence is not None:
@@ -294,10 +345,19 @@ def build_power_pilot_input(
         and manifest.get("schema") != required_manifest_schema
     ):
         raise ValueError("power pilot ranking manifest schema changed after preregistration")
-    frozen_fingerprints = _object(
-        power_pilot_design.get("practice_benchmark_fingerprints"),
-        "preregistration.statistics.power_pilot.practice_benchmark_fingerprints",
-    )
+    if is_pilot_registration:
+        assert pilot_audit is not None
+        frozen_fingerprints = {
+            suite: artifact["content_sha256"]
+            for suite, artifact in pilot_audit["benchmark_artifacts"].items()
+        }
+        frozen_builder_code_sha256 = statistics.get("builder_code_sha256")
+    else:
+        frozen_fingerprints = _object(
+            power_pilot_design.get("practice_benchmark_fingerprints"),
+            "preregistration.statistics.power_pilot.practice_benchmark_fingerprints",
+        )
+        frozen_builder_code_sha256 = power_pilot_design.get("builder_code_sha256")
     builder_code_sha256 = _file_sha256(Path(__file__))
     required_pilot_groups_per_stratum = (
         OFFICIAL_MIN_PILOT_GROUPS_PER_STRATUM
@@ -310,7 +370,7 @@ def build_power_pilot_input(
         or power_pilot_design.get("minimum_repeats") != minimum_repeats
         or power_pilot_design.get("weight_profile") != "balanced"
         or power_pilot_design.get("construction_method") != CONSTRUCTION_METHOD
-        or power_pilot_design.get("builder_code_sha256") != builder_code_sha256
+        or frozen_builder_code_sha256 != builder_code_sha256
         or power_pilot_design.get("minimum_groups_per_stratum")
         != required_pilot_groups_per_stratum
     ):
@@ -329,25 +389,67 @@ def build_power_pilot_input(
         raise ValueError("pre-registered generation settings are invalid")
 
     source_identities: dict[str, dict[str, Any]] = {}
+    run_started_times: list[datetime] = []
+    evidence_completed_times: list[datetime] = []
     for role, reference in (
         ("upper", upper_reference),
         ("lower", lower_reference),
     ):
         name = str(reference.get("name") or "")
         identity = runs_by_model[name][0].get("_provenance") or {}
-        for run in runs_by_model[name]:
+        for run_index, run in enumerate(runs_by_model[name], 1):
             provenance = run.get("_provenance") or {}
             if (
                 provenance.get("served_model") != name
                 or provenance.get("model_id") != reference.get("model_id")
                 or provenance.get("model_revision") != reference.get("revision")
                 or provenance.get("evaluator_git_commit")
-                != season.get("protocol_git_commit")
+                != protocol.get("protocol_git_commit")
                 or provenance.get("source_dirty") is not False
             ):
                 raise ValueError(
                     f"{role} anchor provenance does not match preregistration"
                 )
+            if is_pilot_registration:
+                assert registration_time is not None
+                assert power_frozen_time is not None
+                started_at = _timestamp(
+                    provenance.get("started_at"),
+                    f"{role} anchor run {run_index} started_at",
+                )
+                if not registration_time <= started_at <= power_frozen_time:
+                    raise ValueError(
+                        f"{role} anchor run is outside the frozen pilot window"
+                    )
+                evidence_profiles = _object(
+                    run.get("_execution_evidence"),
+                    f"{role} anchor run {run_index} execution evidence",
+                )
+                for profile, evidence_value in evidence_profiles.items():
+                    evidence = _object(
+                        evidence_value,
+                        f"{role} anchor run {run_index} {profile} evidence",
+                    )
+                    created_at = _timestamp(
+                        evidence.get("created_at"),
+                        f"{role} anchor run {run_index} {profile} created_at",
+                    )
+                    completed_at = _timestamp(
+                        evidence.get("completed_at"),
+                        f"{role} anchor run {run_index} {profile} completed_at",
+                    )
+                    if not (
+                        registration_time
+                        <= started_at
+                        <= created_at
+                        <= completed_at
+                        <= power_frozen_time
+                    ):
+                        raise ValueError(
+                            f"{role} anchor execution evidence is outside the frozen pilot window"
+                        )
+                    evidence_completed_times.append(completed_at)
+                run_started_times.append(started_at)
             for suite in suites:
                 report_identity = run["_identities"][suite]
                 if (
@@ -365,7 +467,12 @@ def build_power_pilot_input(
                     )
         source_identities[role] = identity
 
-    target_strata, suite_counts = _target_design(preregistration)
+    if is_pilot_registration:
+        assert pilot_audit is not None
+        target_strata = pilot_audit["baseline_target_strata"]
+        suite_counts = pilot_audit["baseline_suite_counts"]
+    else:
+        target_strata, suite_counts = _target_design(preregistration)
     total_groups = sum(target_strata.values())
     protected_groups = sum(
         count for key, count in target_strata.items()
@@ -381,6 +488,7 @@ def build_power_pilot_input(
     }
     clusters: list[dict[str, Any]] = []
     pilot_stratum_counts = {key: 0 for key in target_strata}
+    observed_target_groups: set[tuple[str, str]] = set()
     manifest_sha256 = _file_sha256(manifest_path)
     for suite in suites:
         upper_groups = _group_rows(aggregated[upper_name][suite])
@@ -403,6 +511,7 @@ def build_power_pilot_input(
             stratum = f"{suite}:{domain}:{expected}"
             if stratum not in target_strata:
                 continue
+            observed_target_groups.add((suite, group))
             upper_value = _group_influence(
                 upper_groups[group],
                 suite=suite,
@@ -443,9 +552,27 @@ def build_power_pilot_input(
     if sparse:
         details = ", ".join(f"{key}={value}" for key, value in sorted(sparse.items()))
         raise ValueError(f"power pilot has insufficient target-stratum coverage: {details}")
+    if is_pilot_registration:
+        assert pilot_audit is not None
+        expected_counts = pilot_audit["practice_target_strata"]
+        if pilot_stratum_counts != expected_counts:
+            raise ValueError(
+                "power pilot target-stratum coverage changed after registration"
+            )
+        assert practice_review is not None
+        reviewed_groups = {
+            (str(row["suite"]), str(row["independence_group"]))
+            for row in practice_review["case_reviews"]
+        }
+        if observed_target_groups != reviewed_groups:
+            raise ValueError(
+                "power pilot independence-group set does not match practice review"
+            )
 
     pilot_source = {
-        "schema": PILOT_SOURCE_SCHEMA,
+        "schema": (
+            PILOT_SOURCE_V2_SCHEMA if is_pilot_registration else PILOT_SOURCE_SCHEMA
+        ),
         "ranking_manifest_sha256": manifest_sha256,
         "ranking_manifest_schema": manifest["schema"],
         "upper_model": upper_name,
@@ -472,6 +599,23 @@ def build_power_pilot_input(
         "builder_code_sha256": builder_code_sha256,
         "evaluator_git_commit": source_identities["upper"]["evaluator_git_commit"],
     }
+    if is_pilot_registration:
+        assert pilot_audit is not None
+        if not run_started_times or not evidence_completed_times:
+            raise ValueError("power pilot requires timestamped execution evidence")
+        pilot_source.update({
+            "pilot_registration_sha256": pilot_audit[
+                "registration_canonical_sha256"
+            ],
+            "practice_review_sha256": pilot_audit["review_canonical_sha256"],
+            "pilot_id": pilot_audit["pilot_id"],
+            "pilot_registered_at": pilot_audit["registered_at"],
+            "first_run_started_at": min(run_started_times).isoformat(),
+            "last_run_started_at": max(run_started_times).isoformat(),
+            "last_execution_completed_at": max(
+                evidence_completed_times
+            ).isoformat(),
+        })
     pilot_dataset_sha256 = canonical_sha256({
         "source": pilot_source,
         "target_strata": target_strata,
@@ -493,11 +637,19 @@ def build_power_pilot_input(
         "pilot_clusters": clusters,
         "simulation_iterations": simulation_iterations,
         "seed": seed,
-        "assumptions": [
-            "Paired reference-group influence values are exchangeable within each frozen suite/domain/expected stratum.",
-            "The public-practice within-stratum variance is applicable to the newly authored official split.",
-            "Official stratum allocation and the balanced diagnostic weights remain fixed for the season.",
-        ],
+        "assumptions": (
+            [
+                "Paired reference-group influence values are exchangeable within each frozen suite/domain/expected stratum.",
+                "The reviewed public-practice within-stratum variance is applicable to an independently authored hidden official split.",
+                "Baseline stratum proportions and balanced diagnostic weights remain fixed for sample-size planning.",
+            ]
+            if is_pilot_registration
+            else [
+                "Paired reference-group influence values are exchangeable within each frozen suite/domain/expected stratum.",
+                "The public-practice within-stratum variance is applicable to the newly authored official split.",
+                "Official stratum allocation and the balanced diagnostic weights remain fixed for the season.",
+            ]
+        ),
     }
 
 

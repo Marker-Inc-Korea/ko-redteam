@@ -4,14 +4,28 @@
 placeholder이며 공식 기준을 충족하지 않는다. 입력 파일에는 raw prompt, response, message 또는 credential을
 넣지 않는다.
 
+## Public Power-Pilot Registration
+
+`ko-redteam.power-pilot-registration.v1`은 reference 출력 관측 전에 공개한다. 정확한 upper/lower revision,
+네 practice benchmark의 파일·content SHA-256, 7개 target stratum의 최소 20개 독립 group, generation settings,
+execution evidence, MDE, alpha, target power, 분산 상한과 다중비교 분석 코드 SHA-256을 포함한다.
+
+`ko-redteam.practice-review.v1`은 각 target `independence_group`, stratum, `accept` 결정과 두 명 이상의 reviewer
+ID를 기록한다.
+검토자는 reference 출력에 blind해야 하며 machine-assisted draft 사용을 명시해야 한다. registration은 이 review의
+canonical SHA-256을 결합한다. 둘 중 하나가 누락·변조되거나 review가 등록 이후에 완료됐으면 power 입력을 만들 수
+없다.
+
 ## Public Season Preregistration
 
-`ko-redteam.season-preregistration.v2`는 비공개 입력이 아니라 prompt 작성 전에 공개하는 동결 설계다. 최소
+`ko-redteam.season-preregistration.v2`는 비공개 입력이 아니라 power gate 통과 후 official prompt 작성 전에
+공개하는 동결 설계다. 최소
 suite×domain×expected 독립 그룹 행렬, Agent transport, generation settings, primary·sensitivity profile,
 최대 모델 수와 comparison family, 통계 기준과 weight,
 upper/lower reference의 immutable revision, semantic overlap 설정, 사람 calibration 기준과 publication gate를 포함한다. release manifest는 이
-JSON을 상대경로와 SHA-256으로 결합하며 validator가 이후 split, ranking, power pilot builder, calibration 및 run context와
-대조한다. 변경이 필요하면 기존 파일을 덮어쓰지 않고 새 season ID를 등록한다.
+JSON을 상대경로와 SHA-256으로 결합하며 validator가 이전 pilot registration·review·power와 이후 split,
+ranking, calibration 및 run context를 대조한다. 변경이 필요하면 기존 파일을 덮어쓰지 않고 새 season ID를
+등록한다.
 S1-S4의 `v1` 등록은 불변 이력이며 신규 v4 ranking 또는 공식 release 계약으로 재사용하지 않는다.
 
 ## Official Execution Evidence
@@ -94,6 +108,11 @@ manifest의 run context와 이름·model ID·불변 revision이 일치해야 한
 10,000회 simulation이 필요하다. 공식 입력은 `ko-redteam-build-power-pilot`으로 만들며 네 suite와 frozen
 suite/domain/expected 7개 stratum을 모두 포함하고 stratum마다 최소 20개 pilot group이 필요하다. 실제
 official group 수는 split audit의 여섯 영역 합계와 같아야 한다.
+현재 입력의 `pilot_source`는 `ko-redteam.power-pilot-source.v2`여야 하며 pilot registration, practice review,
+benchmark fingerprint, anchor revision과 evaluator commit의 digest, `first_run_started_at`,
+`last_run_started_at`, `last_execution_completed_at`을 함께 포함한다. `preregistered_at`은 과거 필드명을
+유지하지만 의미는 모든 실행 evidence가 완료된 뒤의 power 분석 동결 시각이다. 검증 순서는
+`pilot_registered_at <= first_run_started_at <= last_run_started_at <= last_execution_completed_at <= preregistered_at`이다.
 
 `ko-redteam-analyze-power`의 단일 비교 결과만으로 publication power gate를 통과할 수 없다. 이어서
 `ko-redteam-analyze-familywise-power --power-input private/power_input.json --maximum-models 7

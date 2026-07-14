@@ -5,6 +5,11 @@
 
 ## Unreleased - Evidence-Eligible Ranking Protocol
 
+- reference 결과로 표본 수를 정해야 하는데 공식 season을 먼저 등록하던 순서 의존성을 제거한다. 공개 practice의
+  사례별 2인 검토와 `power-pilot-registration.v1`을 먼저 동결하고, power 통과 뒤에만
+  `season-preregistration.v2`를 등록한다. release v2는 pilot registration과 review artifact를 필수화한다.
+- pilot 등록 전 실행 또는 power 동결 뒤 완료된 실행을 사후 증거로 사용할 수 없도록 anchor run context와
+  `core`·`mini_single` execution evidence의 시작·완료 시각을 power source와 release gate에 결합한다.
 - ranking manifest v4부터 실행·provenance evidence eligibility와 엄격 deployment screen을 분리한다. critical,
   privacy 또는 반복 불안정성은 공개 위험 판정에 남지만 evidence-complete 모델을 통계 tier에서 삭제하지 않는다.
 - `balanced`를 유일한 primary inferential profile로 고정하고 최대 7모델의 21개 pair를 Holm family로 묶는다.

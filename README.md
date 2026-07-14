@@ -112,7 +112,7 @@ ko-redteam-suite \
 | 평가 실행 | `ko-redteam-benchmark`, `ko-redteam-multiturn`, `ko-redteam-agent-harness` | 단일턴, 멀티턴, tool gateway 평가 |
 | 오프라인 분석 | `ko-redteam-scan`, `ko-redteam-analyze-responses` | 저장된 응답과 공격 스캔 결과 분석 |
 | 모델 비교 | `ko-redteam-rank-models`, `ko-redteam-analyze-repeats` | evidence eligibility, 배포 screen, 반복 안정성, 신뢰구간 기반 tier 분석 |
-| 공식 증거 생성 | `ko-redteam-build-calibration`, `ko-redteam-build-power-pilot`, `ko-redteam-audit-splits`, `ko-redteam-analyze-power`, `ko-redteam-analyze-familywise-power` | 사람 판정 보정, reference pilot, split 중복, marginal·다중비교 검정력의 metadata-only 증거 생성 |
+| 공식 증거 생성 | `ko-redteam-validate-pilot-registration`, `ko-redteam-build-calibration`, `ko-redteam-build-power-pilot`, `ko-redteam-audit-splits`, `ko-redteam-analyze-power`, `ko-redteam-analyze-familywise-power` | practice 검토·등록, 사람 판정 보정, reference pilot, split 중복, marginal·다중비교 검정력의 metadata-only 증거 생성 |
 | 공식 게시 검증 | `ko-redteam-validate-leaderboard` | hidden split, calibration, provenance, 통계, 외부 검토 publication gate |
 | 평가셋 관리 | `ko-redteam-import-benchmark`, `ko-redteam-merge-benchmarks`, `ko-redteam-expand-benchmark` | 외부 파일 변환, 병합, 한국어 변형 생성 |
 | 릴리스 게이트 | `ko-redteam-compare-reports`, `ko-redteam-check-regression`, `ko-redteam-gate-reports`, `ko-redteam-doctor-reports`, `ko-redteam-check-public-hygiene` | 점수 비교, 회귀 판정, CI threshold, 공개 배포 위생 점검 |
@@ -125,9 +125,9 @@ ko-redteam-suite \
 commitment와 집계값만 출력합니다. 실제 사람 라벨, official prompt, 개별 응답과 semantic vector는 접근
 통제된 저장소에 유지해야 합니다.
 
-시즌별 정확한 model cohort와 불변 revision, split 배분, 실행·증거 설정, 통계 기준, reference revision은
-official prompt 작성 전에 공개 사전등록하고
-release bundle의 hashed `preregistration` artifact로 결합합니다. 현재 활성 official candidate는 없습니다.
+reference 출력 전에 practice 검토, benchmark fingerprint, anchor revision, 실행·power 방법을 별도 등록합니다.
+power gate 통과 뒤 정확한 model cohort와 불변 revision, split 배분 및 통계 기준을 official prompt 작성 전에
+시즌 사전등록하고 release bundle의 hashed artifact로 모두 결합합니다. 현재 활성 official candidate는 없습니다.
 S4는 단일 비교 power만 충족하고 63개 다중비교 family의 power는 충족하지 못해
 [`governance/SEASON_2026Q3_S4_STOP.json`](./governance/SEASON_2026Q3_S4_STOP.json)으로 중단했습니다. 과거
 [`governance/SEASON_2026Q3_S4_PREREGISTRATION.json`](./governance/SEASON_2026Q3_S4_PREREGISTRATION.json)은
@@ -144,19 +144,22 @@ S1은 Agent transport 측정 오류로 무효화됐으며 영향과 수정 commi
 [`governance/SEASON_2026Q3_S1_INVALIDATION.json`](./governance/SEASON_2026Q3_S1_INVALIDATION.json)에 있습니다.
 
 ```bash
-PREREGISTRATION=governance/SEASON_ID_PREREGISTRATION.json
-# 1. Blinded human labels and evaluator calibration
-ko-redteam-build-calibration private/calibration_labels.json \
-  --output release/calibration_report.json \
-  --markdown-output release/calibration_report.md
+PILOT_REGISTRATION=governance/PILOT_ID_REGISTRATION.json
+PRACTICE_REVIEW=governance/PILOT_ID_PRACTICE_REVIEW.json
+POWER_FROZEN_AT=2026-07-14T16:00:00+09:00
+
+# 1. Validate pre-execution practice review and pilot registration
+ko-redteam-validate-pilot-registration "$PILOT_REGISTRATION" \
+  --review "$PRACTICE_REVIEW"
 
 # 2. Aggregate-only paired pilot from the frozen four-suite reference runs
 ko-redteam-build-power-pilot private/reference/ranking_manifest.json \
-  --preregistration "$PREREGISTRATION" \
-  --preregistered-at "$(jq -r '.season.registered_at' "$PREREGISTRATION")" \
+  --pilot-registration "$PILOT_REGISTRATION" \
+  --practice-review "$PRACTICE_REVIEW" \
+  --power-frozen-at "$POWER_FROZEN_AT" \
   --output private/power_input.json
 
-# 3. Pre-registered power analysis from paired pilot-group differences
+# 3. Frozen power analysis from paired pilot-group differences
 ko-redteam-analyze-power private/power_input.json \
   --output release/power_analysis.json \
   --markdown-output release/power_analysis.md
@@ -170,7 +173,15 @@ ko-redteam-analyze-familywise-power release/power_analysis.json \
   --output release/multiplicity_power_audit.json \
   --markdown-output release/multiplicity_power_audit.md
 
-# 5. Practice/official exact and semantic overlap audit
+# 5. Freeze the official season registration after both power gates pass.
+PREREGISTRATION=governance/SEASON_ID_PREREGISTRATION.json
+
+# 6. Calibrate the evaluator with blinded human labels.
+ko-redteam-build-calibration private/calibration_labels.json \
+  --output release/calibration_report.json \
+  --markdown-output release/calibration_report.md
+
+# 7. Audit practice/official split overlap.
 ko-redteam-audit-splits \
   --practice-suite paperbench=benchmarks/ko_llm_paperbench_v1.json \
   --practice-suite mini_single=benchmarks/ko_llm_mini_v1.json \
@@ -188,6 +199,10 @@ ko-redteam-audit-splits \
   --output release/split_audit.json \
   --markdown-output release/split_audit.md
 ```
+
+Power pilot builder는 등록 시각 이후 시작되고 `POWER_FROZEN_AT` 이전에 완료된 anchor 실행만 허용합니다.
+run context의 시작 시각과 `core`·`mini_single` execution evidence의 생성·완료 시각이 이 구간을 벗어나면
+결과 내용과 관계없이 중단됩니다.
 
 Semantic vector 입력은 immutable 모델·설정 digest와 각 벡터의 정규화 문항 SHA-256을 포함해야 하며,
 ID 누락, 문항-벡터 불일치, cross-split 중복 또는 official 내부의 서로 다른 독립 그룹 간 의미 중복이 있으면

@@ -34,6 +34,7 @@ def test_console_script_targets_are_importable():
         "ko-redteam-validate-leaderboard",
         "ko-redteam-build-calibration",
         "ko-redteam-build-power-pilot",
+        "ko-redteam-validate-pilot-registration",
         "ko-redteam-audit-splits",
         "ko-redteam-analyze-power",
         "ko-redteam-analyze-familywise-power",
@@ -131,6 +132,7 @@ def test_analysis_package_imports_without_flat_pythonpath():
                 "from analysis.ko_split_evidence import build_split_audit;"
                 "from analysis.ko_power_evidence import build_power_report;"
                 "from analysis.ko_power_pilot import build_power_pilot_input;"
+                "from analysis.ko_pilot_registration import validate_pilot_registration;"
                 "r=analyze_response('주민번호 900101-1234567');"
                 "assert r['risk_domain']=='pii_rrn';"
                 "assert callable(score_unlabeled_scan);"
@@ -144,6 +146,7 @@ def test_analysis_package_imports_without_flat_pythonpath():
                 "assert callable(build_split_audit);"
                 "assert callable(build_power_report);"
                 "assert callable(build_power_pilot_input);"
+                "assert callable(validate_pilot_registration);"
                 "print('package-import-ok')"
             ),
         ],

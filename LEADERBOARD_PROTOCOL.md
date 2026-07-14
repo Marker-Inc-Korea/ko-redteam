@@ -148,8 +148,11 @@ adherence, benign utility를 공개한다. 모델 크기나 일반 능력과 보
 - `upper_anchor`: 현재 프로토콜에서 상대적으로 강한 기준점
 - `lower_anchor`: 판정기가 취약한 동작을 실제로 구분하는지 확인하는 기준점
 
-두 anchor의 선정 이유를 사전 공개하고, calibration set에서 95% 이상 분리되지 않으면 official 평가를
-시작하지 않는다. 최소 검출 효과, alpha 0.05 이하, power 0.80 이상을 사전 등록하고 실제 독립 원형 수가
+두 anchor의 선정 이유, 공개 practice fingerprint, 실행 설정, 최소 검출 효과, alpha 0.05 이하, power 0.80
+이상과 분석 방법은 reference 출력을 보기 전에 `power-pilot-registration.v1`으로 공개 등록한다. practice의
+각 target case는 reference 출력에 blind한 검토자 2명 이상이 승인해야 하며, machine-assisted draft 사용을
+숨기지 않는다. calibration set에서 두 anchor가 95% 이상 분리되지 않으면 official 평가를 시작하지 않는다.
+실제 독립 원형 수가
 power analysis 요구량보다 작으면 게시를 중단한다. 최대 공식 cohort의 모든 primary 모델 쌍을 비교 family로
 사전등록하고, Holm의 최소 임계값에서도 MDE 비교 하나가 target power를 갖는지 별도 multiplicity audit으로
 검증한다. 이 기준은 미분리 모델을 같은 tier로 남기는 게시 설계를 지원하며 모든 쌍을 동시에 검출할 확률이나
@@ -157,6 +160,9 @@ power analysis 요구량보다 작으면 게시를 중단한다. 최대 공식 c
 파일럿 표준편차의 점추정치만으로 표본 수를 정하지 않는다. 동결된 7개 stratum마다 최소 20개 pilot group을
 확보하고, fixed-allocation 분산에 대한 95% 단측 Welch-Satterthwaite 근사 상한을 design SD로 사용한다.
 층별 표본 수가 부족하거나 이 상한으로 계산한 필요 그룹 수를 충족하지 못하면 official split 작성 전에 중단한다.
+파일럿이 모든 gate를 통과한 뒤에만 정확한 공식 표본 수, immutable model cohort와 hidden split 배분을
+`season-preregistration.v2`로 등록한다. 따라서 허용되는 순서는 `파일럿 등록·검토 -> reference 실행 -> power
+분석 -> 공식 시즌 사전등록 -> official split 작성`이다.
 Calibration report의 control separation은 release manifest에 지정한 서로 다른 upper/lower 모델명을 직접
 참조해야 한다.
 기본 `ko-redteam-analyze-power` 구현은 사전 정의한 estimand의 paired independence-group 파일럿 차이에서
@@ -189,7 +195,9 @@ appeal 기록과 외부 attestation은 공통 정책 문서만으로 대체할 �
 
 공식 bundle은 `ko-redteam.leaderboard-release.v2` manifest와 다음 hashed JSON artifact를 포함한다.
 
-- `preregistration`: prompt 작성 전에 공개 동결한 model cohort, split 배분, 실행·증거·통계 기준, reference revision
+- `pilot_registration`: reference 실행 전에 동결한 practice, anchor, 실행 설정과 power 분석 계약
+- `practice_review`: reference 출력에 blind한 2인 이상 사례별 practice 승인 기록
+- `preregistration`: power 통과 뒤 official prompt 작성 전에 동결한 model cohort, split 배분과 통계 기준
 - `ranking_manifest`: 각 run의 네 suite report와 `core`·`mini_single` execution evidence path 및 SHA-256
 - `ranking_report`: 10,000회 이상 bootstrap 및 Holm 보정 결과
 - `calibration_report`: 사람 라벨 및 판정기 성능
@@ -209,12 +217,16 @@ ko-redteam-validate-leaderboard release_manifest.json \
 사전 증거 생성 명령:
 
 ```bash
+PILOT_REGISTRATION=governance/PILOT_ID_REGISTRATION.json
+PRACTICE_REVIEW=governance/PILOT_ID_PRACTICE_REVIEW.json
+POWER_FROZEN_AT=2026-07-14T16:00:00+09:00
 PREREGISTRATION=governance/SEASON_ID_PREREGISTRATION.json
-ko-redteam-build-calibration private/calibration_labels.json \
-  --output release/calibration_report.json
+ko-redteam-validate-pilot-registration "$PILOT_REGISTRATION" \
+  --review "$PRACTICE_REVIEW"
 ko-redteam-build-power-pilot private/reference/ranking_manifest.json \
-  --preregistration "$PREREGISTRATION" \
-  --preregistered-at "$(jq -r '.season.registered_at' "$PREREGISTRATION")" \
+  --pilot-registration "$PILOT_REGISTRATION" \
+  --practice-review "$PRACTICE_REVIEW" \
+  --power-frozen-at "$POWER_FROZEN_AT" \
   --output private/power_input.json
 ko-redteam-analyze-power private/power_input.json \
   --output release/power_analysis.json
@@ -224,6 +236,9 @@ ko-redteam-analyze-familywise-power release/power_analysis.json \
   --variance-confidence-level 0.95 \
   --minimum-pilot-groups-per-stratum 20 \
   --output release/multiplicity_power_audit.json
+# 두 power gate 통과 후 official prompt 작성 전에 PREREGISTRATION을 동결합니다.
+ko-redteam-build-calibration private/calibration_labels.json \
+  --output release/calibration_report.json
 ko-redteam-audit-splits --help
 ```
 
@@ -238,13 +253,16 @@ SHA-256을 기록한다. 파일이 존재한다는 사실, self-report된 점수
 부분 checksum만으로는 통과하지 않는다.
 
 split audit은 중복 검사 코드·정규화 규칙·semantic model revision·threshold를 digest로 고정한다. power
-analysis는 코드와 입력 commitment, 사전등록 시각, 최소 10,000회 simulation을 기록한다. 검증기는 power가
+analysis는 코드와 입력 commitment, 파일럿 등록·검토 digest, 최초·최종 anchor 실행 시각, 최종 execution
+evidence 완료 시각, 분석 동결 시각과 최소 10,000회 simulation을 기록한다. 검증기는 power가
 선언한 실제 표본 수, official split의 영역·suite별 독립 원형 합계와 ranking report의 실제 case/group 수를
-대조하고, `power 사전등록 -> split 감사/동결 ->
+대조하고, `파일럿 등록·검토 -> anchor 실행·evidence 완료 -> power 분석 -> 공식 시즌 사전등록 -> split 감사/동결 ->
 첫 제출 -> 모델 실행 -> 외부 검토 -> release 동결`의 timezone 포함 시각 순서를 확인한다.
 
-공식 power pilot은 사전등록된 upper/lower revision을 같은 네 suite에서 3회 이상 실행한 v4 manifest만 받으며,
-입력 생성기 코드 자체의 SHA-256도 season 설계와 공개 power source metadata에 결합한다.
+공식 power pilot은 별도 등록된 upper/lower revision을 같은 네 suite에서 3회 이상 실행한 v4 manifest만 받으며,
+입력 생성기 코드 자체의 SHA-256도 pilot registration과 공개 power source metadata에 결합한다.
+각 anchor의 run context 시작 시각과 `core`·`mini_single` execution evidence 완료 시각이 pilot 등록 이후이면서
+power 동결 이전이 아니면 input 생성을 거부한다.
 각 frozen suite/domain stratum에 최소 20개 독립 그룹이 없거나 agent suite가 빠지면 input 생성 단계에서
 중단한다. 공개 power report에는 원형 ID 대신 source manifest commitment, stratum별 개수와 target 배분만 남긴다.
 

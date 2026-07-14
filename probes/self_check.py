@@ -53,6 +53,7 @@ REQUIRED_MODULES = [
     "ko_report",
     "ko_report_doctor",
     "ko_model_ranking",
+    "ko_pilot_registration",
     "ko_power_evidence",
     "ko_run_context",
     "ko_response_contract",
@@ -62,6 +63,7 @@ REQUIRED_MODULES = [
     "merge_benchmarks",
     "multiturn_benchmark",
     "run_suite",
+    "validate_pilot_registration",
     "validate_leaderboard",
 ]
 

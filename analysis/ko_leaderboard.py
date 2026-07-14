@@ -12,6 +12,7 @@ from typing import Any
 
 try:
     import ko_familywise_power as familywise_power
+    import ko_pilot_registration as pilot_registration
     from ko_familywise_power import (
         OFFICIAL_MIN_PILOT_GROUPS_PER_STRATUM,
         OFFICIAL_VARIANCE_CONFIDENCE_LEVEL,
@@ -33,6 +34,7 @@ try:
     from ko_run_context import canonical_sha256, validate_run_context
 except ModuleNotFoundError:  # package import path
     from . import ko_familywise_power as familywise_power
+    from . import ko_pilot_registration as pilot_registration
     from .ko_familywise_power import (
         OFFICIAL_MIN_PILOT_GROUPS_PER_STRATUM,
         OFFICIAL_VARIANCE_CONFIDENCE_LEVEL,
@@ -63,7 +65,10 @@ POWER_SCHEMA = "ko-redteam.power-analysis.v1"
 MULTIPLICITY_POWER_SCHEMA = FAMILYWISE_POWER_SCHEMA
 EXTERNAL_REVIEW_SCHEMA = "ko-redteam.external-review.v1"
 PREREGISTRATION_SCHEMA = "ko-redteam.season-preregistration.v2"
-POWER_PILOT_SOURCE_SCHEMA = "ko-redteam.power-pilot-source.v1"
+LEGACY_POWER_PILOT_SOURCE_SCHEMA = "ko-redteam.power-pilot-source.v1"
+POWER_PILOT_SOURCE_SCHEMA = "ko-redteam.power-pilot-source.v2"
+PILOT_REGISTRATION_SCHEMA = pilot_registration.PILOT_REGISTRATION_SCHEMA
+PRACTICE_REVIEW_SCHEMA = pilot_registration.PRACTICE_REVIEW_SCHEMA
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 GIT_COMMIT_RE = re.compile(r"^[0-9a-f]{40}$")
 REQUIRED_DOMAINS = {
@@ -1651,6 +1656,28 @@ def _audit_power(audit: _Audit, power: dict[str, Any]) -> None:
         pilot_source.get("schema") == POWER_PILOT_SOURCE_SCHEMA
         and bool(
             SHA256_RE.fullmatch(
+                str(pilot_source.get("pilot_registration_sha256") or "")
+            )
+        )
+        and bool(
+            SHA256_RE.fullmatch(
+                str(pilot_source.get("practice_review_sha256") or "")
+            )
+        )
+        and isinstance(pilot_source.get("pilot_id"), str)
+        and bool(pilot_source.get("pilot_id", "").strip())
+        and _iso_with_timezone(pilot_source.get("pilot_registered_at"))
+        and _iso_with_timezone(pilot_source.get("first_run_started_at"))
+        and _iso_with_timezone(pilot_source.get("last_run_started_at"))
+        and _iso_with_timezone(pilot_source.get("last_execution_completed_at"))
+        and _iso_with_timezone(power.get("preregistered_at"))
+        and _timestamp(pilot_source.get("pilot_registered_at"))
+        <= _timestamp(pilot_source.get("first_run_started_at"))
+        <= _timestamp(pilot_source.get("last_run_started_at"))
+        <= _timestamp(pilot_source.get("last_execution_completed_at"))
+        <= _timestamp(power.get("preregistered_at"))
+        and bool(
+            SHA256_RE.fullmatch(
                 str(pilot_source.get("ranking_manifest_sha256") or "")
             )
         )
@@ -1772,6 +1799,152 @@ def _audit_power(audit: _Audit, power: dict[str, Any]) -> None:
         and simulations >= PUBLIC_REQUIREMENTS["minimum_power_simulations"],
         f"power analysis must be pre-registered and reproducible with at least {PUBLIC_REQUIREMENTS['minimum_power_simulations']} simulations",
         actual=simulations,
+    )
+
+
+def _audit_pilot_evidence(
+    audit: _Audit,
+    registration: dict[str, Any],
+    practice_review: dict[str, Any],
+    power: dict[str, Any] | None,
+    multiplicity_power: dict[str, Any] | None,
+) -> None:
+    validation: dict[str, Any] | None = None
+    validation_error: str | None = None
+    try:
+        validation = pilot_registration.validate_pilot_registration(
+            registration,
+            practice_review,
+        )
+    except ValueError as exc:
+        validation_error = str(exc)
+    audit.check(
+        "pilot_registration.contract",
+        "governance",
+        validation is not None,
+        "power pilot registration and two-reviewer case evidence must be frozen before execution",
+        actual=validation_error,
+    )
+
+    pilot = registration.get("pilot") if isinstance(registration.get("pilot"), dict) else {}
+    statistics = (
+        registration.get("statistics")
+        if isinstance(registration.get("statistics"), dict)
+        else {}
+    )
+    references = (
+        registration.get("reference_models")
+        if isinstance(registration.get("reference_models"), list)
+        else []
+    )
+    references_by_role = {
+        item.get("role"): item
+        for item in references
+        if isinstance(item, dict) and isinstance(item.get("role"), str)
+    }
+    pilot_summary = (
+        power.get("pilot_summary")
+        if isinstance(power, dict) and isinstance(power.get("pilot_summary"), dict)
+        else {}
+    )
+    pilot_stratum_counts = (
+        pilot_summary.get("pilot_stratum_counts")
+        if isinstance(pilot_summary.get("pilot_stratum_counts"), dict)
+        else {}
+    )
+    target_strata = (
+        pilot_summary.get("target_strata")
+        if isinstance(pilot_summary.get("target_strata"), dict)
+        else {}
+    )
+    source = (
+        pilot_summary.get("source")
+        if isinstance(pilot_summary.get("source"), dict)
+        else {}
+    )
+    benchmark_artifacts = (
+        validation.get("benchmark_artifacts")
+        if isinstance(validation, dict)
+        and isinstance(validation.get("benchmark_artifacts"), dict)
+        else {}
+    )
+    registered_at = _timestamp(pilot.get("registered_at"))
+    first_run_started_at = _timestamp(source.get("first_run_started_at"))
+    last_run_started_at = _timestamp(source.get("last_run_started_at"))
+    last_execution_completed_at = _timestamp(
+        source.get("last_execution_completed_at")
+    )
+    power_time = (
+        _timestamp(power.get("preregistered_at")) if isinstance(power, dict) else None
+    )
+    source_binding_valid = (
+        validation is not None
+        and source.get("schema") == POWER_PILOT_SOURCE_SCHEMA
+        and source.get("pilot_registration_sha256")
+        == validation.get("registration_canonical_sha256")
+        and source.get("practice_review_sha256")
+        == validation.get("review_canonical_sha256")
+        and source.get("pilot_id") == validation.get("pilot_id")
+        and source.get("pilot_registered_at") == validation.get("registered_at")
+        and source.get("evaluator_git_commit") == pilot.get("protocol_git_commit")
+        and source.get("builder_code_sha256")
+        == statistics.get("builder_code_sha256")
+        and isinstance(power, dict)
+        and power.get("analysis_code_sha256")
+        == statistics.get("power_analysis_code_sha256")
+        and source.get("benchmark_fingerprints")
+        == {
+            suite: artifact.get("content_sha256")
+            for suite, artifact in benchmark_artifacts.items()
+            if isinstance(artifact, dict)
+        }
+        and pilot_stratum_counts == validation.get("practice_target_strata")
+        and target_strata == validation.get("baseline_target_strata")
+        and pilot_summary.get("cluster_count") == sum(pilot_stratum_counts.values())
+        and set(references_by_role) == {"upper_anchor", "lower_anchor"}
+        and source.get("upper_model")
+        == references_by_role["upper_anchor"].get("name")
+        and source.get("upper_model_id")
+        == references_by_role["upper_anchor"].get("model_id")
+        and source.get("upper_revision")
+        == references_by_role["upper_anchor"].get("revision")
+        and source.get("lower_model")
+        == references_by_role["lower_anchor"].get("name")
+        and source.get("lower_model_id")
+        == references_by_role["lower_anchor"].get("model_id")
+        and source.get("lower_revision")
+        == references_by_role["lower_anchor"].get("revision")
+        and registered_at is not None
+        and first_run_started_at is not None
+        and last_run_started_at is not None
+        and last_execution_completed_at is not None
+        and power_time is not None
+        and registered_at
+        <= first_run_started_at
+        <= last_run_started_at
+        <= last_execution_completed_at
+        <= power_time
+    )
+    audit.check(
+        "pilot_registration.power_binding",
+        "artifact_integrity",
+        source_binding_valid,
+        "power evidence must bind the exact pre-execution pilot registration, review, benchmarks, anchors, code, and timeline",
+    )
+
+    multiplicity_method = (
+        multiplicity_power.get("method")
+        if isinstance(multiplicity_power, dict)
+        and isinstance(multiplicity_power.get("method"), dict)
+        else {}
+    )
+    audit.check(
+        "pilot_registration.multiplicity_method",
+        "statistics",
+        validation is not None
+        and multiplicity_method.get("analysis_code_sha256")
+        == statistics.get("multiplicity_power_analysis_code_sha256"),
+        "pilot registration must freeze the multiplicity and variance analysis implementation",
     )
 
 
@@ -2579,6 +2752,20 @@ def _audit_preregistration(
         == POWER_PILOT_SOURCE_SCHEMA
         and power_pilot_source.get("schema")
         == power_pilot_design.get("source_schema")
+        and power_pilot_design.get("pilot_registration_sha256")
+        == power_pilot_source.get("pilot_registration_sha256")
+        and power_pilot_design.get("practice_review_sha256")
+        == power_pilot_source.get("practice_review_sha256")
+        and bool(
+            SHA256_RE.fullmatch(
+                str(power_pilot_design.get("pilot_registration_sha256") or "")
+            )
+        )
+        and bool(
+            SHA256_RE.fullmatch(
+                str(power_pilot_design.get("practice_review_sha256") or "")
+            )
+        )
         and power_pilot_design.get("suites") == list(SUITES)
         and power_pilot_source.get("suites")
         == power_pilot_design.get("suites")
@@ -2880,20 +3067,27 @@ def _audit_preregistration(
         "governance",
         registered_at is not None
         and power_time is not None
-        and registered_at <= power_time,
-        "public season design must be registered no later than the power preregistration",
+        and power_time <= registered_at,
+        "official season design must be registered after the frozen pilot analysis and before official split construction",
     )
 
 
 def _audit_timeline(
     audit: _Audit,
     manifest: dict[str, Any],
+    preregistration: dict[str, Any],
     split: dict[str, Any],
     power: dict[str, Any],
     review: dict[str, Any],
     contexts: list[dict[str, Any]],
 ) -> None:
     release_time = _timestamp((manifest.get("release") or {}).get("frozen_at"))
+    season = (
+        preregistration.get("season")
+        if isinstance(preregistration.get("season"), dict)
+        else {}
+    )
+    season_registered_at = _timestamp(season.get("registered_at"))
     official = split.get("official") if isinstance(split.get("official"), dict) else {}
     split_audit = split.get("audit") if isinstance(split.get("audit"), dict) else {}
     power_time = _timestamp(power.get("preregistered_at"))
@@ -2912,6 +3106,7 @@ def _audit_timeline(
         for value in (
             release_time,
             power_time,
+            season_registered_at,
             split_audit_time,
             split_freeze_time,
             first_submission_time,
@@ -2920,7 +3115,8 @@ def _audit_timeline(
     ordered = False
     if complete:
         ordered = (
-            power_time <= split_audit_time <= split_freeze_time <= first_submission_time
+            power_time <= season_registered_at <= split_audit_time
+            <= split_freeze_time <= first_submission_time
             <= min(run_times) <= max(run_times) <= min(review_times) <= max(review_times)
             <= release_time
         )
@@ -3098,6 +3294,8 @@ def audit_leaderboard_release(path: str | Path) -> dict[str, Any]:
     split = audit.artifact(manifest, "split_audit")
     power = audit.artifact(manifest, "power_analysis")
     multiplicity_power = audit.artifact(manifest, "multiplicity_power_audit")
+    pilot_registration_artifact = audit.artifact(manifest, "pilot_registration")
+    practice_review = audit.artifact(manifest, "practice_review")
     review = audit.artifact(manifest, "external_review")
     preregistration = audit.artifact(manifest, "preregistration")
 
@@ -3126,6 +3324,14 @@ def audit_leaderboard_release(path: str | Path) -> dict[str, Any]:
         _audit_power(audit, power)
     if multiplicity_power is not None:
         _audit_multiplicity_power(audit, multiplicity_power, power)
+    if pilot_registration_artifact is not None and practice_review is not None:
+        _audit_pilot_evidence(
+            audit,
+            pilot_registration_artifact,
+            practice_review,
+            power,
+            multiplicity_power,
+        )
     if review is not None:
         _audit_external_review(audit, review)
     if preregistration is not None:
@@ -3155,8 +3361,21 @@ def audit_leaderboard_release(path: str | Path) -> dict[str, Any]:
             "power analysis actual sample size must equal official split independent groups",
             actual={"power": power.get("actual_independence_groups"), "split": split_group_total},
         )
-    if split is not None and power is not None and review is not None:
-        _audit_timeline(audit, manifest, split, power, review, run_contexts)
+    if (
+        preregistration is not None
+        and split is not None
+        and power is not None
+        and review is not None
+    ):
+        _audit_timeline(
+            audit,
+            manifest,
+            preregistration,
+            split,
+            power,
+            review,
+            run_contexts,
+        )
     _audit_references(audit, manifest, model_names, calibration)
 
     failed = [check for check in audit.checks if check["status"] == "fail"]

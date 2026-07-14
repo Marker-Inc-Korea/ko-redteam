@@ -28,6 +28,11 @@ MAX_SIMULATIONS = 1_000_000
 MAX_REQUIRED_GROUPS = 100_000
 MAX_ABS_PILOT_DIFFERENCE = 1_000.0
 PILOT_SOURCE_SCHEMA = "ko-redteam.power-pilot-source.v1"
+PILOT_SOURCE_V2_SCHEMA = "ko-redteam.power-pilot-source.v2"
+SUPPORTED_PILOT_SOURCE_SCHEMAS = {
+    PILOT_SOURCE_SCHEMA,
+    PILOT_SOURCE_V2_SCHEMA,
+}
 
 
 def _file_sha256(path: Path) -> str:
@@ -246,6 +251,20 @@ def build_power_report(data: dict[str, Any]) -> dict[str, Any]:
     if pilot_source is not None:
         if not isinstance(pilot_source, dict):
             raise ValueError("pilot_source must be an object")
+        pilot_source_schema = pilot_source.get("schema")
+        v2_source_keys = (
+            {
+                "pilot_registration_sha256",
+                "practice_review_sha256",
+                "pilot_id",
+                "pilot_registered_at",
+                "first_run_started_at",
+                "last_run_started_at",
+                "last_execution_completed_at",
+            }
+            if pilot_source_schema == PILOT_SOURCE_V2_SCHEMA
+            else set()
+        )
         _require_keys(
             pilot_source,
             {
@@ -270,11 +289,14 @@ def build_power_report(data: dict[str, Any]) -> dict[str, Any]:
                 "construction_method",
                 "builder_code_sha256",
                 "evaluator_git_commit",
-            },
+            }
+            | v2_source_keys,
             "pilot_source",
         )
-        if pilot_source.get("schema") != PILOT_SOURCE_SCHEMA:
-            raise ValueError(f"pilot_source.schema must be {PILOT_SOURCE_SCHEMA}")
+        if pilot_source_schema not in SUPPORTED_PILOT_SOURCE_SCHEMAS:
+            raise ValueError(
+                "pilot_source.schema must be a supported power-pilot source"
+            )
         for key in (
             "ranking_manifest_sha256",
             "ranking_manifest_schema",
@@ -341,6 +363,43 @@ def build_power_report(data: dict[str, Any]) -> dict[str, Any]:
             raise ValueError("pilot_source.max_tokens must be positive")
         if pilot_source.get("agent_tool_call_mode") != "prompt_json_v1":
             raise ValueError("pilot_source.agent_tool_call_mode must be prompt_json_v1")
+        if pilot_source_schema == PILOT_SOURCE_V2_SCHEMA:
+            for key in (
+                "pilot_registration_sha256",
+                "practice_review_sha256",
+            ):
+                if not SHA256_RE.fullmatch(str(pilot_source.get(key) or "")):
+                    raise ValueError(f"pilot_source.{key} must be SHA-256")
+            if not isinstance(pilot_source.get("pilot_id"), str) or not pilot_source[
+                "pilot_id"
+            ].strip():
+                raise ValueError("pilot_source.pilot_id must be non-empty")
+            timeline = {
+                key: datetime.fromisoformat(
+                    _timestamp(pilot_source.get(key), f"pilot_source.{key}").replace(
+                        "Z", "+00:00"
+                    )
+                )
+                for key in (
+                    "pilot_registered_at",
+                    "first_run_started_at",
+                    "last_run_started_at",
+                    "last_execution_completed_at",
+                )
+            }
+            power_frozen_at = datetime.fromisoformat(
+                preregistered_at.replace("Z", "+00:00")
+            )
+            if not (
+                timeline["pilot_registered_at"]
+                <= timeline["first_run_started_at"]
+                <= timeline["last_run_started_at"]
+                <= timeline["last_execution_completed_at"]
+                <= power_frozen_at
+            ):
+                raise ValueError(
+                    "pilot_source execution timeline must follow registration and precede power freeze"
+                )
 
     clusters = data.get("pilot_clusters")
     if not isinstance(clusters, list) or len(clusters) < MIN_PILOT_CLUSTERS:

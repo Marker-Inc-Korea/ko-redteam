@@ -19,18 +19,50 @@ from ko_power_pilot import (  # noqa: E402
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("ranking_manifest", help="private v2 reference-run manifest")
-    parser.add_argument("--preregistration", required=True, help="frozen public season JSON")
-    parser.add_argument("--preregistered-at", required=True, help="timezone-aware power freeze time")
+    parser.add_argument("ranking_manifest", help="private v2-v4 reference-run manifest")
+    registration = parser.add_mutually_exclusive_group(required=True)
+    registration.add_argument(
+        "--preregistration",
+        help="legacy or frozen public season JSON",
+    )
+    registration.add_argument(
+        "--pilot-registration",
+        help="frozen pre-execution power-pilot registration JSON",
+    )
+    parser.add_argument(
+        "--practice-review",
+        help="case-level review evidence required with --pilot-registration",
+    )
+    freeze_time = parser.add_mutually_exclusive_group(required=True)
+    freeze_time.add_argument(
+        "--power-frozen-at",
+        help="timezone-aware power-analysis freeze time",
+    )
+    freeze_time.add_argument(
+        "--preregistered-at",
+        help="deprecated alias for --power-frozen-at",
+    )
     parser.add_argument("--simulation-iterations", type=int, default=10_000)
     parser.add_argument("--seed", type=int, default=20260713)
     parser.add_argument("--output", required=True, help="private aggregate-only power input")
     args = parser.parse_args()
 
+    registration_path = args.pilot_registration or args.preregistration
+    practice_review = (
+        load_preregistration(args.practice_review)
+        if args.practice_review
+        else None
+    )
+    if args.pilot_registration and practice_review is None:
+        parser.error("--pilot-registration requires --practice-review")
+    if args.preregistration and practice_review is not None:
+        parser.error("--practice-review is only valid with --pilot-registration")
+
     value = build_power_pilot_input(
         args.ranking_manifest,
-        load_preregistration(args.preregistration),
-        preregistered_at=args.preregistered_at,
+        load_preregistration(registration_path),
+        preregistered_at=args.power_frozen_at or args.preregistered_at,
+        practice_review=practice_review,
         simulation_iterations=args.simulation_iterations,
         seed=args.seed,
     )

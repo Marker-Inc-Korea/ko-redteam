@@ -4,6 +4,8 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+from datetime import datetime, timedelta
+from statistics import variance
 import subprocess
 import sys
 from pathlib import Path
@@ -16,6 +18,7 @@ sys.path.insert(0, str(ROOT / "analysis"))
 import ko_leaderboard as L  # noqa: E402
 import ko_familywise_power as F  # noqa: E402
 import ko_model_ranking as R  # noqa: E402
+import ko_pilot_registration as PR  # noqa: E402
 import ko_power_pilot as PP  # noqa: E402
 import ko_run_context as C  # noqa: E402
 
@@ -29,13 +32,18 @@ def _write_json(path: Path, value: dict) -> None:
     path.write_text(json.dumps(value, ensure_ascii=False, indent=1), "utf-8")
 
 
-def _context(model: str, run: int) -> dict:
+def _context(
+    model: str,
+    run: int,
+    *,
+    started_at: str | None = None,
+) -> dict:
     empty_sha = C.canonical_sha256("")
     revision_seed = hashlib.sha1(model.encode()).hexdigest()
     return {
         "schema": C.SCHEMA,
         "run_id": f"{model}-official-{run:03d}",
-        "started_at": f"2026-07-{10 + run:02d}T10:00:00+09:00",
+        "started_at": started_at or f"2026-07-{10 + run:02d}T10:00:00+09:00",
         "model": {
             "provider": "unit-provider",
             "model_id": f"unit/{model}",
@@ -185,6 +193,9 @@ def _execution_evidence(
     context: dict,
     run: dict,
 ) -> dict[str, dict[str, str]]:
+    started_at = datetime.fromisoformat(context["started_at"])
+    created_at = (started_at + timedelta(seconds=1)).isoformat()
+    completed_at = (started_at + timedelta(minutes=10)).isoformat()
     common_config = {
         "expand": False,
         "include_raw": False,
@@ -247,8 +258,8 @@ def _execution_evidence(
             "schema": R.SUITE_EXECUTION_EVIDENCE_SCHEMA,
             "profile": "core" if profile == "core" else "single",
             "status": "pass",
-            "created_at": "2026-07-13T00:00:00Z",
-            "completed_at": "2026-07-13T00:10:00Z",
+            "created_at": created_at,
+            "completed_at": completed_at,
             "model": model,
             "run_context": {
                 "run_id": context["run_id"],
@@ -328,12 +339,21 @@ def _ranking_bundle(
     full_official: bool = False,
     groups_per_domain: int = 30,
     unsafe_lower: bool = False,
+    run_month: str = "2026-07",
+    run_day_base: int = 10,
+    analyze: bool = True,
 ) -> tuple[Path, Path, dict]:
     entries = []
     for model, score in (("upper-model", 100.0), ("lower-model", 10.0)):
         runs = []
         for run_index in range(1, 4):
-            context = _context(model, run_index)
+            context = _context(
+                model,
+                run_index,
+                started_at=(
+                    f"{run_month}-{run_day_base + run_index:02d}T10:00:00+09:00"
+                ),
+            )
             run = {"run_id": context["run_id"]}
             for suite in R.SUITES:
                 report_path = root / "runs" / model / f"run-{run_index}" / f"{suite}.json"
@@ -372,9 +392,14 @@ def _ranking_bundle(
         "ranking_policy": R.RANKING_POLICY,
         "models": entries,
     })
-    ranking = R.analyze_ranking_manifest(ranking_manifest_path, iterations=10_000)
     ranking_path = root / "ranking_report.json"
-    _write_json(ranking_path, ranking)
+    ranking = (
+        R.analyze_ranking_manifest(ranking_manifest_path, iterations=10_000)
+        if analyze
+        else {}
+    )
+    if analyze:
+        _write_json(ranking_path, ranking)
     return ranking_manifest_path, ranking_path, ranking
 
 
@@ -403,6 +428,14 @@ def _valid_release(
         full_official=True,
         groups_per_domain=groups_per_domain,
         unsafe_lower=unsafe_lower,
+    )
+    pilot_manifest_path, _, _ = _ranking_bundle(
+        tmp_path / "pilot-ranking",
+        full_official=True,
+        groups_per_domain=40,
+        run_month="2026-05",
+        run_day_base=20,
+        analyze=False,
     )
     domains = {domain: 50 for domain in L.REQUIRED_DOMAINS}
     domain_confusion = {"tp": 24, "fp": 1, "tn": 24, "fn": 1}
@@ -554,22 +587,196 @@ def _valid_release(
         "agent_harness:agent_rag:no_tool": agent_half,
         "agent_harness:agent_rag:allow": agent_half,
     }
+    practice_target_counts = {
+        "paperbench:privacy:no_leak": 40,
+        "paperbench:safety:refuse_or_redirect": 40,
+        "mini_single:korean_quality:allow": 40,
+        "mini_single:overrefusal:allow": 40,
+        "multiturn:prompt_security:refuse_or_redirect": 40,
+        "agent_harness:agent_rag:no_tool": 20,
+        "agent_harness:agent_rag:allow": 20,
+    }
     pilot_difference = math.sqrt(60.8)
+    pilot_clusters = [
+        {
+            "id": f"{stratum}:{index}",
+            "stratum": stratum,
+            "difference": (
+                -pilot_difference if index % 2 == 0 else pilot_difference
+            ),
+        }
+        for stratum, count in practice_target_counts.items()
+        for index in range(count)
+    ]
+    pilot_standard_deviation = math.sqrt(sum(
+        (count / total_groups) * variance([
+            cluster["difference"]
+            for cluster in pilot_clusters
+            if cluster["stratum"] == stratum
+        ])
+        for stratum, count in power_target_strata.items()
+    ))
     variance_power_input = {
         "schema": F.POWER_INPUT_SCHEMA,
         "target_strata": power_target_strata,
-        "pilot_clusters": [
-            {
-                "id": f"{stratum}:{index}",
-                "stratum": stratum,
-                "difference": (
-                    -pilot_difference if index % 2 == 0 else pilot_difference
-                ),
-            }
-            for stratum in power_target_strata
-            for index in range(F.OFFICIAL_MIN_PILOT_GROUPS_PER_STRATUM)
-        ],
+        "pilot_clusters": pilot_clusters,
     }
+    practice_review_path = tmp_path / "practice_review.json"
+    practice_review = {
+        "schema": PR.PRACTICE_REVIEW_SCHEMA,
+        "status": PR.REVIEW_PASSED_STATUS,
+        "review": {
+            "id": "unit-practice-review",
+            "completed_at": "2026-05-15T00:00:00+09:00",
+            "blind_to_reference_outputs": True,
+            "machine_assisted_drafts_disclosed": True,
+            "conflicts_resolved": True,
+            "reviewer_ids": ["reviewer-a", "reviewer-b"],
+        },
+        "benchmarks": {
+            suite: {"content_sha256": fingerprint}
+            for suite, fingerprint in suite_fingerprints.items()
+        },
+        "target_strata": practice_target_counts,
+        "case_reviews": [
+            {
+                "suite": stratum.split(":", 1)[0],
+                "independence_group": (
+                    f"{stratum.replace(':', '-')}-{index:03d}"
+                ),
+                "stratum": stratum,
+                "decision": "accept",
+                "reviewer_ids": ["reviewer-a", "reviewer-b"],
+            }
+            for stratum, count in practice_target_counts.items()
+            for index in range(count)
+        ],
+        "raw_reference_output_used": False,
+    }
+    _write_json(practice_review_path, practice_review)
+    pilot_registration_path = tmp_path / "pilot_registration.json"
+    pilot_registration = {
+        "schema": PR.PILOT_REGISTRATION_SCHEMA,
+        "status": PR.FROZEN_STATUS,
+        "pilot": {
+            "id": "unit-power-pilot-v1",
+            "registered_at": "2026-05-20T00:00:00+09:00",
+            "protocol_git_commit": "a" * 40,
+            "locale": "ko-KR",
+            "purpose": "variance_and_sample_size_planning_only",
+            "official_model_results_allowed": False,
+        },
+        "reference_models": [
+            {
+                "role": "upper_anchor",
+                "name": "upper-model",
+                "model_id": "unit/upper-model",
+                "revision": hashlib.sha1(b"upper-model").hexdigest(),
+            },
+            {
+                "role": "lower_anchor",
+                "name": "lower-model",
+                "model_id": "unit/lower-model",
+                "revision": hashlib.sha1(b"lower-model").hexdigest(),
+            },
+        ],
+        "baseline_design": {
+            "candidate_independence_groups": total_groups,
+            "suite_domain_independence_groups": {
+                "paperbench": {
+                    "privacy": groups_per_domain,
+                    "safety": groups_per_domain,
+                },
+                "mini_single": {
+                    "korean_quality": groups_per_domain,
+                    "overrefusal": groups_per_domain,
+                },
+                "multiturn": {"prompt_security": groups_per_domain},
+                "agent_harness": {"agent_rag": groups_per_domain},
+            },
+            "suite_domain_expected_independence_groups": {
+                "paperbench": {
+                    "privacy": {"no_leak": groups_per_domain},
+                    "safety": {"refuse_or_redirect": groups_per_domain},
+                },
+                "mini_single": {
+                    "korean_quality": {"allow": groups_per_domain},
+                    "overrefusal": {"allow": groups_per_domain},
+                },
+                "multiturn": {
+                    "prompt_security": {"refuse_or_redirect": groups_per_domain},
+                },
+                "agent_harness": {
+                    "agent_rag": {"allow": agent_half, "no_tool": agent_half},
+                },
+            },
+        },
+        "practice_design": {
+            "suites": list(R.SUITES),
+            "minimum_groups_per_stratum": (
+                F.OFFICIAL_MIN_PILOT_GROUPS_PER_STRATUM
+            ),
+            "target_strata": practice_target_counts,
+            "benchmark_artifacts": {
+                suite: {
+                    "path": f"benchmarks/{suite}.json",
+                    "sha256": fingerprint,
+                    "content_sha256": fingerprint,
+                }
+                for suite, fingerprint in suite_fingerprints.items()
+            },
+            "review_artifact": {
+                "schema": PR.PRACTICE_REVIEW_SCHEMA,
+                "path": "practice_review.json",
+                "canonical_sha256": C.canonical_sha256(practice_review),
+            },
+            "ranking_manifest_schema": R.RANKING_MANIFEST_SCHEMA,
+            "minimum_repeats": 3,
+            "weight_profile": "balanced",
+            "construction_method": PR.CONSTRUCTION_METHOD,
+        },
+        "execution": {
+            "suites": list(R.SUITES),
+            "minimum_repeats": 3,
+            "temperature": 0.0,
+            "max_tokens": 512,
+            "agent_tool_call_mode": "prompt_json_v1",
+            "execution_evidence": json.loads(
+                json.dumps(R.EXECUTION_EVIDENCE_CONTRACT)
+            ),
+            "immutable_model_revision_required": True,
+            "clean_evaluator_commit_required": True,
+        },
+        "statistics": {
+            "estimand": "paired balanced diagnostic profile score difference",
+            "minimum_detectable_effect": 5.0,
+            "alpha": 0.05,
+            "target_power": 0.8,
+            "simulation_iterations": 10_000,
+            "seed": 20260713,
+            "primary_weight_profile": "balanced",
+            "weight_profiles": {"balanced": R.WEIGHT_PROFILES["balanced"]},
+            "maximum_official_models": R.RANKING_POLICY["maximum_models"],
+            "maximum_comparison_family_size": 21,
+            "multiple_comparison_correction": "holm",
+            "pilot_variance_confidence_level": (
+                F.OFFICIAL_VARIANCE_CONFIDENCE_LEVEL
+            ),
+            "minimum_pilot_groups_per_stratum": (
+                F.OFFICIAL_MIN_PILOT_GROUPS_PER_STRATUM
+            ),
+            "builder_code_sha256": _sha_file(Path(PP.__file__)),
+            "power_analysis_code_sha256": "7" * 64,
+            "multiplicity_power_analysis_code_sha256": _sha_file(Path(F.__file__)),
+        },
+        "stopping_rules": {
+            "pilot_variance_precision_required": True,
+            "maximum_cohort_multiplicity_power_required": True,
+            "stop_before_official_split_on_failure": True,
+            "threshold_relaxation_allowed": False,
+        },
+    }
+    _write_json(pilot_registration_path, pilot_registration)
     power_path = tmp_path / "power.json"
     power_report = {
         "schema": L.POWER_SCHEMA,
@@ -590,11 +797,22 @@ def _valid_release(
         "simulation_iterations": 10000,
         "pilot_summary": {
             "dataset_sha256": "9" * 64,
-            "cluster_count": 140,
-            "standard_deviation": 8.0,
+            "cluster_count": sum(practice_target_counts.values()),
+            "standard_deviation": pilot_standard_deviation,
             "source": {
                 "schema": L.POWER_PILOT_SOURCE_SCHEMA,
-                "ranking_manifest_sha256": "2" * 64,
+                "pilot_registration_sha256": C.canonical_sha256(
+                    pilot_registration
+                ),
+                "practice_review_sha256": C.canonical_sha256(practice_review),
+                "pilot_id": pilot_registration["pilot"]["id"],
+                "pilot_registered_at": pilot_registration["pilot"][
+                    "registered_at"
+                ],
+                "first_run_started_at": "2026-05-21T10:00:00+09:00",
+                "last_run_started_at": "2026-05-23T10:00:00+09:00",
+                "last_execution_completed_at": "2026-05-23T10:10:00+09:00",
+                "ranking_manifest_sha256": _sha_file(pilot_manifest_path),
                 "ranking_manifest_schema": R.RANKING_MANIFEST_SCHEMA,
                 "upper_model": "upper-model",
                 "lower_model": "lower-model",
@@ -617,10 +835,7 @@ def _valid_release(
                 "builder_code_sha256": _sha_file(Path(PP.__file__)),
                 "evaluator_git_commit": "a" * 40,
             },
-            "pilot_stratum_counts": {
-                stratum: F.OFFICIAL_MIN_PILOT_GROUPS_PER_STRATUM
-                for stratum in power_target_strata
-            },
+            "pilot_stratum_counts": practice_target_counts,
             "target_strata": power_target_strata,
         },
         "assumptions": ["Independent groups are exchangeable within pre-registered strata."],
@@ -695,14 +910,14 @@ def _valid_release(
         "status": "frozen_design_candidate",
         "season": {
             "id": "season-1",
-            "registered_at": "2026-05-01T00:00:00+09:00",
+            "registered_at": "2026-06-02T00:00:00+09:00",
             "protocol_version": "1.0.0",
             "protocol_git_commit": "a" * 40,
             "scope": "Korean general-purpose chat model security qualification",
             "locale": "ko-KR",
         },
         "official_model_cohort": {
-            "frozen_at": "2026-05-01T00:00:00+09:00",
+            "frozen_at": "2026-06-02T00:00:00+09:00",
             "selection_rule": (
                 "Pre-declared upper and lower open-weight controls for protocol validation."
             ),
@@ -815,6 +1030,10 @@ def _valid_release(
             "planned_independence_groups": total_groups,
             "power_pilot": {
                 "source_schema": L.POWER_PILOT_SOURCE_SCHEMA,
+                "pilot_registration_sha256": C.canonical_sha256(
+                    pilot_registration
+                ),
+                "practice_review_sha256": C.canonical_sha256(practice_review),
                 "ranking_manifest_schema": R.RANKING_MANIFEST_SCHEMA,
                 "suites": list(R.SUITES),
                 "practice_benchmark_fingerprints": suite_fingerprints,
@@ -927,6 +1146,8 @@ def _valid_release(
             "multiplicity_power_audit": _artifact(
                 multiplicity_power_path, tmp_path
             ),
+            "pilot_registration": _artifact(pilot_registration_path, tmp_path),
+            "practice_review": _artifact(practice_review_path, tmp_path),
             "external_review": _artifact(review_path, tmp_path),
             "preregistration": _artifact(preregistration_path, tmp_path),
         },
@@ -946,10 +1167,21 @@ def test_complete_release_bundle_is_publishable(tmp_path):
             tmp_path / manifest["artifacts"]["ranking_report"]["path"]
         ).read_text("utf-8")
     )
+    pilot_registration = json.loads(
+        (
+            tmp_path / manifest["artifacts"]["pilot_registration"]["path"]
+        ).read_text("utf-8")
+    )
+    practice_review = json.loads(
+        (tmp_path / manifest["artifacts"]["practice_review"]["path"]).read_text(
+            "utf-8"
+        )
+    )
     power_input = PP.build_power_pilot_input(
-        tmp_path / manifest["artifacts"]["ranking_manifest"]["path"],
-        preregistration,
+        tmp_path / "pilot-ranking" / "ranking_manifest.json",
+        pilot_registration,
         preregistered_at="2026-06-01T00:00:00+09:00",
+        practice_review=practice_review,
     )
     result = L.audit_leaderboard_release(release_path)
 
@@ -996,7 +1228,7 @@ def test_complete_release_bundle_is_publishable(tmp_path):
         PP.build_power_pilot_input(
             tmp_path / manifest["artifacts"]["ranking_manifest"]["path"],
             changed_execution,
-            preregistered_at="2026-06-01T00:00:00+09:00",
+            preregistered_at="2026-06-03T00:00:00+09:00",
         )
 
     changed_evidence = json.loads(json.dumps(preregistration))
@@ -1007,7 +1239,7 @@ def test_complete_release_bundle_is_publishable(tmp_path):
         PP.build_power_pilot_input(
             tmp_path / manifest["artifacts"]["ranking_manifest"]["path"],
             changed_evidence,
-            preregistered_at="2026-06-01T00:00:00+09:00",
+            preregistered_at="2026-06-03T00:00:00+09:00",
         )
 
     duplicate_reference = json.loads(json.dumps(preregistration))
@@ -1018,7 +1250,7 @@ def test_complete_release_bundle_is_publishable(tmp_path):
         PP.build_power_pilot_input(
             tmp_path / manifest["artifacts"]["ranking_manifest"]["path"],
             duplicate_reference,
-            preregistered_at="2026-06-01T00:00:00+09:00",
+            preregistered_at="2026-06-03T00:00:00+09:00",
         )
 
     split_reference = manifest["artifacts"]["split_audit"]
@@ -1035,6 +1267,198 @@ def test_complete_release_bundle_is_publishable(tmp_path):
     }
     assert tampered["status"] == "not_publishable"
     assert "split.ranking_coverage_binding" in failed_ids
+
+
+def test_v4_power_pilot_accepts_frozen_pilot_registration_before_season(tmp_path):
+    release_path = _valid_release(tmp_path, groups_per_domain=40)
+    release = json.loads(release_path.read_text("utf-8"))
+    manifest_path = tmp_path / "pilot-ranking" / "ranking_manifest.json"
+    preregistration = json.loads(
+        (tmp_path / release["artifacts"]["preregistration"]["path"]).read_text(
+            "utf-8"
+        )
+    )
+    historical_input = PP.build_power_pilot_input(
+        manifest_path,
+        preregistration,
+        preregistered_at="2026-06-03T00:00:00+09:00",
+    )
+    practice_counts = {
+        stratum: sum(
+            cluster["stratum"] == stratum
+            for cluster in historical_input["pilot_clusters"]
+        )
+        for stratum in historical_input["target_strata"]
+    }
+    fingerprints = preregistration["statistics"]["power_pilot"][
+        "practice_benchmark_fingerprints"
+    ]
+    review = {
+        "schema": PR.PRACTICE_REVIEW_SCHEMA,
+        "status": PR.REVIEW_PASSED_STATUS,
+        "review": {
+            "id": "unit-pilot-review",
+            "completed_at": "2026-05-15T00:00:00+09:00",
+            "blind_to_reference_outputs": True,
+            "machine_assisted_drafts_disclosed": True,
+            "conflicts_resolved": True,
+            "reviewer_ids": ["reviewer-a", "reviewer-b"],
+        },
+        "benchmarks": {
+            suite: {"content_sha256": fingerprint}
+            for suite, fingerprint in fingerprints.items()
+        },
+        "target_strata": practice_counts,
+        "case_reviews": [
+            {
+                "suite": stratum.split(":", 1)[0],
+                "independence_group": (
+                    f"{stratum.replace(':', '-')}-{index:03d}"
+                ),
+                "stratum": stratum,
+                "decision": "accept",
+                "reviewer_ids": ["reviewer-a", "reviewer-b"],
+            }
+            for stratum, count in practice_counts.items()
+            for index in range(count)
+        ],
+        "raw_reference_output_used": False,
+    }
+    split_design = preregistration["official_split_design"]
+    pilot_registration = {
+        "schema": PR.PILOT_REGISTRATION_SCHEMA,
+        "status": PR.FROZEN_STATUS,
+        "pilot": {
+            "id": "unit-successor-power-pilot",
+            "registered_at": "2026-05-20T00:00:00+09:00",
+            "protocol_git_commit": preregistration["season"][
+                "protocol_git_commit"
+            ],
+            "locale": "ko-KR",
+            "purpose": "variance_and_sample_size_planning_only",
+            "official_model_results_allowed": False,
+        },
+        "reference_models": preregistration["reference_models"],
+        "baseline_design": {
+            "candidate_independence_groups": split_design[
+                "minimum_independence_groups"
+            ],
+            "suite_domain_independence_groups": split_design[
+                "suite_domain_independence_groups"
+            ],
+            "suite_domain_expected_independence_groups": split_design[
+                "suite_domain_expected_independence_groups"
+            ],
+        },
+        "practice_design": {
+            "suites": list(R.OFFICIAL_SUITES),
+            "minimum_groups_per_stratum": 20,
+            "target_strata": practice_counts,
+            "benchmark_artifacts": {
+                suite: {
+                    "path": f"benchmarks/{suite}.json",
+                    "sha256": str(index) * 64,
+                    "content_sha256": fingerprints[suite],
+                }
+                for index, suite in enumerate(R.OFFICIAL_SUITES, 5)
+            },
+            "review_artifact": {
+                "schema": PR.PRACTICE_REVIEW_SCHEMA,
+                "path": "governance/unit_pilot_review.json",
+                "canonical_sha256": C.canonical_sha256(review),
+            },
+            "ranking_manifest_schema": R.RANKING_MANIFEST_SCHEMA,
+            "minimum_repeats": 3,
+            "weight_profile": "balanced",
+            "construction_method": PR.CONSTRUCTION_METHOD,
+        },
+        "execution": preregistration["execution"],
+        "statistics": {
+            "estimand": "paired balanced diagnostic profile score difference",
+            "minimum_detectable_effect": 5.0,
+            "alpha": 0.05,
+            "target_power": 0.8,
+            "simulation_iterations": 10_000,
+            "seed": 20260713,
+            "primary_weight_profile": "balanced",
+            "weight_profiles": {"balanced": R.WEIGHT_PROFILES["balanced"]},
+            "maximum_official_models": R.RANKING_POLICY["maximum_models"],
+            "maximum_comparison_family_size": 21,
+            "multiple_comparison_correction": "holm",
+            "pilot_variance_confidence_level": 0.95,
+            "minimum_pilot_groups_per_stratum": 20,
+            "builder_code_sha256": _sha_file(Path(PP.__file__)),
+            "power_analysis_code_sha256": "e" * 64,
+            "multiplicity_power_analysis_code_sha256": "f" * 64,
+        },
+        "stopping_rules": {
+            "pilot_variance_precision_required": True,
+            "maximum_cohort_multiplicity_power_required": True,
+            "stop_before_official_split_on_failure": True,
+            "threshold_relaxation_allowed": False,
+        },
+    }
+
+    power_input = PP.build_power_pilot_input(
+        manifest_path,
+        pilot_registration,
+        preregistered_at="2026-06-01T00:00:00+09:00",
+        practice_review=review,
+    )
+
+    assert power_input["pilot_clusters"] == historical_input["pilot_clusters"]
+    assert power_input["pilot_source"]["schema"] == (
+        "ko-redteam.power-pilot-source.v2"
+    )
+    assert power_input["pilot_source"]["pilot_registration_sha256"] == (
+        C.canonical_sha256(pilot_registration)
+    )
+    assert power_input["pilot_source"]["practice_review_sha256"] == (
+        C.canonical_sha256(review)
+    )
+    assert power_input["pilot_source"]["pilot_id"] == (
+        "unit-successor-power-pilot"
+    )
+    assert power_input["pilot_source"]["first_run_started_at"] == (
+        "2026-05-21T10:00:00+09:00"
+    )
+    assert power_input["pilot_source"]["last_execution_completed_at"] == (
+        "2026-05-23T10:10:00+09:00"
+    )
+
+    late_registration = json.loads(json.dumps(pilot_registration))
+    late_registration["pilot"]["registered_at"] = (
+        "2026-05-22T00:00:00+09:00"
+    )
+    with pytest.raises(ValueError, match="outside the frozen pilot window"):
+        PP.build_power_pilot_input(
+            manifest_path,
+            late_registration,
+            preregistered_at="2026-06-01T00:00:00+09:00",
+            practice_review=review,
+        )
+
+    with pytest.raises(ValueError, match="outside the frozen pilot window"):
+        PP.build_power_pilot_input(
+            manifest_path,
+            pilot_registration,
+            preregistered_at="2026-05-22T00:00:00+09:00",
+            practice_review=review,
+        )
+
+    changed_review = json.loads(json.dumps(review))
+    changed_review["case_reviews"][0]["independence_group"] += "-changed"
+    changed_registration = json.loads(json.dumps(pilot_registration))
+    changed_registration["practice_design"]["review_artifact"][
+        "canonical_sha256"
+    ] = C.canonical_sha256(changed_review)
+    with pytest.raises(ValueError, match="independence-group set"):
+        PP.build_power_pilot_input(
+            manifest_path,
+            changed_registration,
+            preregistered_at="2026-06-01T00:00:00+09:00",
+            practice_review=changed_review,
+        )
 
 
 def test_deployment_failure_is_disclosed_without_removing_ranking_evidence(
@@ -1158,7 +1582,7 @@ def test_current_power_pilot_rejects_historical_v2_manifest(tmp_path):
         PP.build_power_pilot_input(
             manifest_path,
             preregistration,
-            preregistered_at="2026-06-01T00:00:00+09:00",
+            preregistered_at="2026-06-03T00:00:00+09:00",
         )
 
 
@@ -1188,7 +1612,7 @@ def test_power_pilot_rejects_endpoint_error_rows(tmp_path):
         PP.build_power_pilot_input(
             manifest_path,
             preregistration,
-            preregistered_at="2026-06-01T00:00:00+09:00",
+            preregistered_at="2026-06-03T00:00:00+09:00",
         )
 
 
@@ -1205,6 +1629,109 @@ def test_release_requires_hashed_preregistration_artifact(tmp_path):
 
     assert result["status"] == "not_publishable"
     assert "artifact.preregistration.reference" in failed_ids
+
+
+@pytest.mark.parametrize(
+    "artifact_name",
+    ["pilot_registration", "practice_review"],
+)
+def test_release_requires_pilot_registration_and_review_artifacts(
+    tmp_path,
+    artifact_name,
+):
+    release_path = _valid_release(tmp_path)
+    manifest = json.loads(release_path.read_text("utf-8"))
+    manifest["artifacts"].pop(artifact_name)
+    _write_json(release_path, manifest)
+
+    result = L.audit_leaderboard_release(release_path)
+    failed_ids = {
+        check["id"] for check in result["checks"] if check["status"] == "fail"
+    }
+
+    assert result["status"] == "not_publishable"
+    assert f"artifact.{artifact_name}.reference" in failed_ids
+
+
+def test_release_rejects_practice_review_changed_after_pilot_freeze(tmp_path):
+    release_path = _valid_release(tmp_path)
+    manifest = json.loads(release_path.read_text("utf-8"))
+    reference = manifest["artifacts"]["practice_review"]
+    review_path = tmp_path / reference["path"]
+    review = json.loads(review_path.read_text("utf-8"))
+    review["case_reviews"].pop()
+    _write_json(review_path, review)
+    reference["sha256"] = _sha_file(review_path)
+    _write_json(release_path, manifest)
+
+    result = L.audit_leaderboard_release(release_path)
+    failed_ids = {
+        check["id"] for check in result["checks"] if check["status"] == "fail"
+    }
+
+    assert result["status"] == "not_publishable"
+    assert "pilot_registration.contract" in failed_ids
+    assert "pilot_registration.power_binding" in failed_ids
+
+
+def test_release_rejects_power_pilot_counts_changed_after_registration(tmp_path):
+    release_path = _valid_release(tmp_path)
+    manifest = json.loads(release_path.read_text("utf-8"))
+    reference = manifest["artifacts"]["power_analysis"]
+    power_path = tmp_path / reference["path"]
+    power = json.loads(power_path.read_text("utf-8"))
+    stratum = "paperbench:privacy:no_leak"
+    power["pilot_summary"]["pilot_stratum_counts"][stratum] += 1
+    power["pilot_summary"]["cluster_count"] += 1
+    _write_json(power_path, power)
+    reference["sha256"] = _sha_file(power_path)
+    _write_json(release_path, manifest)
+
+    result = L.audit_leaderboard_release(release_path)
+    failed_ids = {
+        check["id"] for check in result["checks"] if check["status"] == "fail"
+    }
+
+    assert result["status"] == "not_publishable"
+    assert "pilot_registration.power_binding" in failed_ids
+
+    power["pilot_summary"]["pilot_stratum_counts"][stratum] -= 1
+    power["pilot_summary"]["cluster_count"] -= 1
+    power["preregistered_at"] = "invalid-time"
+    _write_json(power_path, power)
+    reference["sha256"] = _sha_file(power_path)
+    _write_json(release_path, manifest)
+
+    invalid_time = L.audit_leaderboard_release(release_path)
+    assert invalid_time["status"] == "not_publishable"
+    assert any(
+        check["id"] == "power.pilot_design" and check["status"] == "fail"
+        for check in invalid_time["checks"]
+    )
+
+
+def test_release_rejects_season_registration_before_power_analysis(tmp_path):
+    release_path = _valid_release(tmp_path)
+    manifest = json.loads(release_path.read_text("utf-8"))
+    reference = manifest["artifacts"]["preregistration"]
+    preregistration_path = tmp_path / reference["path"]
+    preregistration = json.loads(preregistration_path.read_text("utf-8"))
+    preregistration["season"]["registered_at"] = "2026-05-01T00:00:00+09:00"
+    preregistration["official_model_cohort"]["frozen_at"] = (
+        "2026-05-01T00:00:00+09:00"
+    )
+    _write_json(preregistration_path, preregistration)
+    reference["sha256"] = _sha_file(preregistration_path)
+    _write_json(release_path, manifest)
+
+    result = L.audit_leaderboard_release(release_path)
+    failed_ids = {
+        check["id"] for check in result["checks"] if check["status"] == "fail"
+    }
+
+    assert result["status"] == "not_publishable"
+    assert "preregistration.timeline" in failed_ids
+    assert "release.timeline" in failed_ids
 
 
 def test_release_requires_passing_multiplicity_power_artifact(tmp_path):

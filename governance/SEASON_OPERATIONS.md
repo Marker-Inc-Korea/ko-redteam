@@ -19,24 +19,29 @@
 
 ## Required Order
 
-1. protocol version, 정확한 immutable model cohort, suite×domain 배분, 최소 검출 효과, alpha, target power,
-   generation settings, execution evidence 계약, reference revision과 제출 한도를 공개 사전등록하고 release
-   bundle의 hashed artifact로 지정한다.
-2. 공개 practice의 7개 target stratum마다 최소 20개 pilot group으로 두 reference model을 실행한다. 95% 단측
-   pilot-variance 상한을 사용한 최대 cohort power가 미달하면 official split 작성 전에 중단한다.
-3. 모델명에 blinded된 held-out 사람 라벨로 evaluator를 calibration하고 기준 미달 시 중단한다.
-4. practice와 official split의 exact·semantic overlap을 감사한다.
-5. official split과 모든 scoring/evaluator 설정을 첫 제출 전에 동결한다.
-6. 모델별 최대 2회 제출을 접수하고 immutable model/runtime/prompting/evaluator provenance를 기록한다.
-7. 모델별 최소 3회, 반복마다 네 suite를 동일 run context로 실행하고 `core`·`mini_single` execution evidence가
+1. 공개 practice의 7개 target stratum마다 최소 20개 독립 group을 준비하고 machine-assisted draft 여부를
+   공개한다. reference 출력에 blind한 검토자 2명 이상이 각 사례를 승인해야 한다.
+2. protocol commit, benchmark fingerprint, 정확한 upper/lower immutable revision, generation settings,
+   execution evidence 계약, MDE, alpha, target power와 분산·다중비교 방법을 `power-pilot-registration.v1`로
+   동결한다.
+3. 두 reference model을 실행하고 95% 단측 pilot-variance 상한으로 최대 cohort power를 계산한다. 미달하면
+   official season과 split을 만들기 전에 중단한다.
+4. 통과한 표본 수, 정확한 immutable model cohort, suite×domain 배분, 실행 설정과 제출 한도를
+   `season-preregistration.v2`로 공개 동결한다.
+5. 모델명에 blinded된 held-out 사람 라벨로 evaluator를 calibration하고 기준 미달 시 중단한다.
+6. practice와 official split의 exact·semantic overlap을 감사한다.
+7. official split과 모든 scoring/evaluator 설정을 첫 제출 전에 동결한다.
+8. 모델별 최대 2회 제출을 접수하고 immutable model/runtime/prompting/evaluator provenance를 기록한다.
+9. 모델별 최소 3회, 반복마다 네 suite를 동일 run context로 실행하고 `core`·`mini_single` execution evidence가
    endpoint smoke, 필수 단계 완료, report doctor와 네 report digest를 결합했는지 확인한다.
-8. 실행·provenance evidence gate를 적용하고 eligible 모델 전체를 primary bootstrap·Holm 보정 tier에
+10. 실행·provenance evidence gate를 적용하고 eligible 모델 전체를 primary bootstrap·Holm 보정 tier에
    포함한다. critical·privacy·불안정성의 엄격 배포 screen은 별도로 공개하며 tier 포함 여부를 바꾸지 않는다.
-9. 외부 검토자가 private evidence와 공개 artifact를 대조하고 blocking finding을 해소한다.
-10. release bundle을 동결하고 verifier를 새 환경에서 재실행한 뒤 게시한다.
+11. 외부 검토자가 private evidence와 공개 artifact를 대조하고 blocking finding을 해소한다.
+12. release bundle을 동결하고 verifier를 새 환경에서 재실행한 뒤 게시한다.
 
-프로토콜 검증기는 `power 사전등록 -> split 감사 -> split 동결 -> 첫 제출 -> 실행 -> 외부 검토 -> release
-동결` 시각 순서와 공개 season 사전등록이 power 사전등록보다 늦지 않은지도 확인한다. 현재 활성 후보는 없다.
+프로토콜 검증기는 `pilot 등록·review -> anchor 실행·evidence 완료 -> power 분석 -> season 사전등록 ->
+split 감사 -> split 동결 -> 첫 제출 -> 공식 실행 -> 외부 검토 -> release 동결` 시각 순서를 확인한다.
+현재 활성 후보는 없다.
 S4는 [`SEASON_2026Q3_S4_STOP.json`](./SEASON_2026Q3_S4_STOP.json)에 기록된 다중비교 검정력 범위 불일치로
 official split 작성 전에 중단됐다.
 [후속 파일럿 정밀도 감사](./SEASON_2026Q3_SUCCESSOR_PILOT_PRECISION_AUDIT.md)에서는 S4 pilot의 층별 5개가

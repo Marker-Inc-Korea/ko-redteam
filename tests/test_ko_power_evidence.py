@@ -144,6 +144,35 @@ def test_stratified_power_preserves_target_allocation_and_source():
     assert pilot["standard_deviation"] == pytest.approx(7.905694, abs=1e-6)
 
 
+def test_stratified_power_accepts_registration_bound_v2_source():
+    data = _stratified_input()
+    data["pilot_source"].update({
+        "schema": P.PILOT_SOURCE_V2_SCHEMA,
+        "pilot_registration_sha256": "5" * 64,
+        "practice_review_sha256": "6" * 64,
+        "pilot_id": "unit-power-pilot-v1",
+        "pilot_registered_at": "2026-04-30T00:00:00+09:00",
+        "first_run_started_at": "2026-04-30T01:00:00+09:00",
+        "last_run_started_at": "2026-04-30T02:00:00+09:00",
+        "last_execution_completed_at": "2026-04-30T03:00:00+09:00",
+    })
+
+    report = P.build_power_report(data)
+
+    assert report["pilot_summary"]["source"]["schema"] == (
+        P.PILOT_SOURCE_V2_SCHEMA
+    )
+    assert report["pilot_summary"]["source"][
+        "pilot_registration_sha256"
+    ] == "5" * 64
+
+    data["pilot_source"]["first_run_started_at"] = (
+        "2026-04-29T23:00:00+09:00"
+    )
+    with pytest.raises(ValueError, match="execution timeline"):
+        P.build_power_report(data)
+
+
 def test_stratified_power_rejects_sparse_or_mismatched_strata():
     data = _stratified_input()
     data["pilot_clusters"] = data["pilot_clusters"][:-1]

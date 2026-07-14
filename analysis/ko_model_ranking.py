@@ -500,6 +500,7 @@ def _report_identity(report: dict[str, Any]) -> dict[str, Any]:
         "reported_model": report.get("model"),
         "run_context_sha256": provenance.get("context_sha256"),
         "run_id": provenance.get("run_id"),
+        "started_at": provenance.get("started_at"),
         "model_provider": model.get("provider"),
         "model_id": model.get("model_id"),
         "served_model": model.get("served_model"),
