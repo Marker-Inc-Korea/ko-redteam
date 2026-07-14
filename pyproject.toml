@@ -48,6 +48,7 @@ ko-redteam-build-calibration-commitments = "probes.build_calibration_commitments
 ko-redteam-verify-calibration-signatures = "probes.verify_calibration_signatures:main"
 ko-redteam-build-power-pilot = "probes.build_power_pilot:main"
 ko-redteam-build-review-packets = "probes.build_review_packets:main"
+ko-redteam-review-response = "probes.review_response:main"
 ko-redteam-build-review-commitment = "probes.build_review_commitment:main"
 ko-redteam-merge-review-responses = "probes.merge_review_responses:main"
 ko-redteam-verify-review-signatures = "probes.verify_review_signatures:main"

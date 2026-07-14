@@ -120,7 +120,7 @@ def test_doctor_warnings_fail_turns_warning_only_report_into_failure(tmp_path):
     assert strict["status"] == "fail"
 
 
-def test_doctor_recognizes_signed_calibration_contract_schemas(tmp_path):
+def test_doctor_recognizes_new_evidence_contract_schemas(tmp_path):
     paths = []
     for index, schema in enumerate(
         (
@@ -130,6 +130,7 @@ def test_doctor_recognizes_signed_calibration_contract_schemas(tmp_path):
             "ko-redteam.calibration-adjudication-commitment.v1",
             "ko-redteam.calibration-signature-evidence.v1",
             "ko-redteam.calibration-signature-audit.v1",
+            "ko-redteam.review-response-progress.v1",
         )
     ):
         path = tmp_path / f"calibration-contract-{index}.json"

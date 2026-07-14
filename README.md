@@ -113,6 +113,7 @@ ko-redteam-suite \
 | 연결 확인 | `ko-redteam-check-endpoint` | OpenAI-compatible endpoint와 한국어 응답 신호 확인 |
 | 평가 실행 | `ko-redteam-benchmark`, `ko-redteam-multiturn`, `ko-redteam-agent-harness` | 단일턴, 멀티턴, tool gateway 평가 |
 | 오프라인 분석 | `ko-redteam-scan`, `ko-redteam-analyze-responses` | 저장된 응답과 공격 스캔 결과 분석 |
+| 사람 검토 | `ko-redteam-review-response`, `ko-redteam-build-review-commitment`, `ko-redteam-merge-review-responses` | 항목별 명시적 blind 판정, 비공개 증거 서약, reviewer별 서명 동결과 fail-closed 병합 |
 | 모델 비교 | `ko-redteam-rank-models`, `ko-redteam-analyze-repeats` | evidence eligibility, 배포 screen, 반복 안정성, 신뢰구간 기반 tier 분석 |
 | 공식 증거 생성 | `ko-redteam-validate-pilot-registration`, `ko-redteam-build-calibration-commitments`, `ko-redteam-build-calibration`, `ko-redteam-verify-calibration-signatures`, `ko-redteam-build-power-pilot`, `ko-redteam-audit-splits`, `ko-redteam-analyze-power`, `ko-redteam-analyze-familywise-power`, `ko-redteam-build-power-design` | practice 검토·등록, signed 사람 판정 보정, reference pilot, split 중복, marginal·다중비교 검정력과 공식 분할 규모의 metadata-only 증거 생성 |
 | 공식 게시 검증 | `ko-redteam-build-external-review-statement`, `ko-redteam-assemble-external-review`, `ko-redteam-verify-external-review`, `ko-redteam-validate-leaderboard` | signed 외부 검토 scope와 hidden split, calibration, provenance, 통계 publication gate |
@@ -157,6 +158,9 @@ reference model 출력은 사용하지 않았으며 140개 행 모두 아직 `pe
 [검수 workflow](./governance/PRACTICE_REVIEW_WORKFLOW.md)는 검토자별 blind packet, 빈 응답 template, 신원·소속
 attestation, reviewer가 직접 서명하는 Ed25519 commitment와 fail-closed 병합을 제공합니다. 서명은 제출물 무결성을
 증명하지만 실제 신원 확인을 대체하지 않으며, 도구는 사람 승인값을 자동 생성하지 않습니다.
+[offline response 도구](./governance/REVIEWER_RESPONSE_TOOL.md)는 다른 reviewer 결정이나 model output을 읽지 않고
+한 항목의 여섯 기준을 모두 직접 입력하게 하며 자동·일괄 승인을 제공하지 않습니다. 140개 판정 후에는 사람이
+제출한 identity·affiliation·signed statement의 digest와 전용 공개키를 `attest` 명령으로 결합합니다.
 
 ```bash
 ko-redteam-build-review-packets \
@@ -164,6 +168,12 @@ ko-redteam-build-review-packets \
   --root . --output-dir private/review-workspace \
   --reviewer reviewer-a --reviewer reviewer-b \
   --planned-at 2026-07-15T09:00:00+09:00
+
+# 각 reviewer는 본인의 packet·response만 사용해 한 항목씩 직접 판정
+ko-redteam-review-response \
+  private/review-workspace/reviewer-01.packet.json \
+  private/review-workspace/reviewer-01.response.json \
+  review
 
 # 각 검토자가 response·attestation을 완료한 뒤 본인 전용 키로 각각 실행
 ko-redteam-build-review-commitment \

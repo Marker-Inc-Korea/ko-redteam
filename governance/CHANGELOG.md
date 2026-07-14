@@ -5,6 +5,12 @@
 
 ## Unreleased - Evidence-Eligible Ranking Protocol
 
+- blind reviewer가 140개 JSON 행을 직접 수정하지 않도록 항목별 offline response CLI를 추가한다. 본인의 packet,
+  response, attestation과 미리 지정된 비공개 증거만 사용하고 여섯 criterion을 모두 명시해야 하며 자동·일괄
+  승인을 제공하지 않는다.
+  모든 판정 후에는 predeclared 신원·소속·서명문 digest와 Ed25519 공개키를 다섯 개의 명시적 서약으로 결합한다.
+  atomic write, 중간 장애 복구, concurrent edit와 commitment 이후 수정 거부를 적용하며 frozen review·merge 계약과
+  사람 서명 요건은 바꾸지 않는다.
 - 사람 calibration을 `evaluator-calibration.v3`로 강화한다. 세 명 이상의 각 rater가 자신의 전체 라벨 subset과
   private 신원·자격·attestation digest를 별도 Ed25519 SSHSIG로 승인하고, 두 명 이상의 expert가 동일 최종
   adjudication report를 공동서명해야 한다. standalone verifier와 release gate가 입력·설정·라벨·evaluator

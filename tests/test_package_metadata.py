@@ -37,6 +37,7 @@ def test_console_script_targets_are_importable():
         "ko-redteam-verify-calibration-signatures",
         "ko-redteam-build-power-pilot",
         "ko-redteam-build-review-packets",
+        "ko-redteam-review-response",
         "ko-redteam-build-review-commitment",
         "ko-redteam-merge-review-responses",
         "ko-redteam-verify-review-signatures",
@@ -149,6 +150,7 @@ def test_package_data_paths_exist():
         ROOT / "governance" / "SUCCESSOR_PILOT_REGISTRATION_SPEC.json"
     ).exists()
     assert (ROOT / "governance" / "PRACTICE_REVIEW_WORKFLOW.md").exists()
+    assert (ROOT / "governance" / "REVIEWER_RESPONSE_TOOL.md").exists()
     assert (ROOT / "governance" / "CALIBRATION_REVIEW_WORKFLOW.md").exists()
     assert (ROOT / "gap_analysis" / "_vendor" / "mitigationbypass_substrings.txt").exists()
 

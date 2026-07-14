@@ -48,6 +48,7 @@ KNOWN_SCHEMAS = PRIMARY_REPORT_SCHEMAS | {
     "ko-redteam.practice-review-evidence.v2",
     "ko-redteam.reviewer-commitment.v1",
     "ko-redteam.review-signature-audit.v1",
+    "ko-redteam.review-response-progress.v1",
     "ko-redteam.practice-review-merge-audit.v1",
     "ko-redteam.leaderboard-release.v3",
     "ko-redteam.leaderboard-release.v2",
