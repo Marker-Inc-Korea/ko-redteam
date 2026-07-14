@@ -5,6 +5,11 @@
 
 ## Unreleased - Evidence-Eligible Ranking Protocol
 
+- blind reviewer 둘이 중앙 workspace를 공유하지 않도록 reviewer별 plan·packet·빈 template만 `0700` handoff로
+  반출하고, 완료된 evidence·commitment·SSHSIG의 정확한 파일 집합을 단독 검증한 뒤 새 merge workspace로
+  조립하는 CLI를 추가한다. 동일 signing key·중복 identity commitment·symlink·미등록 파일을 거부하고 reject는
+  자동 수정하지 않은 채 `assembled_not_ready`로 보존한다. 이 계층은 파일 격리를 검증하지만 서로 다른 실제 사람
+  신원을 공개적으로 증명한다고 주장하지 않는다.
 - blind reviewer가 140개 JSON 행을 직접 수정하지 않도록 항목별 offline response CLI를 추가한다. 본인의 packet,
   response, attestation과 미리 지정된 비공개 증거만 사용하고 여섯 criterion을 모두 명시해야 하며 자동·일괄
   승인을 제공하지 않는다.

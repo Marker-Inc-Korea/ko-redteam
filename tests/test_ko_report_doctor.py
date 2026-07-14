@@ -130,6 +130,9 @@ def test_doctor_recognizes_new_evidence_contract_schemas(tmp_path):
             "ko-redteam.calibration-adjudication-commitment.v1",
             "ko-redteam.calibration-signature-evidence.v1",
             "ko-redteam.calibration-signature-audit.v1",
+            "ko-redteam.review-handoff.v1",
+            "ko-redteam.review-submission-audit.v1",
+            "ko-redteam.review-submission-assembly.v1",
             "ko-redteam.review-response-progress.v1",
         )
     ):

@@ -18,6 +18,7 @@
 | [`PRACTICE_VALIDATION_2026Q3_INFERENCE_NOTICE.md`](./PRACTICE_VALIDATION_2026Q3_INFERENCE_NOTICE.md) | 과거 bootstrap-tail pair 분리·tier 추론 철회 |
 | [`PRACTICE_REVIEW_WORKFLOW.md`](./PRACTICE_REVIEW_WORKFLOW.md) | successor pilot blind packet·독립 응답·서명 commitment·병합 절차 |
 | [`REVIEWER_RESPONSE_TOOL.md`](./REVIEWER_RESPONSE_TOOL.md) | 자동 승인 없는 항목별 offline reviewer response 작성 도구 |
+| [`REVIEW_HANDOFF_WORKFLOW.md`](./REVIEW_HANDOFF_WORKFLOW.md) | reviewer별 최소 workspace 격리 반출·서명 제출 검증·원자적 회수 절차 |
 | [`CALIBRATION_REVIEW_WORKFLOW.md`](./CALIBRATION_REVIEW_WORKFLOW.md) | 사람 calibration의 rater·expert SSHSIG와 private 신원·자격 확인 절차 |
 | [`EXTERNAL_REVIEW_WORKFLOW.md`](./EXTERNAL_REVIEW_WORKFLOW.md) | 공식 release scope와 공개 검토 증거를 검토자별 SSHSIG로 결합하는 절차 |
 | [`SUCCESSOR_PILOT_REGISTRATION_SPEC.json`](./SUCCESSOR_PILOT_REGISTRATION_SPEC.json) | 사람 검수 후 재현 가능한 v2 pilot registration을 생성하는 공개 사양 |

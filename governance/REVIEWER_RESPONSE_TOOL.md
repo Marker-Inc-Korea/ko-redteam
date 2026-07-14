@@ -3,6 +3,8 @@
 `ko-redteam-review-response`는 blind pilot reviewer가 140개 JSON 행을 직접 편집하지 않고 본인에게 할당된 원형을
 한 항목씩 검토하도록 돕는 선택형 offline 도구다. frozen
 [`PRACTICE_REVIEW_WORKFLOW.md`](./PRACTICE_REVIEW_WORKFLOW.md)의 기준, 서명 또는 병합 계약을 바꾸지 않는다.
+두 reviewer의 파일을 분리 전달하고 회수하는 절차는
+[`REVIEW_HANDOFF_WORKFLOW.md`](./REVIEW_HANDOFF_WORKFLOW.md)를 따른다.
 
 ## Security Boundary
 
