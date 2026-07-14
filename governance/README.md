@@ -19,6 +19,7 @@
 | [`SEASON_2026Q3_S4_PREREGISTRATION.json`](./SEASON_2026Q3_S4_PREREGISTRATION.json) | 과거 324그룹 S4 동결 설계와 v3 실행 증거 계약 |
 | [`SEASON_2026Q3_S4_POWER_ANALYSIS.json`](./SEASON_2026Q3_S4_POWER_ANALYSIS.json) | S4 v3 reference 기반 단일 비교 검정력 증거 |
 | [`SEASON_2026Q3_S4_FAMILYWISE_POWER_AUDIT.json`](./SEASON_2026Q3_S4_FAMILYWISE_POWER_AUDIT.json) | S4 63-comparison 검정력 범위 감사와 중단 근거 |
+| [`SEASON_2026Q3_SUCCESSOR_PILOT_PRECISION_AUDIT.json`](./SEASON_2026Q3_SUCCESSOR_PILOT_PRECISION_AUDIT.json) ([요약](./SEASON_2026Q3_SUCCESSOR_PILOT_PRECISION_AUDIT.md)) | 현행 7모델·1 primary profile에서 S4 pilot 분산 정밀도와 다중비교 검정력을 재감사한 successor 설계 근거 |
 | [`SEASON_2026Q3_S4_STOP.json`](./SEASON_2026Q3_S4_STOP.json) | S4 다중비교 검정력 범위 불일치 중단 결정 |
 | [`SEASON_2026Q3_S3_STOP.json`](./SEASON_2026Q3_S3_STOP.json) | S3 동결 validator 불일치 중단 결정 |
 | [`SEASON_2026Q3_S3_PREREGISTRATION.json`](./SEASON_2026Q3_S3_PREREGISTRATION.json) | byte 보존된 과거 324그룹 S3 동결 설계 |

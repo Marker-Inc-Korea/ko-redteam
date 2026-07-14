@@ -1,0 +1,130 @@
+{
+ "schema": "ko-redteam.familywise-power-audit.v2",
+ "status": "pilot_variance_precision_fail",
+ "source": {
+  "power_analysis_sha256": "7721fa0f33c4c5d41e136df16d53993ea0ecc9767a5b4c7b085f11f43aa8486e",
+  "power_analysis_schema": "ko-redteam.power-analysis.v1",
+  "pilot_dataset_sha256": "1b8c5eaddaca6b89d92fe9654ef3dbb48ab114c3e99dd6d838442725289ba45a",
+  "pilot_standard_deviation": 32.105180010905606,
+  "design_standard_deviation": 50.344238908433205,
+  "minimum_detectable_effect": 5.0,
+  "marginal_alpha": 0.05,
+  "marginal_target_power": 0.8,
+  "marginal_achieved_power": 0.8002,
+  "actual_independence_groups": 324
+ },
+ "method": {
+  "name": "Bonferroni least-favorable threshold, pilot-variance upper bound, and union-bound simultaneous-power design",
+  "family": "all unordered model pairs multiplied by all inferential weight profiles",
+  "interpretation": "Per-comparison power uses the smallest Holm threshold. The stronger simultaneous design controls the sum of type-II errors so the union bound guarantees the target probability of detecting every MDE-or-larger comparison. It does not assume independent tests.",
+  "analysis_code_sha256": "652cd57c3ef3519ff345af9fd25356e3ebcab710a3944c6bf45a279bc242d0f0"
+ },
+ "minimum_publication_cohort": {
+  "model_count": 2,
+  "pair_count": 1,
+  "weight_profile_count": 1,
+  "comparison_family_size": 1,
+  "familywise_alpha": 0.05,
+  "bonferroni_comparison_alpha": 0.05,
+  "required_independence_groups_per_comparison": 796,
+  "required_independence_groups_simultaneous": 796,
+  "actual_independence_groups": 324,
+  "comparison_power_at_actual": 0.43170115498657613,
+  "per_comparison_target_for_simultaneous_bound": 0.8,
+  "simultaneous_power_union_lower_bound_at_actual": 0.43170115498657613,
+  "target_power": 0.8,
+  "groups_shortfall_per_comparison": 472,
+  "groups_shortfall_simultaneous": 472,
+  "per_comparison_status": "fail",
+  "simultaneous_status": "fail"
+ },
+ "maximum_season_cohort": {
+  "model_count": 7,
+  "pair_count": 21,
+  "weight_profile_count": 1,
+  "comparison_family_size": 21,
+  "familywise_alpha": 0.05,
+  "bonferroni_comparison_alpha": 0.002380952380952381,
+  "required_independence_groups_per_comparison": 1527,
+  "required_independence_groups_simultaneous": 2938,
+  "actual_independence_groups": 324,
+  "comparison_power_at_actual": 0.10558068490162131,
+  "per_comparison_target_for_simultaneous_bound": 0.9904761904761905,
+  "simultaneous_power_union_lower_bound_at_actual": 0.0,
+  "target_power": 0.8,
+  "groups_shortfall_per_comparison": 1203,
+  "groups_shortfall_simultaneous": 2614,
+  "per_comparison_status": "fail",
+  "simultaneous_status": "fail"
+ },
+ "pilot_variance_uncertainty": {
+  "schema": "ko-redteam.pilot-variance-uncertainty.v1",
+  "status": "insufficient_pilot_groups_per_stratum",
+  "method": "one-sided Welch-Satterthwaite approximate chi-square upper confidence bound",
+  "confidence_level": 0.95,
+  "lower_tail_probability": 0.050000000000000044,
+  "effective_degrees_of_freedom": 10.564763260239083,
+  "lower_chi_square_quantile": 4.296456596970062,
+  "observed_equivalent_variance": 1030.742583532653,
+  "upper_equivalent_variance": 2534.5423912693996,
+  "observed_standard_deviation": 32.105180010905606,
+  "design_standard_deviation_upper_bound": 50.344238908433205,
+  "minimum_pilot_groups_per_stratum_required": 20,
+  "minimum_pilot_groups_per_stratum_observed": 5,
+  "strata": {
+   "agent_harness:agent_rag:allow": {
+    "pilot_groups": 5,
+    "target_weight": 0.08333333333333333,
+    "sample_variance": 28.7424288
+   },
+   "agent_harness:agent_rag:no_tool": {
+    "pilot_groups": 5,
+    "target_weight": 0.08333333333333333,
+    "sample_variance": 4.049999999999974
+   },
+   "mini_single:korean_quality:allow": {
+    "pilot_groups": 5,
+    "target_weight": 0.16666666666666666,
+    "sample_variance": 2184.5639456999997
+   },
+   "mini_single:overrefusal:allow": {
+    "pilot_groups": 5,
+    "target_weight": 0.16666666666666666,
+    "sample_variance": 994.6739763000003
+   },
+   "multiturn:prompt_security:refuse_or_redirect": {
+    "pilot_groups": 5,
+    "target_weight": 0.16666666666666666,
+    "sample_variance": 10.799999999999974
+   },
+   "paperbench:privacy:no_leak": {
+    "pilot_groups": 5,
+    "target_weight": 0.16666666666666666,
+    "sample_variance": 2952.7088647959185
+   },
+   "paperbench:safety:refuse_or_redirect": {
+    "pilot_groups": 5,
+    "target_weight": 0.16666666666666666,
+    "sample_variance": 25.312500000000032
+   }
+  },
+  "power_input_sha256": "b9d7cc1dac653c9d6fa18de33ff49c046387714855918eeae468923edadfb499"
+ },
+ "pilot_variance_assumptions": [
+  "Pilot group differences are independent within each frozen stratum.",
+  "The fixed-allocation stratum variance estimator is adequately represented by the Welch-Satterthwaite approximation.",
+  "The pilot reference pair and prompt strata represent official-season score variance."
+ ],
+ "decision": {
+  "marginal_power_gate_passed": true,
+  "pilot_variance_precision_passed": false,
+  "minimum_cohort_per_comparison_power_passed": false,
+  "maximum_cohort_per_comparison_power_passed": false,
+  "minimum_cohort_simultaneous_power_passed": false,
+  "maximum_cohort_simultaneous_power_passed": false,
+  "official_tier_design_supported": false,
+  "official_complete_ranking_design_supported": false,
+  "multiplicity_controlled_per_comparison_design_supported": false
+ },
+ "raw_prompt_or_response_used": false
+}

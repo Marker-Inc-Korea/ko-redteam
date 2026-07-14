@@ -97,6 +97,14 @@ def test_package_data_paths_exist():
     assert (
         ROOT / "governance" / "SEASON_2026Q3_S4_FAMILYWISE_POWER_AUDIT.md"
     ).exists()
+    assert (
+        ROOT
+        / "governance"
+        / "SEASON_2026Q3_SUCCESSOR_PILOT_PRECISION_AUDIT.json"
+    ).exists()
+    assert (
+        ROOT / "governance" / "SEASON_2026Q3_SUCCESSOR_PILOT_PRECISION_AUDIT.md"
+    ).exists()
     assert (ROOT / "governance" / "SEASON_2026Q3_S4_STOP.json").exists()
     assert (ROOT / "governance" / "PRACTICE_VALIDATION_2026Q3.json").exists()
     assert (ROOT / "governance" / "PRACTICE_VALIDATION_2026Q3.md").exists()

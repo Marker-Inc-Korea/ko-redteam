@@ -15,7 +15,9 @@
   게시를 거부한다. 사후 모델 제외·추가로 comparison family를 바꿀 수 없다.
 - 층별 최소 20개 reference pilot과 95% 단측 Welch-Satterthwaite 분산 상한을 공식 power gate에 추가한다.
   S4의 층별 5개 pilot을 이 기준으로 재감사하면 design SD가 32.11에서 50.34로 올라가고, 7모델·1개 primary
-  profile의 개별 비교 80% 필요량은 1,527그룹이므로 successor preregistration 전에 pilot을 확장한다.
+  profile의 개별 비교 80% 필요량은 1,527그룹이므로 successor preregistration 전에 pilot을 확장한다. 집계
+  결과는 [`SEASON_2026Q3_SUCCESSOR_PILOT_PRECISION_AUDIT.json`](./SEASON_2026Q3_SUCCESSOR_PILOT_PRECISION_AUDIT.json)에
+  고정한다.
 - breaking publication contract를 `leaderboard-release.v2`와 `season-preregistration.v2`로 승격한다. 과거
   S1-S4 `v1` 등록은 수정하지 않으며 신규 v4 pilot이나 공식 release에 재사용할 수 없다.
 

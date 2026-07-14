@@ -38,9 +38,10 @@
 프로토콜 검증기는 `power 사전등록 -> split 감사 -> split 동결 -> 첫 제출 -> 실행 -> 외부 검토 -> release
 동결` 시각 순서와 공개 season 사전등록이 power 사전등록보다 늦지 않은지도 확인한다. 현재 활성 후보는 없다.
 S4는 [`SEASON_2026Q3_S4_STOP.json`](./SEASON_2026Q3_S4_STOP.json)에 기록된 다중비교 검정력 범위 불일치로
-official split 작성 전에 중단됐다. 후속 설계 감사에서는 S4 pilot의 층별 5개가 분산 정밀도 gate에도
-미달했으므로, 층별 20개 reference pilot을 새 프로토콜로 확보하기 전까지 successor season을 사전등록하지
-않는다. S3는
+official split 작성 전에 중단됐다.
+[후속 파일럿 정밀도 감사](./SEASON_2026Q3_SUCCESSOR_PILOT_PRECISION_AUDIT.md)에서는 S4 pilot의 층별 5개가
+분산 정밀도 gate에도 미달했으므로, 층별 20개 reference pilot을 새 프로토콜로 확보하기 전까지 successor
+season을 사전등록하지 않는다. S3는
 [`SEASON_2026Q3_S3_STOP.json`](./SEASON_2026Q3_S3_STOP.json)에 기록된 동결 validator 불일치로 official split
 작성 전에 중단됐다. S2는
 [`SEASON_2026Q3_S2_STOP.json`](./SEASON_2026Q3_S2_STOP.json)에 기록된 검정력 미달로 official split 작성 전에

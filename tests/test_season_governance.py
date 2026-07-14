@@ -32,6 +32,12 @@ S4_POWER_PATH = ROOT / "governance" / "SEASON_2026Q3_S4_POWER_ANALYSIS.json"
 S4_FAMILYWISE_PATH = (
     ROOT / "governance" / "SEASON_2026Q3_S4_FAMILYWISE_POWER_AUDIT.json"
 )
+SUCCESSOR_PRECISION_PATH = (
+    ROOT / "governance" / "SEASON_2026Q3_SUCCESSOR_PILOT_PRECISION_AUDIT.json"
+)
+SUCCESSOR_PRECISION_MD_PATH = (
+    ROOT / "governance" / "SEASON_2026Q3_SUCCESSOR_PILOT_PRECISION_AUDIT.md"
+)
 S1_REGISTRATION_COMMIT = "6de04e588d29fddb2cae5db1d4f481c68883f6f8"
 S2_REGISTRATION_COMMIT = "7d2eef959b8b039162d9bc89e1c77218d33000df"
 S3_REGISTRATION_COMMIT = "46ecc81d88e7437f22ef23a128d05894905d737f"
@@ -39,10 +45,15 @@ S4_REGISTRATION_COMMIT = "0742bdd37b16fde426cb35b9d6053d1996a39be2"
 S4_FAMILYWISE_IMPLEMENTATION_COMMIT = (
     "d0c344d2f18a6071c6a53aca143e7849d10cd8c3"
 )
+SUCCESSOR_PRECISION_IMPLEMENTATION_COMMIT = (
+    "08d7605830fb25c12e0e3c25d44acc5f69f92236"
+)
 S2_POWER_SHA256 = "e01a1570a7ca298d34b17bd4fb743b7b6e1ea16be1588417e83d8aaca509dd11"
 S4_POWER_SHA256 = "7721fa0f33c4c5d41e136df16d53993ea0ecc9767a5b4c7b085f11f43aa8486e"
 S4_FAMILYWISE_SHA256 = "8eb3b380a2f0a222f769191817c83302824b94aa7ea7f9647c46190c89be4211"
 S4_STOP_SHA256 = "8c2610f43eaf8f7859bdd09673b0ba977f01ea0c22264e8451300241060d7e59"
+SUCCESSOR_PRECISION_SHA256 = "b886bddb0d8eff283302175fa7566c4c1d0e4450e292318ae1eb313b73782b58"
+SUCCESSOR_PRECISION_MD_SHA256 = "4b0a75d44d4120612fe7f4bb496b624272b2fe5fc790c087cbfaa165d7341991"
 
 
 def _load(path: Path) -> dict:
@@ -343,6 +354,68 @@ def test_s4_multiplicity_audit_stops_the_official_design_before_data():
     )
     assert "/data1/" not in public_text
     assert "192" + ".168." not in public_text
+
+
+def test_successor_pilot_precision_audit_is_hash_bound_and_blocks_preregistration():
+    audit = _load(SUCCESSOR_PRECISION_PATH)
+
+    assert hashlib.sha256(SUCCESSOR_PRECISION_PATH.read_bytes()).hexdigest() == (
+        SUCCESSOR_PRECISION_SHA256
+    )
+    assert hashlib.sha256(SUCCESSOR_PRECISION_MD_PATH.read_bytes()).hexdigest() == (
+        SUCCESSOR_PRECISION_MD_SHA256
+    )
+    assert audit["schema"] == "ko-redteam.familywise-power-audit.v2"
+    assert audit["status"] == "pilot_variance_precision_fail"
+    assert audit["source"]["power_analysis_sha256"] == S4_POWER_SHA256
+    assert audit["method"]["analysis_code_sha256"] == hashlib.sha256(
+        _git_blob(
+            SUCCESSOR_PRECISION_IMPLEMENTATION_COMMIT,
+            "analysis/ko_familywise_power.py",
+        )
+    ).hexdigest()
+
+    variance = audit["pilot_variance_uncertainty"]
+    assert variance["status"] == "insufficient_pilot_groups_per_stratum"
+    assert variance["confidence_level"] == 0.95
+    assert variance["observed_standard_deviation"] == 32.105180010905606
+    assert variance["design_standard_deviation_upper_bound"] == 50.344238908433205
+    assert variance["minimum_pilot_groups_per_stratum_observed"] == 5
+    assert variance["minimum_pilot_groups_per_stratum_required"] == 20
+    assert set(variance["strata"]) == {
+        "agent_harness:agent_rag:allow",
+        "agent_harness:agent_rag:no_tool",
+        "mini_single:korean_quality:allow",
+        "mini_single:overrefusal:allow",
+        "multiturn:prompt_security:refuse_or_redirect",
+        "paperbench:privacy:no_leak",
+        "paperbench:safety:refuse_or_redirect",
+    }
+    for row in variance["strata"].values():
+        assert set(row) == {"pilot_groups", "target_weight", "sample_variance"}
+        assert row["pilot_groups"] == 5
+
+    maximum = audit["maximum_season_cohort"]
+    assert maximum["model_count"] == 7
+    assert maximum["comparison_family_size"] == 21
+    assert maximum["actual_independence_groups"] == 324
+    assert maximum["required_independence_groups_per_comparison"] == 1527
+    assert maximum["required_independence_groups_simultaneous"] == 2938
+    assert maximum["comparison_power_at_actual"] == 0.10558068490162131
+    assert audit["decision"]["official_tier_design_supported"] is False
+    assert audit["decision"]["official_complete_ranking_design_supported"] is False
+    assert audit["decision"][
+        "multiplicity_controlled_per_comparison_design_supported"
+    ] is False
+    assert audit["raw_prompt_or_response_used"] is False
+
+    public_text = SUCCESSOR_PRECISION_PATH.read_text(
+        "utf-8"
+    ) + SUCCESSOR_PRECISION_MD_PATH.read_text("utf-8")
+    assert "/data1/" not in public_text
+    assert "192" + ".168." not in public_text
+    assert "pilot_clusters" not in public_text
+    assert '"difference"' not in public_text
 
 
 def test_s3_stop_preserves_the_power_derived_s4_design_and_thresholds():

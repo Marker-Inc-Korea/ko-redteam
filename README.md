@@ -131,10 +131,11 @@ release bundle의 hashed `preregistration` artifact로 결합합니다. 현재 �
 S4는 단일 비교 power만 충족하고 63개 다중비교 family의 power는 충족하지 못해
 [`governance/SEASON_2026Q3_S4_STOP.json`](./governance/SEASON_2026Q3_S4_STOP.json)으로 중단했습니다. 과거
 [`governance/SEASON_2026Q3_S4_PREREGISTRATION.json`](./governance/SEASON_2026Q3_S4_PREREGISTRATION.json)은
-불변 이력이며 순위 발표나 완료 증거가 아닙니다. 후속 감사를 통해 S4 pilot이 7개 층마다 5개 그룹뿐이라
-표준편차 점추정치에도 큰 불확실성이 있음을 확인했습니다. 현재 95% 분산 상한을 적용하면 7모델·1개 primary
-profile의 개별 비교 80%에 1,527그룹이 필요하므로, 후속 시즌은 각 층 pilot을 최소 20개로 확장하고 다시
-계산하기 전까지 사전등록하지 않습니다. S3는 동결 validator가 power-derived 54개 최소값을
+불변 이력이며 순위 발표나 완료 증거가 아닙니다.
+[후속 파일럿 정밀도 감사](./governance/SEASON_2026Q3_SUCCESSOR_PILOT_PRECISION_AUDIT.md)를 통해 S4 pilot이
+7개 층마다 5개 그룹뿐이라 표준편차 점추정치에도 큰 불확실성이 있음을 확인했습니다. 현재 95% 분산 상한을
+적용하면 7모델·1개 primary profile의 개별 비교 80%에 1,527그룹이 필요하므로, 후속 시즌은 각 층 pilot을
+최소 20개로 확장하고 다시 계산하기 전까지 사전등록하지 않습니다. S3는 동결 validator가 power-derived 54개 최소값을
 검증하지 못해 official split 작성 전에 [중단](./governance/SEASON_2026Q3_S3_STOP.json)했습니다. S2는 180개
 그룹에서 power 0.5537로 목표 0.80에
 미달해 중단했으며, [결정서](./governance/SEASON_2026Q3_S2_STOP.json)와
