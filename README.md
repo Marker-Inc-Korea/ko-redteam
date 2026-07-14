@@ -114,7 +114,7 @@ ko-redteam-suite \
 | 평가 실행 | `ko-redteam-benchmark`, `ko-redteam-multiturn`, `ko-redteam-agent-harness` | 단일턴, 멀티턴, tool gateway 평가 |
 | 오프라인 분석 | `ko-redteam-scan`, `ko-redteam-analyze-responses` | 저장된 응답과 공격 스캔 결과 분석 |
 | 모델 비교 | `ko-redteam-rank-models`, `ko-redteam-analyze-repeats` | evidence eligibility, 배포 screen, 반복 안정성, 신뢰구간 기반 tier 분석 |
-| 공식 증거 생성 | `ko-redteam-validate-pilot-registration`, `ko-redteam-build-calibration`, `ko-redteam-build-power-pilot`, `ko-redteam-audit-splits`, `ko-redteam-analyze-power`, `ko-redteam-analyze-familywise-power`, `ko-redteam-build-power-design` | practice 검토·등록, 사람 판정 보정, reference pilot, split 중복, marginal·다중비교 검정력과 공식 분할 규모의 metadata-only 증거 생성 |
+| 공식 증거 생성 | `ko-redteam-validate-pilot-registration`, `ko-redteam-build-calibration-commitments`, `ko-redteam-build-calibration`, `ko-redteam-verify-calibration-signatures`, `ko-redteam-build-power-pilot`, `ko-redteam-audit-splits`, `ko-redteam-analyze-power`, `ko-redteam-analyze-familywise-power`, `ko-redteam-build-power-design` | practice 검토·등록, signed 사람 판정 보정, reference pilot, split 중복, marginal·다중비교 검정력과 공식 분할 규모의 metadata-only 증거 생성 |
 | 공식 게시 검증 | `ko-redteam-build-external-review-statement`, `ko-redteam-assemble-external-review`, `ko-redteam-verify-external-review`, `ko-redteam-validate-leaderboard` | signed 외부 검토 scope와 hidden split, calibration, provenance, 통계 publication gate |
 | 평가셋 관리 | `ko-redteam-import-benchmark`, `ko-redteam-merge-benchmarks`, `ko-redteam-expand-benchmark` | 외부 파일 변환, 병합, 한국어 변형 생성 |
 | 릴리스 게이트 | `ko-redteam-compare-reports`, `ko-redteam-check-regression`, `ko-redteam-gate-reports`, `ko-redteam-doctor-reports`, `ko-redteam-check-public-hygiene` | 점수 비교, 회귀 판정, CI threshold, 공개 배포 위생 점검 |
@@ -264,9 +264,24 @@ git commit -m "Publish official season preregistration"
 git push
 
 # 7. Calibrate the evaluator with blinded human labels.
-ko-redteam-build-calibration private/calibration_labels.json \
+CALIBRATION_WORKSPACE=private/calibration
+chmod 700 "$CALIBRATION_WORKSPACE"
+chmod 600 "$CALIBRATION_WORKSPACE"/*
+ko-redteam-build-calibration-commitments \
+  "$CALIBRATION_WORKSPACE/calibration-input.json" \
+  "$CALIBRATION_WORKSPACE/signature-config.json" \
+  --evidence-root "$CALIBRATION_WORKSPACE"
+# Each rater signs only their commitment; each declared expert also signs the
+# common adjudication commitment using the fixed namespaces in the workflow.
+ko-redteam-build-calibration \
+  "$CALIBRATION_WORKSPACE/calibration-input.json" \
+  --signature-config "$CALIBRATION_WORKSPACE/signature-config.json" \
+  --evidence-root "$CALIBRATION_WORKSPACE" \
   --output release/calibration_report.json \
   --markdown-output release/calibration_report.md
+ko-redteam-verify-calibration-signatures \
+  release/calibration_report.json \
+  --output release/calibration_signature_audit.json
 
 # 8. Audit practice/official split overlap.
 ko-redteam-audit-splits \
@@ -303,6 +318,7 @@ ID 누락, 문항-벡터 불일치, cross-split 중복 또는 official 내부의
 | [`LIMITATIONS.md`](./governance/LIMITATIONS.md) | 측정·해석 한계 |
 | [`CONFLICTS.md`](./governance/CONFLICTS.md) | 이해상충과 회피 |
 | [`APPEALS.md`](./governance/APPEALS.md) | 이의제기와 정정 |
+| [`CALIBRATION_REVIEW_WORKFLOW.md`](./governance/CALIBRATION_REVIEW_WORKFLOW.md) | blinded rater commitment, expert 공동서명과 private 신원·자격 확인 |
 | [`INCIDENT_RESPONSE.md`](./governance/INCIDENT_RESPONSE.md) | 문항 유출·무결성 사고 대응 |
 | [`CHANGELOG.md`](./governance/CHANGELOG.md) | 시즌 변경 통제 |
 | [`EVIDENCE_INPUTS.md`](./governance/EVIDENCE_INPUTS.md) | 비공개 입력 JSON 계약 |
@@ -621,7 +637,7 @@ Agent report의 `expected=no_tool`은 schema 하위 호환을 위한 식별자�
 | 점수화 | `analysis/ko_scorecard.py` |
 | 모델 tier·배포 screen | `analysis/ko_model_ranking.py`, `probes/rank_models.py` |
 | 공식 리더보드 gate | `analysis/ko_leaderboard.py`, `probes/validate_leaderboard.py` |
-| 공식 증거 생성 | `analysis/ko_calibration.py`, `analysis/ko_split_evidence.py`, `analysis/ko_power_evidence.py`, `analysis/ko_familywise_power.py`, `analysis/ko_power_design.py`, `analysis/ko_season_preregistration.py` |
+| 공식 증거 생성 | `analysis/ko_calibration.py`, `analysis/ko_calibration_evidence.py`, `analysis/ko_split_evidence.py`, `analysis/ko_power_evidence.py`, `analysis/ko_familywise_power.py`, `analysis/ko_power_design.py`, `analysis/ko_season_preregistration.py` |
 | 시즌 거버넌스 | `governance/README.md`, `governance/SEASON_OPERATIONS.md` |
 | 실행 provenance | `analysis/ko_run_context.py` |
 | 평가셋 식별 | `analysis/ko_benchmark_identity.py` |

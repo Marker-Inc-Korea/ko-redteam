@@ -92,8 +92,9 @@ measurement integrity, report doctor 단계와 report 상대경로·SHA-256을 �
 각 영역 30개 이상이어야 한다. `adjudication_records`는 rater label이 갈린 모든 item을 정확히 한 번씩
 포함해야 한다.
 upper/lower control은 같은 control ID로 짝지은 20개 이상을 사용하고, 사전 방향 one-sided sign-flip
-randomization을 최소 10,000회 실행한다. 공개 `evaluator-calibration.v2`는 null, alternative, randomization
-unit·mode·draw 수와 plus-one p-value를 포함한다.
+randomization을 최소 10,000회 실행한다. 공개 `evaluator-calibration.v3`는 null, alternative, randomization
+unit·mode·draw 수와 plus-one p-value뿐 아니라 rater별 commitment·SSHSIG와 두 expert 이상의 공통 adjudication
+commitment·SSHSIG를 포함한다.
 
 ```json
 {
@@ -132,6 +133,14 @@ unit·mode·draw 수와 plus-one p-value를 포함한다.
   "limitations": ["The held-out labels do not cover every deployment context."]
 }
 ```
+
+같은 `0700` workspace의 `calibration-signature-config.v1`은 정렬된 전체 rater ID, timezone이 있는 planned·completed
+시각, 각 rater의 workspace-relative identity·credential·attestation·commitment·signature 경로, comment 없는
+Ed25519 공개키·fingerprint를 기록한다. `adjudication`은 정렬된 expert ID, 공통 commitment 경로와 expert별
+signature 경로를 포함한다. 입력·설정·private evidence는 `0600`이어야 하며 모든 rater가 모든 item을 판정해야
+한다. 고정 namespace, 서명 순서, private 신원·자격 확인과 재생성 절차는
+[`CALIBRATION_REVIEW_WORKFLOW.md`](./CALIBRATION_REVIEW_WORKFLOW.md)를 따른다. 서명은 key holder와 bytes를
+결합하지만 서로 다른 실제 사람이나 전문가 자격을 공개적으로 증명하지 않는다.
 
 ## Official Model Cohort
 

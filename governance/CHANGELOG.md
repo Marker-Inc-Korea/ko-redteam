@@ -5,6 +5,11 @@
 
 ## Unreleased - Evidence-Eligible Ranking Protocol
 
+- 사람 calibration을 `evaluator-calibration.v3`로 강화한다. 세 명 이상의 각 rater가 자신의 전체 라벨 subset과
+  private 신원·자격·attestation digest를 별도 Ed25519 SSHSIG로 승인하고, 두 명 이상의 expert가 동일 최종
+  adjudication report를 공동서명해야 한다. standalone verifier와 release gate가 입력·설정·라벨·evaluator
+  commit 변조, 키 재사용, 누락 서명과 사후 calibration을 거부한다. 서명은 실제 신원 증명이 아니므로 외부
+  검토자가 private 기록을 대조한다.
 - 외부 검토를 `external-review.v2`로 강화한다. release artifact·governance 문서와 manifest projection,
   공개 reviewer attestation·기관 보고서를 하나의 statement에 묶고 서로 다른 두 reviewer의 Ed25519 SSHSIG를
   제3자가 재검증할 수 있어야 한다.

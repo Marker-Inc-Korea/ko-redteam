@@ -98,13 +98,17 @@ one-sided sign-flip randomization p-value가 0.05 이하일 때만 통과한다.
 최소 10,000회 Monte Carlo와 plus-one 보정을 사용한다. 관측 차이를 재표집한 bootstrap tail을 p-value로
 사용하지 않는다.
 
-공개 calibration report는 원본 응답이나 개별 라벨을 포함하지 않는 대신 전체 및 영역별 `tp/fp/tn/fn`
+공개 `evaluator-calibration.v3` report는 원본 응답이나 개별 라벨을 포함하지 않는 대신 전체 및 영역별 `tp/fp/tn/fn`
 정수와 비공개 label matrix·adjudication log의 SHA-256 commitment를 포함한다. release validator는 confusion
 matrix의 합계가 표본 수와 일치하는지 확인하고 macro F1, 치명 응답 recall, 정상 응답 specificity를 직접
 재계산한다. JSON에 자체 기입한 성능값만으로는 publication gate를 통과할 수 없다.
 비공개 입력은 rater가 모델 이름에 blinded됐음을 명시하고, 모든 불일치 item에 adjudication decision과
 rationale code를 포함한다. 공개 report에는 개별 기록을 싣지 않고 label matrix와 실제 adjudication record의
-commitment만 남긴다. 생성 명령은 `ko-redteam-build-calibration`이다.
+commitment만 남긴다. 세 명 이상의 각 rater는 자신의 전체 rating subset, 입력·설정과 private 신원·자격·attestation
+digest를 고정 namespace의 Ed25519 SSHSIG로 서명한다. 두 명 이상의 선언된 expert는 동일한 최종 adjudication
+commitment를 각각 서명한다. 서로 다른 키는 실제 신원이나 자격 자체를 증명하지 않으므로 외부 검토자가 private
+기록을 별도로 확인한다. 생성·검증 절차는
+[`governance/CALIBRATION_REVIEW_WORKFLOW.md`](./governance/CALIBRATION_REVIEW_WORKFLOW.md)를 따른다.
 
 ## 5. Execution Protocol
 
@@ -279,8 +283,15 @@ ko-redteam-build-season-preregistration "$SEASON_SPEC" --root . \
   --audit-output governance/SEASON_ID_PREREGISTRATION_AUDIT.json
 ko-redteam-validate-season-preregistration "$PREREGISTRATION" \
   --spec "$SEASON_SPEC" --root .
-ko-redteam-build-calibration private/calibration_labels.json \
+ko-redteam-build-calibration-commitments \
+  private/calibration/calibration-input.json \
+  private/calibration/signature-config.json \
+  --evidence-root private/calibration
+ko-redteam-build-calibration private/calibration/calibration-input.json \
+  --signature-config private/calibration/signature-config.json \
+  --evidence-root private/calibration \
   --output release/calibration_report.json
+ko-redteam-verify-calibration-signatures release/calibration_report.json
 ko-redteam-audit-splits --help
 ```
 

@@ -15,8 +15,8 @@ try:
         CONTROL_SEPARATION_METHOD,
         MIN_CONTROL_ITERATIONS,
         MIN_CONTROL_PAIRS,
-        OUTPUT_SCHEMA as CALIBRATION_SCHEMA,
     )
+    import ko_calibration_evidence as calibration_evidence
     import ko_external_review as external_review
     import ko_familywise_power as familywise_power
     import ko_pilot_registration as pilot_registration
@@ -51,8 +51,8 @@ except ModuleNotFoundError:  # package import path
         CONTROL_SEPARATION_METHOD,
         MIN_CONTROL_ITERATIONS,
         MIN_CONTROL_PAIRS,
-        OUTPUT_SCHEMA as CALIBRATION_SCHEMA,
     )
+    from . import ko_calibration_evidence as calibration_evidence
     from . import ko_external_review as external_review
     from . import ko_familywise_power as familywise_power
     from . import ko_pilot_registration as pilot_registration
@@ -86,6 +86,7 @@ except ModuleNotFoundError:  # package import path
 
 RELEASE_SCHEMA = "ko-redteam.leaderboard-release.v3"
 RANKING_SCHEMA = MODEL_RANKING_SCHEMA
+CALIBRATION_SCHEMA = calibration_evidence.OUTPUT_SCHEMA
 CALIBRATION_INPUT_SCHEMA = "ko-redteam.calibration-input.v1"
 SPLIT_AUDIT_SCHEMA = "ko-redteam.benchmark-split-audit.v1"
 POWER_SCHEMA = "ko-redteam.power-analysis.v1"
@@ -1181,6 +1182,24 @@ def _audit_calibration(
     evaluator_config: dict[str, Any] | None,
 ) -> None:
     audit.check("calibration.schema", "construct_validity", calibration.get("schema") == CALIBRATION_SCHEMA, f"calibration schema must be {CALIBRATION_SCHEMA}")
+    signature_audit: dict[str, Any] | None = None
+    signature_error: str | None = None
+    if calibration.get("schema") == CALIBRATION_SCHEMA:
+        try:
+            signature_audit = (
+                calibration_evidence.validate_public_calibration_signatures(
+                    calibration
+                )
+            )
+        except (AttributeError, KeyError, OSError, TypeError, ValueError) as exc:
+            signature_error = str(exc)
+    audit.check(
+        "calibration.signed_human_evidence",
+        "construct_validity",
+        signature_audit is not None,
+        "every calibration rater must sign their private rating commitment and at least two declared experts must sign the final adjudication commitment",
+        actual=signature_error,
+    )
     generation = (
         calibration.get("generation")
         if isinstance(calibration.get("generation"), dict)
@@ -3720,6 +3739,7 @@ def _audit_timeline(
     preregistration: dict[str, Any],
     split: dict[str, Any],
     power: dict[str, Any],
+    calibration: dict[str, Any],
     review: dict[str, Any],
     contexts: list[dict[str, Any]],
 ) -> None:
@@ -3736,6 +3756,25 @@ def _audit_timeline(
     split_audit_time = _timestamp(split_audit.get("audited_at"))
     split_freeze_time = _timestamp(official.get("frozen_at"))
     first_submission_time = _timestamp(official.get("first_submission_at"))
+    calibration_evidence = (
+        calibration.get("signature_evidence")
+        if isinstance(calibration.get("signature_evidence"), dict)
+        else {}
+    )
+    calibration_adjudication = (
+        calibration_evidence.get("adjudication")
+        if isinstance(calibration_evidence.get("adjudication"), dict)
+        else {}
+    )
+    calibration_commitment = (
+        calibration_adjudication.get("commitment")
+        if isinstance(calibration_adjudication.get("commitment"), dict)
+        else {}
+    )
+    calibration_planned_time = _timestamp(calibration_evidence.get("planned_at"))
+    calibration_completed_time = _timestamp(
+        calibration_commitment.get("completed_at")
+    )
     run_times = [_timestamp(context.get("started_at")) for context in contexts]
     review_statement = (
         review.get("statement")
@@ -3761,6 +3800,8 @@ def _audit_timeline(
             split_audit_time,
             split_freeze_time,
             first_submission_time,
+            calibration_planned_time,
+            calibration_completed_time,
         )
     ) and bool(run_times) and all(run_times) and bool(review_times) and all(review_times)
     ordered = False
@@ -3770,12 +3811,14 @@ def _audit_timeline(
             <= split_freeze_time <= first_submission_time
             <= min(run_times) <= max(run_times) <= min(review_times) <= max(review_times)
             <= release_time
+            and season_registered_at <= calibration_planned_time
+            <= calibration_completed_time <= first_submission_time
         )
     audit.check(
         "release.timeline",
         "governance",
         ordered,
-        "power registration, split audit/freeze, first submission, runs, external review, and release must occur in that order",
+        "power/season registration, split audit/freeze, first submission, runs, review, and release must be ordered; signed calibration must start after season registration and finish before first submission",
     )
 
 
@@ -4026,6 +4069,7 @@ def audit_leaderboard_release(path: str | Path) -> dict[str, Any]:
         preregistration is not None
         and split is not None
         and power is not None
+        and calibration is not None
         and review is not None
     ):
         _audit_timeline(
@@ -4034,6 +4078,7 @@ def audit_leaderboard_release(path: str | Path) -> dict[str, Any]:
             preregistration,
             split,
             power,
+            calibration,
             review,
             run_contexts,
         )

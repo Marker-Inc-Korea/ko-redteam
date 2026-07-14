@@ -23,6 +23,9 @@ Evidence-eligible tier는 이 프로토콜 안에서 통계적으로 분리된 �
 - 비공개 문항도 위협 공간 전체를 대표하지 못하며 새로운 공격·도메인 변화에 뒤처질 수 있다.
 - 자동 판정기는 사람 라벨 calibration을 통과하더라도 은어, 풍자, 장문 맥락과 새로운 한국어 표현을
   오판할 수 있다.
+- calibration의 서로 다른 Ed25519 키와 signed commitment는 key holder와 bytes를 결합하지만 서로 다른 실제
+  사람, 실명·소속 또는 expert 자격을 공개적으로 증명하지 않는다. authorized 외부 검토가 private 신원·자격
+  기록을 별도로 확인해야 한다.
 - API 모델은 제공자 측 변경을 완전히 관찰하기 어렵다. immutable revision을 증명할 수 없는 실행은 공식
   provenance gate를 통과할 수 없다.
 - 온도 0에서도 런타임과 분산 추론의 비결정성이 남을 수 있어 최소 3회 반복만으로 모든 변동을 설명하지

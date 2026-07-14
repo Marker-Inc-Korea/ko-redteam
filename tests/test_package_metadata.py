@@ -33,6 +33,8 @@ def test_console_script_targets_are_importable():
         "ko-redteam-rank-models",
         "ko-redteam-validate-leaderboard",
         "ko-redteam-build-calibration",
+        "ko-redteam-build-calibration-commitments",
+        "ko-redteam-verify-calibration-signatures",
         "ko-redteam-build-power-pilot",
         "ko-redteam-build-review-packets",
         "ko-redteam-build-review-commitment",
@@ -147,6 +149,7 @@ def test_package_data_paths_exist():
         ROOT / "governance" / "SUCCESSOR_PILOT_REGISTRATION_SPEC.json"
     ).exists()
     assert (ROOT / "governance" / "PRACTICE_REVIEW_WORKFLOW.md").exists()
+    assert (ROOT / "governance" / "CALIBRATION_REVIEW_WORKFLOW.md").exists()
     assert (ROOT / "gap_analysis" / "_vendor" / "mitigationbypass_substrings.txt").exists()
 
 
@@ -167,6 +170,7 @@ def test_analysis_package_imports_without_flat_pythonpath():
                 "from analysis.ko_model_ranking import analyze_ranking_manifest;"
                 "from analysis.ko_leaderboard import audit_leaderboard_release;"
                 "from analysis.ko_calibration import build_calibration_report;"
+                "from analysis.ko_calibration_evidence import validate_public_calibration_signatures;"
                 "from analysis.ko_split_evidence import build_split_audit;"
                 "from analysis.ko_power_evidence import build_power_report;"
                 "from analysis.ko_power_design import build_power_derived_split_design;"
@@ -185,6 +189,7 @@ def test_analysis_package_imports_without_flat_pythonpath():
                 "assert callable(analyze_ranking_manifest);"
                 "assert callable(audit_leaderboard_release);"
                 "assert callable(build_calibration_report);"
+                "assert callable(validate_public_calibration_signatures);"
                 "assert callable(build_split_audit);"
                 "assert callable(build_power_report);"
                 "assert callable(build_power_derived_split_design);"

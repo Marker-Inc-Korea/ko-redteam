@@ -16,7 +16,6 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "analysis"))
 
 import ko_leaderboard as L  # noqa: E402
-import ko_calibration as KC  # noqa: E402
 import ko_external_review as ER  # noqa: E402
 import ko_familywise_power as F  # noqa: E402
 import ko_model_ranking as R  # noqa: E402
@@ -31,6 +30,10 @@ from tests.review_signature_support import (  # noqa: E402
     attach_public_review_signatures,
     reviewer_key,
     sign_message,
+)
+from tests.calibration_signature_support import (  # noqa: E402
+    calibration_input as signed_calibration_input,
+    signed_calibration_report,
 )
 
 
@@ -602,66 +605,17 @@ def _valid_release(
         run_day_base=20,
         analyze=False,
     )
-    domains = {domain: 50 for domain in L.REQUIRED_DOMAINS}
-    domain_confusion = {"tp": 24, "fp": 1, "tn": 24, "fn": 1}
-    per_domain = {
-        domain: {"f1": 0.96, "confusion_matrix": domain_confusion}
-        for domain in L.REQUIRED_DOMAINS
-    }
     calibration_path = tmp_path / "calibration.json"
-    _write_json(calibration_path, {
-        "schema": L.CALIBRATION_SCHEMA,
-        "dataset": {
-            "split": "held_out",
-            "content_sha256": "b" * 64,
-            "sample_count": 300,
-            "domain_counts": domains,
-        },
-        "annotation": {
-            "rater_count": 3,
-            "expert_rater_count": 2,
-            "blinded_to_model_identity": True,
-            "adjudication": "Two experts adjudicate disagreements before the evaluator is frozen.",
-            "agreement": {"metric": "krippendorff_alpha", "value": 0.85},
-            "label_matrix_sha256": "e" * 64,
-            "adjudication_log_sha256": "f" * 64,
-        },
-        "evaluator": {
-            "evaluator_git_commit": "a" * 40,
-            "protocol_version": "1.0.0",
-            "macro_f1": 0.96,
-            "critical_recall": 0.96,
-            "benign_specificity": 0.96,
-            "confusion_matrix": {"tp": 144, "fp": 6, "tn": 144, "fn": 6},
-            "per_domain": per_domain,
-        },
-        "control_separation": {
-            "status": "pass",
-            "confidence": 99.0,
-            "p_value": 0.01,
-            "upper_model": "upper-model",
-            "lower_model": "lower-model",
-            "dataset_sha256": "3" * 64,
-            "input_sha256": "4" * 64,
-            "sample_count": 30,
-            "iterations": 10_000,
-            "method": L.CONTROL_SEPARATION_METHOD,
-            "null_hypothesis": (
-                "upper and lower model labels are exchangeable within each paired control"
-            ),
-            "alternative": "upper_model score is greater than lower_model score",
-            "randomization_unit": "paired control id",
-            "randomization_mode": "monte_carlo",
-            "randomization_draws": 10_000,
-        },
-        "limitations": ["Synthetic integration fixture; not empirical evidence."],
-        "generation": {
-            "input_schema": L.CALIBRATION_INPUT_SCHEMA,
-            "input_sha256": "0" * 64,
-            "code_sha256": _sha_file(Path(KC.__file__)),
-            "raw_prompt_or_response_used": False,
-        },
-    })
+    calibration_report, _, _, _ = signed_calibration_report(
+        tmp_path.parent / f"{tmp_path.name}-private-calibration",
+        signed_calibration_input(
+            samples_per_domain=50,
+            evaluator_git_commit="a" * 40,
+            protocol_version="1.0.0",
+        ),
+        calibration_id=f"{tmp_path.name}-signed-calibration",
+    )
+    _write_json(calibration_path, calibration_report)
 
     suite_fingerprints = {
         suite: ranking["method"]["benchmarks"][suite]["content_sha256"]
@@ -2134,6 +2088,35 @@ def test_release_rejects_season_registration_before_power_analysis(tmp_path):
 
     assert result["status"] == "not_publishable"
     assert "preregistration.timeline" in failed_ids
+    assert "release.timeline" in failed_ids
+
+
+def test_release_rejects_signed_calibration_after_first_submission(tmp_path):
+    release_path = _valid_release(tmp_path)
+    manifest = json.loads(release_path.read_text("utf-8"))
+    reference = manifest["artifacts"]["calibration_report"]
+    calibration_path = tmp_path / reference["path"]
+    late_report, _, _, _ = signed_calibration_report(
+        tmp_path.parent / f"{tmp_path.name}-late-private-calibration",
+        signed_calibration_input(
+            samples_per_domain=50,
+            evaluator_git_commit="a" * 40,
+            protocol_version="1.0.0",
+        ),
+        calibration_id=f"{tmp_path.name}-late-signed-calibration",
+        calibration_date="2026-06-07",
+    )
+    _write_json(calibration_path, late_report)
+    reference["sha256"] = _sha_file(calibration_path)
+    _write_json(release_path, manifest)
+    _refresh_external_review(release_path)
+
+    result = L.audit_leaderboard_release(release_path)
+    failed_ids = {
+        check["id"] for check in result["checks"] if check["status"] == "fail"
+    }
+
+    assert result["status"] == "not_publishable"
     assert "release.timeline" in failed_ids
 
 

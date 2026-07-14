@@ -147,7 +147,7 @@ def test_calibration_requires_adjudication_record_for_every_disagreement():
         C.build_calibration_report(data)
 
 
-def test_calibration_cli_writes_metadata_only_outputs(tmp_path):
+def test_calibration_cli_requires_signed_human_evidence(tmp_path):
     source = tmp_path / "private_labels.json"
     output = tmp_path / "calibration.json"
     markdown = tmp_path / "calibration.md"
@@ -165,9 +165,11 @@ def test_calibration_cli_writes_metadata_only_outputs(tmp_path):
         ],
         text=True,
         capture_output=True,
-        check=True,
+        check=False,
     )
 
-    assert "calibration samples=24" in cp.stdout
-    assert json.loads(output.read_text("utf-8"))["schema"] == C.OUTPUT_SCHEMA
-    assert "Individual labels" in markdown.read_text("utf-8")
+    assert cp.returncode == 2
+    assert "--signature-config" in cp.stderr
+    assert "--evidence-root" in cp.stderr
+    assert not output.exists()
+    assert not markdown.exists()

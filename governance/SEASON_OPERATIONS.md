@@ -13,7 +13,7 @@
 | Season owner | 일정, 제출 한도, release manifest | 모델별 appeal 최종 단독 결정 금지 |
 | Benchmark custodian | 비공개 split, 접근 로그, freeze | 모델 튜닝·제출 실행 금지 |
 | Evaluation operator | 동결 환경에서 실행, run context 기록 | scoring·threshold 임의 변경 금지 |
-| Calibration lead | 라벨링, adjudication, 판정기 검증 | 모델 이름을 라벨러에게 공개하지 않음 |
+| Calibration lead | 라벨링, adjudication, 판정기 검증 | 모델 이름을 공개하거나 모든 rater 개인키를 대신 보관·사용하지 않음 |
 | Statistics reviewer | power, bootstrap, tier 재계산 | 모델 제공자 이해관계 공개 |
 | External reviewers | 구성·통계·개인정보·재현성 검토 | 최소 2명, 독립 기관 최소 1곳 |
 
@@ -33,7 +33,9 @@
    `ko-redteam-build-season-preregistration`으로만 `season-preregistration.v3`를 만들고 별도 commit/push한 뒤
    official prompt를 작성한다. evidence commit이 pilot evaluator commit보다 뒤인 것은 정상이나, 그 사이 protocol
    구현 파일 변경은 허용하지 않는다.
-6. 모델명에 blinded된 held-out 사람 라벨로 evaluator를 calibration하고 기준 미달 시 중단한다.
+6. 모델명에 blinded된 held-out 사람 라벨로 evaluator를 calibration한다. 각 rater와 두 expert 이상의 서명,
+   private 신원·자격 evidence binding을 검증하고 기준 미달 시 중단한다. calibration은 season 등록 뒤 시작해 첫
+   제출 전에 expert adjudication까지 끝낸다.
 7. practice와 official split의 exact·semantic overlap을 감사한다.
 8. official split과 모든 scoring/evaluator 설정을 첫 제출 전에 동결한다.
 9. 모델별 최대 2회 제출을 접수하고 immutable model/runtime/prompting/evaluator provenance를 기록한다.
@@ -41,11 +43,13 @@
    endpoint smoke, 필수 단계 완료, report doctor와 네 report digest를 결합했는지 확인한다.
 11. 실행·provenance evidence gate를 적용하고 eligible 모델 전체를 primary bootstrap·Holm 보정 tier에
    포함한다. critical·privacy·불안정성의 엄격 배포 screen은 별도로 공개하며 tier 포함 여부를 바꾸지 않는다.
-12. 외부 검토자가 private evidence와 공개 artifact를 대조하고 blocking finding을 해소한다.
+12. 외부 검토자가 calibration rater의 private 신원·자격·attestation 원본과 commitment, 기타 private evidence와
+   공개 artifact를 대조하고 blocking finding을 해소한다.
 13. release bundle을 동결하고 verifier를 새 환경에서 재실행한 뒤 게시한다.
 
 프로토콜 검증기는 `pilot 등록·review -> anchor 실행·evidence 완료 -> power 분석 -> derived split 설계 -> season 사전등록 ->
-split 감사 -> split 동결 -> 첫 제출 -> 공식 실행 -> 외부 검토 -> release 동결` 시각 순서를 확인한다.
+calibration 시작·expert adjudication -> 첫 제출 -> 공식 실행 -> 외부 검토 -> release 동결`의 필수 경계와
+`split 감사 -> split 동결 -> 첫 제출` 시각 순서를 확인한다.
 현재 활성 후보는 없다.
 S4는 [`SEASON_2026Q3_S4_STOP.json`](./SEASON_2026Q3_S4_STOP.json)에 기록된 다중비교 검정력 범위 불일치로
 official split 작성 전에 중단됐다.
@@ -68,6 +72,9 @@ season을 사전등록하지 않는다. S3는
 ko-redteam-check-public-hygiene --root release_bundle
 ko-redteam-verify-review-signatures \
   release_bundle/SUCCESSOR_PILOT_PRACTICE_REVIEW.json
+ko-redteam-verify-calibration-signatures \
+  release_bundle/calibration_report.json \
+  --output release_bundle/calibration_signature_audit.json
 ko-redteam-verify-external-review \
   release_bundle/release_manifest.json \
   release_bundle/external_review.json
@@ -80,7 +87,7 @@ ko-redteam-validate-leaderboard release_bundle/release_manifest.json \
 
 다음 중 하나라도 발생하면 신규 제출과 게시를 중단한다.
 
-- calibration 최저 기준 또는 reference control 분리 실패
+- calibration 최저 기준, rater·expert 서명, private evidence binding, 사전등록 뒤 시작·첫 제출 전 완료 또는 reference control 분리 실패
 - practice/official exact·semantic overlap 또는 official cross-group semantic overlap 1건 이상
 - target stratum별 pilot 20개 미달, pilot 분산 95% 상한 검증 실패, derived split의 최대 cohort 다중비교 power 미달 또는 실제 split 불일치
 - endpoint 오류, 모델 revision 불명확, suite 간 run context 불일치, execution evidence/report digest 불일치
