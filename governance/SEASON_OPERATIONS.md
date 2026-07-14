@@ -28,8 +28,11 @@
    gate가 미달하면 official season과 split을 만들기 전에 중단한다.
 4. 고정 MDE·alpha·target power와 최대 7모델의 최소 Holm 임계값으로 `power-derived-split-design.v1`을 만들고,
    계획 표본 수에서 tier power를 재생한다. 관측 평균 차이로 표본 수를 줄이거나 threshold를 완화하지 않는다.
-5. 통과한 표본 수, 정확한 immutable model cohort, suite×domain 배분, 실행 설정과 제출 한도를
-   `season-preregistration.v3`로 공개 동결한다.
+5. 통과한 다섯 선행 증거와 사람이 결정한 immutable model cohort, 실행·semantic·calibration 정책을
+   `season-preregistration-spec.v1`에 결합해 commit/push한다. clean HEAD의
+   `ko-redteam-build-season-preregistration`으로만 `season-preregistration.v3`를 만들고 별도 commit/push한 뒤
+   official prompt를 작성한다. evidence commit이 pilot evaluator commit보다 뒤인 것은 정상이나, 그 사이 protocol
+   구현 파일 변경은 허용하지 않는다.
 6. 모델명에 blinded된 held-out 사람 라벨로 evaluator를 calibration하고 기준 미달 시 중단한다.
 7. practice와 official split의 exact·semantic overlap을 감사한다.
 8. official split과 모든 scoring/evaluator 설정을 첫 제출 전에 동결한다.

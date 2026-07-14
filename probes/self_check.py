@@ -41,6 +41,7 @@ REQUIRED_MODULES = [
     "build_pilot_registration",
     "build_power_design",
     "build_review_packets",
+    "build_season_preregistration",
     "check_endpoint",
     "check_regression",
     "compare_reports",
@@ -62,6 +63,7 @@ REQUIRED_MODULES = [
     "ko_power_evidence",
     "ko_power_design",
     "ko_run_context",
+    "ko_season_preregistration",
     "ko_response_contract",
     "ko_scorecard",
     "ko_split_evidence",
@@ -71,6 +73,7 @@ REQUIRED_MODULES = [
     "multiturn_benchmark",
     "run_suite",
     "validate_pilot_registration",
+    "validate_season_preregistration",
     "validate_leaderboard",
 ]
 

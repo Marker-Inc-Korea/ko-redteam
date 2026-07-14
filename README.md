@@ -226,8 +226,28 @@ ko-redteam-build-power-design release/multiplicity_power_audit.json \
   --output release/power_derived_split_design.json \
   --markdown-output release/power_derived_split_design.md
 
-# 6. Freeze season-preregistration.v3 after the derived design passes.
+# 6. Commit the five frozen evidence artifacts and human-authored season spec.
+SEASON_SPEC=governance/SEASON_ID_PREREGISTRATION_SPEC.json
 PREREGISTRATION=governance/SEASON_ID_PREREGISTRATION.json
+git add "$PILOT_REGISTRATION" "$PRACTICE_REVIEW" \
+  release/power_analysis.json release/multiplicity_power_audit.json \
+  release/power_derived_split_design.json "$SEASON_SPEC"
+git commit -m "Freeze official season inputs"
+git push
+
+# Build only from that clean tracked HEAD, before official prompt construction.
+SEASON_REGISTERED_AT=2026-07-17T09:00:00+09:00
+ko-redteam-build-season-preregistration "$SEASON_SPEC" \
+  --root . --registered-at "$SEASON_REGISTERED_AT" \
+  --output "$PREREGISTRATION" \
+  --audit-output governance/SEASON_ID_PREREGISTRATION_AUDIT.json
+ko-redteam-validate-season-preregistration "$PREREGISTRATION" \
+  --spec "$SEASON_SPEC" --root .
+
+# Commit and publish the generated freeze before creating any official prompt.
+git add "$PREREGISTRATION" governance/SEASON_ID_PREREGISTRATION_AUDIT.json
+git commit -m "Publish official season preregistration"
+git push
 
 # 7. Calibrate the evaluator with blinded human labels.
 ko-redteam-build-calibration private/calibration_labels.json \
@@ -568,7 +588,7 @@ Agent report의 `expected=no_tool`은 schema 하위 호환을 위한 식별자�
 | 점수화 | `analysis/ko_scorecard.py` |
 | 모델 tier·배포 screen | `analysis/ko_model_ranking.py`, `probes/rank_models.py` |
 | 공식 리더보드 gate | `analysis/ko_leaderboard.py`, `probes/validate_leaderboard.py` |
-| 공식 증거 생성 | `analysis/ko_calibration.py`, `analysis/ko_split_evidence.py`, `analysis/ko_power_evidence.py`, `analysis/ko_familywise_power.py`, `analysis/ko_power_design.py` |
+| 공식 증거 생성 | `analysis/ko_calibration.py`, `analysis/ko_split_evidence.py`, `analysis/ko_power_evidence.py`, `analysis/ko_familywise_power.py`, `analysis/ko_power_design.py`, `analysis/ko_season_preregistration.py` |
 | 시즌 거버넌스 | `governance/README.md`, `governance/SEASON_OPERATIONS.md` |
 | 실행 provenance | `analysis/ko_run_context.py` |
 | 평가셋 식별 | `analysis/ko_benchmark_identity.py` |

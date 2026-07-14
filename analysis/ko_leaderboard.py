@@ -3383,11 +3383,17 @@ def _audit_preregistration(
         and semantic_model_id == split_audit.get("semantic_model")
         and semantic_revision_commitment
         == split_audit.get("semantic_model_revision")
+        and semantic.get("model_configuration_sha256")
+        == split_audit.get("semantic_configuration_sha256")
+        and semantic.get("embedding_dimension")
+        == split_audit.get("semantic_dimension")
         and semantic_threshold is not None
         and 0.0 < semantic_threshold < 1.0
         and semantic_threshold == _number(split_audit.get("near_duplicate_threshold"))
         and semantic.get("normalization_version")
         == "ko-redteam.prompt-normalization.v1"
+        and semantic.get("normalization_sha256")
+        == split_audit.get("normalization_sha256")
         and semantic.get("normalized_embeddings") is True
         and isinstance(semantic.get("pooling"), str)
         and bool(semantic.get("pooling", "").strip()),
@@ -3532,9 +3538,13 @@ def _audit_preregistration(
         == CONTROL_SEPARATION_METHOD
         and calibration_design.get("control_randomization_iterations")
         == calibration_control.get("iterations")
-        and calibration_design.get("minimum_control_pairs")
-        == MIN_CONTROL_PAIRS
-        and calibration_control.get("sample_count") >= MIN_CONTROL_PAIRS
+        and isinstance(calibration_design.get("minimum_control_pairs"), int)
+        and not isinstance(calibration_design.get("minimum_control_pairs"), bool)
+        and calibration_design.get("minimum_control_pairs") >= MIN_CONTROL_PAIRS
+        and isinstance(calibration_control.get("sample_count"), int)
+        and not isinstance(calibration_control.get("sample_count"), bool)
+        and calibration_control.get("sample_count")
+        >= calibration_design.get("minimum_control_pairs")
     )
     audit.check(
         "preregistration.calibration",
@@ -3558,6 +3568,29 @@ def _audit_preregistration(
         if isinstance(publication_gate.get("deployment_screen"), dict)
         else {}
     )
+    external_review = (
+        (audit.artifacts.get("external_review") or {}).get("data") or {}
+    )
+    external_reviewers = (
+        external_review.get("reviewers")
+        if isinstance(external_review.get("reviewers"), list)
+        else []
+    )
+    independent_organizations = (
+        [
+            row
+            for row in external_review.get("organizations", [])
+            if isinstance(row, dict) and row.get("independent") is True
+        ]
+        if isinstance(external_review.get("organizations"), list)
+        else []
+    )
+    required_external_reviewers = publication_gate.get(
+        "independent_external_reviewers"
+    )
+    required_external_organizations = publication_gate.get(
+        "independent_review_organizations"
+    )
     audit.check(
         "preregistration.publication_gate",
         "governance",
@@ -3576,10 +3609,16 @@ def _audit_preregistration(
         and deployment_screen.get("affects_ranking") is False
         and publication_gate.get("minimum_ranking_eligible_models")
         == PUBLIC_REQUIREMENTS["minimum_ranking_eligible_models"]
-        and publication_gate.get("independent_external_reviewers")
-        == PUBLIC_REQUIREMENTS["minimum_external_reviewers"]
-        and publication_gate.get("independent_review_organizations")
-        == PUBLIC_REQUIREMENTS["minimum_independent_review_organizations"]
+        and isinstance(required_external_reviewers, int)
+        and not isinstance(required_external_reviewers, bool)
+        and required_external_reviewers
+        >= PUBLIC_REQUIREMENTS["minimum_external_reviewers"]
+        and len(external_reviewers) >= required_external_reviewers
+        and isinstance(required_external_organizations, int)
+        and not isinstance(required_external_organizations, bool)
+        and required_external_organizations
+        >= PUBLIC_REQUIREMENTS["minimum_independent_review_organizations"]
+        and len(independent_organizations) >= required_external_organizations
         and publication_gate.get("publish_only_when_validator_status")
         == "publishable"
         and publication_gate.get("a_f_grade_in_official_release") is False
@@ -3596,6 +3635,75 @@ def _audit_preregistration(
         and power_time is not None
         and power_time <= registered_at,
         "official season design must be registered after the frozen pilot analysis and before official split construction",
+    )
+
+
+def _audit_preregistration_build(
+    audit: _Audit,
+    preregistration: dict[str, Any],
+    spec: dict[str, Any] | None,
+    pilot_registration_artifact: dict[str, Any] | None,
+    practice_review: dict[str, Any] | None,
+    power: dict[str, Any] | None,
+    multiplicity_power: dict[str, Any] | None,
+    derived_power_design: dict[str, Any] | None,
+) -> None:
+    result: dict[str, Any] | None = None
+    error: str | None = None
+    required_values = {
+        "pilot_registration": pilot_registration_artifact,
+        "practice_review": practice_review,
+        "power_analysis": power,
+        "multiplicity_power_audit": multiplicity_power,
+        "power_derived_split_design": derived_power_design,
+    }
+    spec_artifact = audit.artifacts.get("preregistration_spec") or {}
+    if isinstance(spec, dict) and all(
+        isinstance(value, dict) for value in required_values.values()
+    ):
+        try:
+            try:
+                from ko_season_preregistration import (
+                    audit_season_preregistration,
+                )
+            except ModuleNotFoundError:  # package import path
+                from .ko_season_preregistration import (
+                    audit_season_preregistration,
+                )
+            source_sha256 = {
+                name: (audit.artifacts.get(name) or {}).get("sha256")
+                for name in required_values
+            }
+            result = audit_season_preregistration(
+                preregistration,
+                spec,
+                required_values,
+                source_sha256,
+                spec_file_sha256=spec_artifact.get("sha256"),
+                replay_sources=False,
+            )
+        except (ArithmeticError, KeyError, TypeError, ValueError) as exc:
+            error = str(exc)
+    else:
+        error = "preregistration spec and all frozen source artifacts are required"
+    failed_ids = (
+        [
+            check.get("id")
+            for check in result.get("checks", [])
+            if check.get("status") == "fail"
+        ]
+        if isinstance(result, dict)
+        else []
+    )
+    audit.check(
+        "preregistration.build_evidence",
+        "artifact_integrity",
+        isinstance(result, dict)
+        and result.get("status") == "pass"
+        and result.get("preregistration_canonical_sha256")
+        == canonical_sha256(preregistration),
+        "season preregistration must exactly replay from its public spec, clean builder, and frozen source artifacts",
+        actual=error or failed_ids or None,
     )
 
 
@@ -3827,6 +3935,7 @@ def audit_leaderboard_release(path: str | Path) -> dict[str, Any]:
     pilot_registration_artifact = audit.artifact(manifest, "pilot_registration")
     practice_review = audit.artifact(manifest, "practice_review")
     review = audit.artifact(manifest, "external_review")
+    preregistration_spec = audit.artifact(manifest, "preregistration_spec")
     preregistration = audit.artifact(manifest, "preregistration")
 
     model_names: set[str] = set()
@@ -3867,6 +3976,16 @@ def audit_leaderboard_release(path: str | Path) -> dict[str, Any]:
     if review is not None:
         _audit_external_review(audit, review)
     if preregistration is not None:
+        _audit_preregistration_build(
+            audit,
+            preregistration,
+            preregistration_spec,
+            pilot_registration_artifact,
+            practice_review,
+            power,
+            multiplicity_power,
+            derived_power_design,
+        )
         _audit_preregistration(
             audit,
             preregistration,

@@ -53,6 +53,8 @@ KNOWN_SCHEMAS = PRIMARY_REPORT_SCHEMAS | {
     "ko-redteam.season-preregistration.v3",
     "ko-redteam.season-preregistration.v2",
     "ko-redteam.season-preregistration.v1",
+    "ko-redteam.season-preregistration-spec.v1",
+    "ko-redteam.season-preregistration-audit.v1",
     "ko-redteam.evaluator-calibration.v2",
     "ko-redteam.evaluator-calibration.v1",
     "ko-redteam.benchmark-split-audit.v1",

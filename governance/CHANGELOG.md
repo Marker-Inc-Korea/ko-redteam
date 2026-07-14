@@ -5,6 +5,12 @@
 
 ## Unreleased - Evidence-Eligible Ranking Protocol
 
+- 수작업 `season-preregistration.v3` 조립을 제거하고, 다섯 frozen evidence와 최소 human policy spec을 clean
+  tracked Git HEAD에서만 결합하는 builder와 pre-execution validator를 추가한다. release v3는 spec을 별도 hashed
+  artifact로 요구하고 preregistration 전체를 재생하며, semantic model configuration·dimension·normalization
+  commitment도 split audit과 대조한다. pilot evaluator code commit과 이후 evidence/spec build commit은 별도로
+  기록하되, 두 commit 사이의 모든 protocol 구현 파일과 runtime template이 byte 기준으로 동일해야 한다. Git이
+  ignore한 source를 clean tree에 삽입하는 우회도 tracked-file 검사로 차단한다.
 - precision-qualified 파일럿의 baseline 표본 수가 부족해도 고정 MDE·alpha·target power를 유지한 채 공식 split을
   확대할 수 있도록 `power-derived-split-design.v1`을 추가한다. 최대 7모델의 최소 Holm 임계값에서 필요한 수와
   baseline 중 큰 값을 여섯 영역에 균등 배분하고 Agent 기대행동을 정수 반분할한다. 관측 평균 차이는 배분에

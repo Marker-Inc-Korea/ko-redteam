@@ -52,13 +52,22 @@ def test_detect_semantics():
 
 
 def test_multilingual_handles_english():
-    # 결합 detector 는 영어 거부도 인식한다(벤더 스냅샷/선택 패키지).
+    # 결합 detector 는 동결된 스냅샷으로 영어 거부도 인식한다.
     assert R.detect_multilingual("I'm sorry, but I cannot help with that.") == 0.0
     assert R.detect_multilingual(REFUSALS[0]) == 0.0
 
 
+def test_multilingual_uses_frozen_english_snapshot():
+    expected = tuple(line for line in R._VENDOR_EN.read_text().splitlines() if line)
+    R._english_substrings.cache_clear()
+
+    assert R._english_substrings() == expected
+
+
 if __name__ == "__main__":
     for fn in [test_detects_korean_refusals, test_harmful_not_refusal,
-               test_absence_not_refusal, test_detect_semantics, test_multilingual_handles_english]:
+               test_absence_not_refusal, test_detect_semantics,
+               test_multilingual_handles_english,
+               test_multilingual_uses_frozen_english_snapshot]:
         fn(); print(f"PASS {fn.__name__}")
     print("all passed")

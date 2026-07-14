@@ -213,6 +213,7 @@ appeal 기록과 외부 attestation은 공통 정책 문서만으로 대체할 �
 
 - `pilot_registration`: reference 실행 전에 동결한 practice, anchor, 실행 설정과 power 분석 계약
 - `practice_review`: reference 출력에 blind한 2인 이상 사례별 `practice-review.v2` 승인과 packet·response·attestation commitment
+- `preregistration_spec`: 사람이 결정한 cohort, 실행, semantic audit, calibration 및 외부 검토 정책과 다섯 선행 증거의 경로·SHA-256
 - `preregistration`: power 통과 뒤 official prompt 작성 전에 동결한 model cohort, split 배분과 통계 기준
 - `ranking_manifest`: 각 run의 네 suite report와 `core`·`mini_single` execution evidence path 및 SHA-256
 - `ranking_report`: 10,000회 이상 bootstrap·null randomization 및 Holm 보정 결과
@@ -265,8 +266,16 @@ ko-redteam-analyze-familywise-power release/power_analysis.json \
 ko-redteam-build-power-design release/multiplicity_power_audit.json \
   --output release/power_derived_split_design.json \
   --markdown-output release/power_derived_split_design.md
-# 분산 정밀도와 derived tier-power gate 통과 후 official prompt 작성 전에
-# season-preregistration.v3를 동결합니다.
+# 분산 정밀도와 derived tier-power gate 통과 후 선행 artifact와 spec을
+# commit/push하고, clean HEAD에서 official prompt 작성 전에 동결합니다.
+SEASON_SPEC=governance/SEASON_ID_PREREGISTRATION_SPEC.json
+SEASON_REGISTERED_AT=2026-07-17T09:00:00+09:00
+ko-redteam-build-season-preregistration "$SEASON_SPEC" --root . \
+  --registered-at "$SEASON_REGISTERED_AT" \
+  --output "$PREREGISTRATION" \
+  --audit-output governance/SEASON_ID_PREREGISTRATION_AUDIT.json
+ko-redteam-validate-season-preregistration "$PREREGISTRATION" \
+  --spec "$SEASON_SPEC" --root .
 ko-redteam-build-calibration private/calibration_labels.json \
   --output release/calibration_report.json
 ko-redteam-audit-splits --help
@@ -274,7 +283,7 @@ ko-redteam-audit-splits --help
 
 비공개 입력 구조는 [`governance/EVIDENCE_INPUTS.md`](./governance/EVIDENCE_INPUTS.md)에 정의한다. 생성된
 JSON이 존재하는 것만으로 충분하지 않으며, release manifest가 각 상대경로와 SHA-256을 결합해야 한다.
-사전등록 artifact의 season, protocol commit, suite×domain×expected 그룹 행렬, generation settings, execution
+사전등록 spec과 생성 artifact의 season, protocol commit, suite×domain×expected 그룹 행렬, generation settings, execution
 evidence 계약, MDE, weight, reference model revision, semantic 감사 설정과 calibration 기준은 실제 artifact 및
 run provenance와 정확히 일치해야 한다. 사후 수정은 기존 season을 무효화하고 새 season ID로 다시 등록한다.
 
@@ -282,7 +291,8 @@ run provenance와 정확히 일치해야 한다. 사후 수정은 기존 season�
 SHA-256을 기록한다. 파일이 존재한다는 사실, self-report된 점수,
 부분 checksum만으로는 통과하지 않는다.
 
-split audit은 중복 검사 코드·정규화 규칙·semantic model revision·threshold를 digest로 고정한다. power
+split audit은 중복 검사 코드·정규화 규칙·semantic model revision·embedding configuration·dimension·threshold를
+digest로 고정한다. power
 analysis는 코드와 입력 commitment, 파일럿 등록·검토 digest, 최초·최종 anchor 실행 시각, 최종 execution
 evidence 완료 시각, 분석 동결 시각과 최소 10,000회 simulation을 기록한다. 검증기는 power가
 선언한 파일럿 baseline과 power-derived 계획 표본 수, official split의 영역·suite별 독립 원형 합계 및 ranking report의 실제 case/group 수를

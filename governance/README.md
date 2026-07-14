@@ -36,3 +36,7 @@
 현재 저장소의 공개 seed 및 비교 결과는 연구용 진단 자료다. 비공개 official split, 사람 라벨 기반
 calibration, 검정력, 불변 실행 provenance와 독립 외부 검토가 모두 함께 충족되지 않은 결과에는 공식 순위
 표현을 사용하지 않는다.
+
+신규 시즌은 `EVIDENCE_INPUTS.md`의 `season-preregistration-spec.v1`을 먼저 commit/push한 뒤 clean HEAD에서
+`ko-redteam-build-season-preregistration`과 `ko-redteam-validate-season-preregistration`을 순서대로 실행한다.
+현재 successor는 사람 검토 전이므로 실제 season spec이나 v3 preregistration을 생성하지 않는다.

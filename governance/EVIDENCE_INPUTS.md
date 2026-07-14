@@ -42,6 +42,25 @@ ranking, calibration 및 run context를 대조한다. 변경이 필요하면 기
 등록한다.
 S1-S4의 `v1` 등록은 불변 이력이며 신규 v5 ranking 또는 공식 release 계약으로 재사용하지 않는다.
 
+`ko-redteam.season-preregistration-spec.v1`은 사람이 결정해야 하는 season metadata, 정확한 model cohort,
+temperature 0 실행 설정, upper/lower anchor, semantic embedding의 immutable revision·configuration digest·dimension,
+calibration 최저 기준과 외부 검토 수만 기록한다. pilot registration, practice review, marginal power,
+familywise power와 derived split은 상대경로·file SHA-256·schema로 결합한다. spec과 다섯 source가 clean tracked
+build HEAD에 없거나, reference pilot의 `protocol_git_commit` 이후 builder·분석·validator 구현 파일이 하나라도
+바뀌었으면 생성기는 실패한다. 출력의 `build_evidence`는 spec/source의 file·canonical SHA-256, 구현 경로·SHA-256,
+pilot evaluator의 `protocol_git_commit`, evidence를 포함한 `build_git_commit`, 전체 배포 Python source와 runtime
+template tree commitment 및 생성 시각을 보존한다. tree 안의 모든 파일은 일반 Git tracked file이어야 한다.
+standalone validator와 최종 release validator가 이 출력을 결정적으로 다시 생성해 canonical-equivalent JSON인지
+확인한다.
+
+spec의 최상위 필드는 `schema`, `status`, `season`, `source_artifacts`, `official_model_cohort`, `execution`,
+`reference_models`, `semantic_overlap`, `calibration`, `external_review`, `official_output_observed`로 제한한다.
+`source_artifacts`에는 다음 다섯 이름을 정확히 한 번씩 기록하고 각 행에 `path`, `sha256`, `schema`, `usage`를
+둔다: `pilot_registration`, `practice_review`, `power_analysis`, `multiplicity_power_audit`,
+`power_derived_split_design`. cohort와 두 anchor의 이름·model ID·revision은 일치해야 하며 revision은 40~64자
+소문자 hex digest여야 한다. `official_output_observed=false`, `temperature=0`, decision flip 허용치 0이 아니면
+생성하지 않는다.
+
 ## Official Execution Evidence
 
 성공한 `ko-redteam-suite` 실행은 `ko-redteam.suite-execution-evidence.v1`을 함께 만든다. 이 파일은 endpoint나

@@ -145,14 +145,10 @@ _VENDOR_EN = Path(__file__).resolve().parent.parent / "gap_analysis" / "_vendor"
 
 @functools.lru_cache(maxsize=1)
 def _english_substrings() -> tuple[str, ...]:
-    """영어 거부 문자열: 선택 패키지 설치 시 실제 리스트, 아니면 벤더 스냅샷."""
-    try:
-        from garak.detectors.mitigation import MitigationBypass
-        return tuple(MitigationBypass().substrings)
-    except Exception:
-        if _VENDOR_EN.exists():
-            return tuple(s for s in _VENDOR_EN.read_text().splitlines() if s)
-        return ()
+    """동결된 영어 거부 문자열로 선택 패키지에 따른 판정 변화를 막는다."""
+    if _VENDOR_EN.exists():
+        return tuple(s for s in _VENDOR_EN.read_text().splitlines() if s)
+    return ()
 
 
 def _english_refused(text: str) -> bool:
