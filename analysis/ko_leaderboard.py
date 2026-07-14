@@ -17,6 +17,7 @@ try:
         MIN_CONTROL_PAIRS,
         OUTPUT_SCHEMA as CALIBRATION_SCHEMA,
     )
+    import ko_external_review as external_review
     import ko_familywise_power as familywise_power
     import ko_pilot_registration as pilot_registration
     import ko_power_design as power_design
@@ -52,6 +53,7 @@ except ModuleNotFoundError:  # package import path
         MIN_CONTROL_PAIRS,
         OUTPUT_SCHEMA as CALIBRATION_SCHEMA,
     )
+    from . import ko_external_review as external_review
     from . import ko_familywise_power as familywise_power
     from . import ko_pilot_registration as pilot_registration
     from . import ko_power_design as power_design
@@ -88,7 +90,7 @@ CALIBRATION_INPUT_SCHEMA = "ko-redteam.calibration-input.v1"
 SPLIT_AUDIT_SCHEMA = "ko-redteam.benchmark-split-audit.v1"
 POWER_SCHEMA = "ko-redteam.power-analysis.v1"
 MULTIPLICITY_POWER_SCHEMA = FAMILYWISE_POWER_SCHEMA
-EXTERNAL_REVIEW_SCHEMA = "ko-redteam.external-review.v1"
+EXTERNAL_REVIEW_SCHEMA = external_review.EXTERNAL_REVIEW_SCHEMA
 PREREGISTRATION_SCHEMA = "ko-redteam.season-preregistration.v3"
 LEGACY_POWER_PILOT_SOURCE_SCHEMA = "ko-redteam.power-pilot-source.v1"
 POWER_PILOT_SOURCE_SCHEMA = "ko-redteam.power-pilot-source.v2"
@@ -3571,18 +3573,23 @@ def _audit_preregistration(
     external_review = (
         (audit.artifacts.get("external_review") or {}).get("data") or {}
     )
+    external_statement = (
+        external_review.get("statement")
+        if isinstance(external_review.get("statement"), dict)
+        else {}
+    )
     external_reviewers = (
-        external_review.get("reviewers")
-        if isinstance(external_review.get("reviewers"), list)
+        external_statement.get("reviewers")
+        if isinstance(external_statement.get("reviewers"), list)
         else []
     )
     independent_organizations = (
         [
             row
-            for row in external_review.get("organizations", [])
+            for row in external_statement.get("organizations", [])
             if isinstance(row, dict) and row.get("independent") is True
         ]
-        if isinstance(external_review.get("organizations"), list)
+        if isinstance(external_statement.get("organizations"), list)
         else []
     )
     required_external_reviewers = publication_gate.get(
@@ -3730,7 +3737,16 @@ def _audit_timeline(
     split_freeze_time = _timestamp(official.get("frozen_at"))
     first_submission_time = _timestamp(official.get("first_submission_at"))
     run_times = [_timestamp(context.get("started_at")) for context in contexts]
-    reviewer_records = review.get("reviewers") if isinstance(review.get("reviewers"), list) else []
+    review_statement = (
+        review.get("statement")
+        if isinstance(review.get("statement"), dict)
+        else {}
+    )
+    reviewer_records = (
+        review_statement.get("reviewers")
+        if isinstance(review_statement.get("reviewers"), list)
+        else []
+    )
     review_times = [
         _timestamp(item.get("reviewed_at"))
         for item in reviewer_records
@@ -3764,84 +3780,67 @@ def _audit_timeline(
 
 
 def _audit_external_review(audit: _Audit, review: dict[str, Any]) -> None:
-    audit.check("review.schema", "governance", review.get("schema") == EXTERNAL_REVIEW_SCHEMA, f"external review schema must be {EXTERNAL_REVIEW_SCHEMA}")
-    audit.check("review.status", "governance", review.get("status") == "complete", "independent external review must be complete", actual=review.get("status"))
-    reviewer_count = review.get("reviewer_count")
-    reviewers = review.get("reviewers") if isinstance(review.get("reviewers"), list) else []
-    reviewer_names = [item.get("name") for item in reviewers if isinstance(item, dict)]
-    reviewer_attestations = [
-        item.get("attestation_sha256") for item in reviewers if isinstance(item, dict)
-    ]
-    reviewer_details_valid = bool(reviewers) and all(
-        isinstance(item, dict)
-        and isinstance(item.get("name"), str)
-        and bool(item["name"].strip())
-        and isinstance(item.get("affiliation"), str)
-        and bool(item["affiliation"].strip())
-        and item.get("independent") is True
-        and isinstance(item.get("conflict_statement"), str)
-        and bool(item["conflict_statement"].strip())
-        and _iso_with_timezone(item.get("reviewed_at"))
-        and bool(SHA256_RE.fullmatch(str(item.get("attestation_sha256") or "")))
-        for item in reviewers
-    )
+    schema_valid = review.get("schema") == EXTERNAL_REVIEW_SCHEMA
     audit.check(
-        "review.reviewer_identity",
+        "review.schema",
         "governance",
-        reviewer_details_valid
-        and len(set(reviewer_names)) == len(reviewers)
-        and len(set(reviewer_attestations)) == len(reviewers),
-        "every external reviewer must have a unique public identity, independence statement, date, and attestation commitment",
+        schema_valid,
+        f"external review schema must be {EXTERNAL_REVIEW_SCHEMA}",
+        actual=review.get("schema"),
+    )
+    verification: dict[str, Any] | None = None
+    error: str | None = None
+    if schema_valid:
+        try:
+            verification = external_review.validate_external_review(
+                review,
+                audit.manifest_path,
+            )
+        except (OSError, ValueError) as exc:
+            error = str(exc)
+    audit.check(
+        "review.signed_evidence",
+        "governance",
+        verification is not None,
+        "external review must bind every reviewed release artifact, public attestation, organization report, and reviewer signature",
+        actual=error,
+    )
+    if verification is None:
+        return
+    statement = review["statement"]
+    audit.check(
+        "review.status",
+        "governance",
+        statement.get("status") == "complete",
+        "independent external review must be complete",
+        actual=statement.get("status"),
     )
     audit.check(
         "review.reviewers",
         "governance",
-        isinstance(reviewer_count, int)
-        and not isinstance(reviewer_count, bool)
-        and reviewer_count == len(reviewers)
-        and reviewer_count >= PUBLIC_REQUIREMENTS["minimum_external_reviewers"],
-        f"declared reviewer count must match at least {PUBLIC_REQUIREMENTS['minimum_external_reviewers']} reviewer records",
-        actual={"declared": reviewer_count, "records": len(reviewers)},
-    )
-    organization_count = review.get("independent_organization_count")
-    organizations = review.get("organizations") if isinstance(review.get("organizations"), list) else []
-    organization_names = [item.get("name") for item in organizations if isinstance(item, dict)]
-    independent_organizations = [
-        item for item in organizations
-        if isinstance(item, dict) and item.get("independent") is True
-    ]
-    organization_details_valid = bool(organizations) and all(
-        isinstance(item, dict)
-        and isinstance(item.get("name"), str)
-        and bool(item["name"].strip())
-        and item.get("independent") is True
-        and bool(SHA256_RE.fullmatch(str(item.get("review_report_sha256") or "")))
-        for item in organizations
-    )
-    audit.check(
-        "review.organization_identity",
-        "governance",
-        organization_details_valid and len(set(organization_names)) == len(organizations),
-        "every reviewing organization must be named, independent, and bind its review report by SHA-256",
+        verification["reviewer_count"]
+        >= PUBLIC_REQUIREMENTS["minimum_external_reviewers"],
+        f"at least {PUBLIC_REQUIREMENTS['minimum_external_reviewers']} external reviewers must sign the same statement",
+        actual=verification["reviewer_count"],
     )
     audit.check(
         "review.organizations",
         "governance",
-        isinstance(organization_count, int)
-        and not isinstance(organization_count, bool)
-        and organization_count == len(independent_organizations)
-        and organization_count >= PUBLIC_REQUIREMENTS["minimum_independent_review_organizations"],
-        "declared independent organization count must match at least one organization record",
-        actual={"declared": organization_count, "records": len(independent_organizations)},
+        verification["organization_count"]
+        >= PUBLIC_REQUIREMENTS["minimum_independent_review_organizations"],
+        "at least one independent organization report must be publicly bound",
+        actual=verification["organization_count"],
     )
-    audit.check("review.findings", "governance", review.get("findings_resolved") is True, "blocking external-review findings must be resolved")
-    limitations = review.get("limitations")
+    audit.check(
+        "review.findings",
+        "governance",
+        statement.get("findings_resolved") is True,
+        "blocking external-review findings must be resolved",
+    )
     audit.check(
         "review.limitations",
         "governance",
-        isinstance(limitations, list)
-        and bool(limitations)
-        and all(isinstance(item, str) and item.strip() for item in limitations),
+        bool(statement.get("limitations")),
         "external review must record non-empty limitation statements",
     )
 

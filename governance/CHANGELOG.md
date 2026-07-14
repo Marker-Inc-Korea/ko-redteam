@@ -5,6 +5,9 @@
 
 ## Unreleased - Evidence-Eligible Ranking Protocol
 
+- 외부 검토를 `external-review.v2`로 강화한다. release artifact·governance 문서와 manifest projection,
+  공개 reviewer attestation·기관 보고서를 하나의 statement에 묶고 서로 다른 두 reviewer의 Ed25519 SSHSIG를
+  제3자가 재검증할 수 있어야 한다.
 - 완료된 reviewer submission을 정규화한 `reviewer-commitment.v1`과 전용 Ed25519 OpenSSH SSHSIG를 요구한다.
   병합기와 pilot validator는 고정 namespace, 공개키 fingerprint, 서명 및 reviewer별 key uniqueness를 다시
   검증하며, 공개 review만으로 재검증하는 CLI를 제공한다. 전자서명은 키 소유·제출물 무결성 증거이며 실제

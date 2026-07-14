@@ -37,7 +37,9 @@ REQUIRED_MODULES = [
     "analyze_power",
     "audit_splits",
     "benchmark_scan",
+    "assemble_external_review",
     "build_calibration",
+    "build_external_review_statement",
     "build_pilot_registration",
     "build_power_design",
     "build_review_commitment",
@@ -52,6 +54,7 @@ REQUIRED_MODULES = [
     "ko_benchmark_coverage",
     "ko_benchmark_identity",
     "ko_calibration",
+    "ko_external_review",
     "ko_llm_forensics",
     "ko_leaderboard",
     "ko_public_hygiene",
@@ -76,6 +79,7 @@ REQUIRED_MODULES = [
     "validate_pilot_registration",
     "validate_season_preregistration",
     "validate_leaderboard",
+    "verify_external_review",
     "verify_review_signatures",
 ]
 

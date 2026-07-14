@@ -48,7 +48,12 @@ def reviewer_key(reviewer_id: str) -> tuple[Path, str, str]:
     return value
 
 
-def sign_message(reviewer_id: str, message: bytes) -> str:
+def sign_message(
+    reviewer_id: str,
+    message: bytes,
+    *,
+    namespace: str = R.SSHSIG_NAMESPACE,
+) -> str:
     key_path, _, _ = reviewer_key(reviewer_id)
     process = subprocess.run(
         [
@@ -58,7 +63,7 @@ def sign_message(reviewer_id: str, message: bytes) -> str:
             "-f",
             str(key_path),
             "-n",
-            R.SSHSIG_NAMESPACE,
+            namespace,
         ],
         input=message,
         capture_output=True,

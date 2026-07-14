@@ -65,7 +65,11 @@ KNOWN_SCHEMAS = PRIMARY_REPORT_SCHEMAS | {
     "ko-redteam.familywise-power-audit.v2",
     "ko-redteam.familywise-power-audit.v1",
     "ko-redteam.power-derived-split-design.v1",
+    "ko-redteam.external-review.v2",
     "ko-redteam.external-review.v1",
+    "ko-redteam.external-review-scope.v1",
+    "ko-redteam.external-review-statement.v1",
+    "ko-redteam.external-review-signature-audit.v1",
     "ko-redteam.run-context.v1",
 }
 

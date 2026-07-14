@@ -17,6 +17,7 @@ sys.path.insert(0, str(ROOT / "analysis"))
 
 import ko_leaderboard as L  # noqa: E402
 import ko_calibration as KC  # noqa: E402
+import ko_external_review as ER  # noqa: E402
 import ko_familywise_power as F  # noqa: E402
 import ko_model_ranking as R  # noqa: E402
 import ko_pilot_registration as PR  # noqa: E402
@@ -26,7 +27,11 @@ import ko_power_evidence as PE  # noqa: E402
 import ko_run_context as C  # noqa: E402
 import ko_season_preregistration as SR  # noqa: E402
 import ko_split_evidence as SP  # noqa: E402
-from tests.review_signature_support import attach_public_review_signatures  # noqa: E402
+from tests.review_signature_support import (  # noqa: E402
+    attach_public_review_signatures,
+    reviewer_key,
+    sign_message,
+)
 
 
 def _sha_file(path: Path) -> str:
@@ -526,6 +531,31 @@ def _ranking_bundle(
 
 def _artifact(path: Path, root: Path) -> dict:
     return {"path": str(path.relative_to(root)), "sha256": _sha_file(path)}
+
+
+def _refresh_external_review(release_path: Path) -> None:
+    root = release_path.parent
+    manifest = json.loads(release_path.read_text("utf-8"))
+    reference = manifest["artifacts"]["external_review"]
+    review_path = root / reference["path"]
+    previous = json.loads(review_path.read_text("utf-8"))["statement"]
+    declaration = {
+        key: previous[key] for key in ER.DECLARATION_FIELDS
+    }
+    statement = ER.make_external_review_statement(release_path, declaration)
+    message = ER.canonical_json_bytes(statement)
+    signatures = {
+        row["reviewer_id"]: sign_message(
+            row["reviewer_id"],
+            message,
+            namespace=ER.SSHSIG_NAMESPACE,
+        )
+        for row in statement["reviewers"]
+    }
+    review = ER.assemble_external_review(statement, signatures, release_path)
+    _write_json(review_path, review)
+    reference["sha256"] = _sha_file(review_path)
+    _write_json(release_path, manifest)
 
 
 def _valid_release(
@@ -1075,39 +1105,66 @@ def _valid_release(
     _write_json(power_design_path, derived_power_design)
 
     review_path = tmp_path / "external_review.json"
-    _write_json(review_path, {
-        "schema": L.EXTERNAL_REVIEW_SCHEMA,
+    external_evidence_dir = tmp_path / "external-review-evidence"
+    external_evidence_dir.mkdir()
+    organization_report_path = external_evidence_dir / "review-report.md"
+    organization_report_path.write_text(
+        "# Independent review report\n\nNo unresolved blocking findings.\n",
+        "utf-8",
+    )
+    external_reviewers = []
+    for reviewer_id, name, reviewed_at in (
+        (
+            "release-reviewer-b",
+            "Independent Reviewer Two",
+            "2026-07-21T10:00:00+09:00",
+        ),
+        (
+            "release-reviewer-a",
+            "Independent Reviewer One",
+            "2026-07-20T10:00:00+09:00",
+        ),
+    ):
+        attestation_path = external_evidence_dir / f"{reviewer_id}-attestation.md"
+        attestation_path.write_text(
+            f"# Reviewer attestation\n\n{name} reviewed the frozen scope.\n",
+            "utf-8",
+        )
+        _, public_key, fingerprint = reviewer_key(reviewer_id)
+        external_reviewers.append({
+            "reviewer_id": reviewer_id,
+            "name": name,
+            "affiliation": "Independent Evaluation Lab",
+            "organization_name": "Independent Evaluation Lab",
+            "independent": True,
+            "conflict_statement": "No conflict with evaluated model providers.",
+            "reviewed_at": reviewed_at,
+            "attestation_path": str(attestation_path.relative_to(tmp_path)),
+            "attestation_sha256": _sha_file(attestation_path),
+            "signing_public_key": public_key,
+            "signing_key_fingerprint": fingerprint,
+        })
+    external_review_declaration = {
         "status": "complete",
         "reviewer_count": 2,
         "independent_organization_count": 1,
-        "reviewers": [
-            {
-                "name": "Independent Reviewer One",
-                "affiliation": "Independent Evaluation Lab",
-                "independent": True,
-                "conflict_statement": "No conflict with evaluated model providers.",
-                "reviewed_at": "2026-07-20T10:00:00+09:00",
-                "attestation_sha256": "1" * 64,
-            },
-            {
-                "name": "Independent Reviewer Two",
-                "affiliation": "Independent Evaluation Lab",
-                "independent": True,
-                "conflict_statement": "No conflict with evaluated model providers.",
-                "reviewed_at": "2026-07-21T10:00:00+09:00",
-                "attestation_sha256": "2" * 64,
-            },
-        ],
+        "reviewers": external_reviewers,
         "organizations": [
             {
                 "name": "Independent Evaluation Lab",
                 "independent": True,
-                "review_report_sha256": "3" * 64,
+                "review_report_path": str(
+                    organization_report_path.relative_to(tmp_path)
+                ),
+                "review_report_sha256": _sha_file(organization_report_path),
             }
         ],
         "findings_resolved": True,
-        "limitations": ["Review covers protocol compliance, not deployment certification."],
-    })
+        "limitations": [
+            "Review covers protocol compliance, not deployment certification."
+        ],
+    }
+    _write_json(review_path, {})
 
     reference_models = [
         {
@@ -1245,7 +1302,7 @@ def _valid_release(
         document_references[key] = _artifact(document_path, tmp_path)
 
     release_path = tmp_path / "release.json"
-    _write_json(release_path, {
+    release_manifest = {
         "schema": L.RELEASE_SCHEMA,
         "release": {
             "id": "unit-season-1",
@@ -1288,7 +1345,32 @@ def _valid_release(
             ),
             "preregistration": _artifact(preregistration_path, tmp_path),
         },
-    })
+    }
+    _write_json(release_path, release_manifest)
+    external_review_statement = ER.make_external_review_statement(
+        release_path,
+        external_review_declaration,
+    )
+    external_review_message = ER.canonical_json_bytes(external_review_statement)
+    external_review_signatures = {
+        row["reviewer_id"]: sign_message(
+            row["reviewer_id"],
+            external_review_message,
+            namespace=ER.SSHSIG_NAMESPACE,
+        )
+        for row in external_review_statement["reviewers"]
+    }
+    signed_external_review = ER.assemble_external_review(
+        external_review_statement,
+        external_review_signatures,
+        release_path,
+    )
+    _write_json(review_path, signed_external_review)
+    release_manifest["artifacts"]["external_review"] = _artifact(
+        review_path,
+        tmp_path,
+    )
+    _write_json(release_path, release_manifest)
     return release_path
 
 
@@ -1426,6 +1508,29 @@ def test_complete_release_bundle_is_publishable(tmp_path):
     assert "split.ranking_coverage_binding" in failed_ids
 
 
+def test_release_rejects_external_review_signature_tamper(tmp_path):
+    release_path = _valid_release(tmp_path)
+    manifest = json.loads(release_path.read_text("utf-8"))
+    reference = manifest["artifacts"]["external_review"]
+    review_path = tmp_path / reference["path"]
+    review = json.loads(review_path.read_text("utf-8"))
+    review["signatures"][0]["signature"] = review["signatures"][1]["signature"]
+    review["signatures"][0]["signature_sha256"] = review["signatures"][1][
+        "signature_sha256"
+    ]
+    _write_json(review_path, review)
+    reference["sha256"] = _sha_file(review_path)
+    _write_json(release_path, manifest)
+
+    result = L.audit_leaderboard_release(release_path)
+
+    assert result["status"] == "not_publishable"
+    assert any(
+        row["id"] == "review.signed_evidence" and row["status"] == "fail"
+        for row in result["checks"]
+    )
+
+
 def test_release_accepts_stricter_preregistered_control_pair_floor(tmp_path):
     release_path = _valid_release(tmp_path)
     manifest = json.loads(release_path.read_text("utf-8"))
@@ -1462,6 +1567,7 @@ def test_release_accepts_stricter_preregistered_control_pair_floor(tmp_path):
     _write_json(preregistration_path, preregistration)
     preregistration_reference["sha256"] = _sha_file(preregistration_path)
     _write_json(release_path, manifest)
+    _refresh_external_review(release_path)
 
     result = L.audit_leaderboard_release(release_path)
 

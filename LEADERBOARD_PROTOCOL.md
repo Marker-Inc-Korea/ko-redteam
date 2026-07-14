@@ -197,8 +197,10 @@ randomization power를 뜻하지 않는다. power input·report·multiplicity au
 - 재평가는 코드·모델 revision·서비스 설정이 바뀐 경우 새 제출로 처리한다.
 
 위 공개 문서는 release bundle 내부의 상대경로와 SHA-256으로 결합한다. 외부 검토 artifact에는 공개에
-동의한 검토자 이름·소속·이해상충 진술·검토 시각과 attestation commitment, 독립 기관명과 검토 보고서
-commitment를 기록한다. 단순한 검토자 수 자체 기입은 외부 검토 증거로 인정하지 않는다.
+동의한 검토자 이름·소속·이해상충 진술·검토 시각, 실제 공개 attestation, 독립 기관명과 실제 공개 검토 보고서를
+기록한다. 모든 검토자는 같은 release artifact·governance 문서·manifest projection을 묶은 canonical statement를
+각자의 Ed25519 키로 서명한다. 단순한 검토자 수나 파일 없는 SHA-256 자체 기입은 외부 검토 증거로 인정하지 않는다.
+세부 실행 절차는 [`governance/EXTERNAL_REVIEW_WORKFLOW.md`](./governance/EXTERNAL_REVIEW_WORKFLOW.md)를 따른다.
 
 공개 절차는 [`governance/README.md`](./governance/README.md), 시즌 실행 순서는
 [`governance/SEASON_OPERATIONS.md`](./governance/SEASON_OPERATIONS.md)에 둔다. 특정 시즌의 이해상충 진술,
@@ -223,7 +225,7 @@ appeal 기록과 외부 attestation은 공통 정책 문서만으로 대체할 �
 - `power_analysis`: 단일 비교 사전 검출 효과와 표본 수 근거
 - `multiplicity_power_audit`: 최대 cohort의 primary 비교 family와 보정 후 tier 검정력 근거
 - `power_derived_split_design`: 분산 상한과 고정 MDE로 산출하고 재생 검증한 공식 split 규모·배분
-- `external_review`: 검토자 수, 기관 수, finding 처리, 한계
+- `external_review`: 공개 attestation·기관 보고서, 검토 scope, finding 처리·한계와 검토자별 Ed25519 SSHSIG
 
 검증 명령:
 

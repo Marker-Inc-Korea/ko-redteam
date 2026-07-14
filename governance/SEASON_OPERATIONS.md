@@ -68,6 +68,9 @@ season을 사전등록하지 않는다. S3는
 ko-redteam-check-public-hygiene --root release_bundle
 ko-redteam-verify-review-signatures \
   release_bundle/SUCCESSOR_PILOT_PRACTICE_REVIEW.json
+ko-redteam-verify-external-review \
+  release_bundle/release_manifest.json \
+  release_bundle/external_review.json
 ko-redteam-validate-leaderboard release_bundle/release_manifest.json \
   --output release_bundle/leaderboard_release_audit.json \
   --markdown-output release_bundle/leaderboard_release_audit.md
@@ -82,7 +85,7 @@ ko-redteam-validate-leaderboard release_bundle/release_manifest.json \
 - target stratum별 pilot 20개 미달, pilot 분산 95% 상한 검증 실패, derived split의 최대 cohort 다중비교 power 미달 또는 실제 split 불일치
 - endpoint 오류, 모델 revision 불명확, suite 간 run context 불일치, execution evidence/report digest 불일치
 - ranking evidence-eligible 모델 2개 미만
-- 외부 검토 blocking finding, split 유출 또는 공개 위생 실패
+- 외부 검토 scope·공개 증거·검토자 서명 실패, blocking finding, split 유출 또는 공개 위생 실패
 
 중단 후 기준을 사후 완화하지 않는다. 수정 가능한 운영 오류는 동일 동결 조건으로 전체 영향 범위를
 재검증하고, prompt·scoring·evaluator 변경이 필요하면 새 시즌을 만든다.

@@ -68,6 +68,15 @@ spec의 최상위 필드는 `schema`, `status`, `season`, `source_artifacts`, `o
 소문자 hex digest여야 한다. `official_output_observed=false`, `temperature=0`, decision flip 허용치 0이 아니면
 생성하지 않는다.
 
+## External Review Declaration
+
+`external-review.v2` declaration은 `status`, `reviewer_count`, `independent_organization_count`, `reviewers`,
+`organizations`, `findings_resolved`, `limitations`만 허용한다. Reviewer 행은 공개 이름·소속·기관·이해상충·검토
+시각, release root 아래의 실제 attestation 경로·SHA-256과 comment 없는 Ed25519 공개키·fingerprint를 포함한다.
+기관 행은 실제 공개 검토 보고서 경로·SHA-256을 포함한다. Builder가 release scope와 manifest projection을
+추가한 뒤 모든 reviewer가 동일 canonical statement를 서명한다. 정확한 절차와 필드는
+[`EXTERNAL_REVIEW_WORKFLOW.md`](./EXTERNAL_REVIEW_WORKFLOW.md)를 따른다.
+
 ## Official Execution Evidence
 
 성공한 `ko-redteam-suite` 실행은 `ko-redteam.suite-execution-evidence.v1`을 함께 만든다. 이 파일은 endpoint나
