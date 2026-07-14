@@ -154,8 +154,9 @@ S1은 Agent transport 측정 오류로 무효화됐으며 영향과 수정 commi
 reference model 출력은 사용하지 않았으며 140개 행 모두 아직 `pending_human_review`입니다. 서로 다른 두 검토자가
 한국어 자연스러움, 기대행동, 중복과 실제 개인정보 포함 여부를 승인하고 최종 `practice-review.v2`와
 `power-pilot-registration.v2`를 동결하기 전에는 anchor를 실행하거나 power·순위 근거로 사용하지 않습니다.
-[검수 workflow](./governance/PRACTICE_REVIEW_WORKFLOW.md)는 검토자별 blind packet, 빈 응답 template, 신원·소속·서명
-attestation commitment와 fail-closed 병합을 제공합니다. 도구는 사람 승인값을 자동 생성하지 않습니다.
+[검수 workflow](./governance/PRACTICE_REVIEW_WORKFLOW.md)는 검토자별 blind packet, 빈 응답 template, 신원·소속
+attestation, reviewer가 직접 서명하는 Ed25519 commitment와 fail-closed 병합을 제공합니다. 서명은 제출물 무결성을
+증명하지만 실제 신원 확인을 대체하지 않으며, 도구는 사람 승인값을 자동 생성하지 않습니다.
 
 ```bash
 ko-redteam-build-review-packets \
@@ -164,12 +165,25 @@ ko-redteam-build-review-packets \
   --reviewer reviewer-a --reviewer reviewer-b \
   --planned-at 2026-07-15T09:00:00+09:00
 
-# 두 검토자가 각자의 response와 attestation을 직접 완료한 뒤에만 실행
+# 각 검토자가 response·attestation을 완료한 뒤 본인 전용 키로 각각 실행
+ko-redteam-build-review-commitment \
+  private/review-workspace/review-plan.json \
+  --root . --reviewer reviewer-a
+ssh-keygen -Y sign -f "$REVIEWER_A_KEY" \
+  -n ko-redteam-practice-review@marker-inc-korea \
+  < private/review-workspace/reviewer-01.commitment.json \
+  > private/review-workspace/reviewer-01.commitment.json.sig
+chmod 600 private/review-workspace/reviewer-01.commitment.json.sig
+
+# reviewer-b도 plan에 지정된 파일과 별도 키로 완료한 뒤에만 병합
 ko-redteam-merge-review-responses \
   private/review-workspace/review-plan.json \
   --root . \
   --output governance/SUCCESSOR_PILOT_PRACTICE_REVIEW.json \
   --audit-output private/review-workspace/merge-audit.json
+
+ko-redteam-verify-review-signatures \
+  governance/SUCCESSOR_PILOT_PRACTICE_REVIEW.json
 
 # 최종 review를 먼저 공개 commit/push한 clean HEAD에서만 등록 생성
 git add governance/SUCCESSOR_PILOT_PRACTICE_REVIEW.json

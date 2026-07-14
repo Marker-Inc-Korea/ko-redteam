@@ -12,6 +12,7 @@ import pytest
 import ko_model_ranking as R
 import ko_pilot_registration as P
 from ko_run_context import canonical_sha256
+from tests.review_signature_support import attach_public_review_signatures
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -55,7 +56,7 @@ def _practice_review() -> dict:
                 "decision": "accept",
                 "reviewer_ids": ["reviewer-a", "reviewer-b"],
             })
-    return {
+    review = {
         "schema": P.PRACTICE_REVIEW_SCHEMA,
         "status": P.REVIEW_PASSED_STATUS,
         "review": {
@@ -67,7 +68,7 @@ def _practice_review() -> dict:
             "reviewer_ids": ["reviewer-a", "reviewer-b"],
         },
         "evidence": {
-            "schema": "ko-redteam.practice-review-evidence.v1",
+            "schema": "ko-redteam.practice-review-evidence.v2",
             "review_plan_sha256": "5" * 64,
             "review_plan_file_sha256": "6" * 64,
             "review_workflow_sha256": _sha(
@@ -129,6 +130,7 @@ def _practice_review() -> dict:
         "case_reviews": rows,
         "raw_reference_output_used": False,
     }
+    return attach_public_review_signatures(review)
 
 
 def _registration(review: dict) -> dict:
@@ -393,6 +395,18 @@ def test_frozen_pilot_registration_binds_review_and_pre_execution_design():
                 "reviewer_responses"
             ][1].update(affiliation_record_sha256="invalid"),
             "affiliation_record_sha256",
+        ),
+        (
+            lambda registration, review: review["evidence"][
+                "reviewer_responses"
+            ][0].update(
+                reviewer_commitment_signature=review["evidence"][
+                    "reviewer_responses"
+                ][0]["reviewer_commitment_signature"].replace(
+                    "BEGIN SSH", "BEGIN BAD", 1
+                )
+            ),
+            "signature",
         ),
         (
             lambda registration, review: review["benchmarks"][

@@ -14,13 +14,16 @@ randomization으로 고정하며, Monte Carlo를 사용할 때 최소 10,000회�
 신뢰구간과 방향 확률에만 사용하고 영가설 p-value로 재사용하지 않는다.
 
 `ko-redteam.practice-review.v2`는 각 target `independence_group`, stratum, `accept` 결정과 두 명 이상의 reviewer
-ID를 기록한다. `practice-review-plan.v1`과 검수 workflow의 digest, reviewer별 packet·response·신원·소속·서명 attestation
-SHA-256, 독립성·blindness 진술, 실제 배정 수가 함께 결합되지 않으면 pilot registration에서 거부한다. 개별
+ID를 기록한다. `practice-review-plan.v1`과 검수 workflow의 digest, reviewer별 packet·response·신원·소속·서명
+attestation SHA-256, 전용 Ed25519 공개키·fingerprint, 정규화된 `reviewer-commitment.v1`과 OpenSSH SSHSIG,
+독립성·blindness 진술, 실제 배정 수가 함께 결합되지 않으면 pilot registration에서 거부한다. 개별
 response와 notes 및 신원 문서는 비공개 workspace에 두고, 병합기가 실제 파일의 존재·비어 있지 않음·digest를
 검증한 뒤 최종 artifact에는 commitment만 공개한다.
 shared server의 workspace는 `0700`, 모든 private review·신원 증거와 merge audit은 `0600`이어야 한다. 최종
 review가 선언한 workflow, merge-code와 merge CLI entrypoint SHA-256은 pilot registration 시 현재 tracked 파일과
-일치해야 한다.
+일치해야 한다. pilot validator는 공개키와 고정 namespace로 모든 reviewer signature를 다시 검증하고, 같은 키를
+둘 이상의 reviewer가 사용하거나 signed commitment와 공개 필드가 다르면 거부한다. 서명 키와 실제 신원·소속의
+대응은 접근 통제된 증거 및 외부 감사로 별도 확인한다.
 검토자는 reference 출력에 blind해야 하며 machine-assisted draft 사용을 명시해야 한다. registration은 이 review의
 canonical SHA-256을 결합한다. 둘 중 하나가 누락·변조되거나 review가 등록 이후에 완료됐으면 power 입력을 만들 수
 없다.

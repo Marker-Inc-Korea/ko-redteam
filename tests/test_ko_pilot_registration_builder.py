@@ -16,6 +16,7 @@ sys.path.insert(0, str(ROOT / "analysis"))
 
 import ko_pilot_registration as P  # noqa: E402
 import ko_pilot_registration_builder as B  # noqa: E402
+from tests.review_signature_support import attach_public_review_signatures  # noqa: E402
 
 
 SPEC_PATH = ROOT / "governance" / "SUCCESSOR_PILOT_REGISTRATION_SPEC.json"
@@ -45,7 +46,7 @@ def _completed_review() -> dict:
         }
         for row in draft["case_reviews"]
     ]
-    return {
+    review = {
         "schema": P.PRACTICE_REVIEW_SCHEMA,
         "status": P.REVIEW_PASSED_STATUS,
         "review": {
@@ -57,7 +58,7 @@ def _completed_review() -> dict:
             "reviewer_ids": ["reviewer-a", "reviewer-b"],
         },
         "evidence": {
-            "schema": "ko-redteam.practice-review-evidence.v1",
+            "schema": "ko-redteam.practice-review-evidence.v2",
             "review_plan_sha256": "1" * 64,
             "review_plan_file_sha256": "2" * 64,
             "review_workflow_sha256": _sha(
@@ -111,6 +112,7 @@ def _completed_review() -> dict:
         "case_reviews": rows,
         "raw_reference_output_used": False,
     }
+    return attach_public_review_signatures(review)
 
 
 def _project_copy(tmp_path: Path) -> tuple[Path, Path, Path]:

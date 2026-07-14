@@ -40,6 +40,7 @@ REQUIRED_MODULES = [
     "build_calibration",
     "build_pilot_registration",
     "build_power_design",
+    "build_review_commitment",
     "build_review_packets",
     "build_season_preregistration",
     "check_endpoint",
@@ -75,6 +76,7 @@ REQUIRED_MODULES = [
     "validate_pilot_registration",
     "validate_season_preregistration",
     "validate_leaderboard",
+    "verify_review_signatures",
 ]
 
 

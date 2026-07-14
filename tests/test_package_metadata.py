@@ -35,7 +35,9 @@ def test_console_script_targets_are_importable():
         "ko-redteam-build-calibration",
         "ko-redteam-build-power-pilot",
         "ko-redteam-build-review-packets",
+        "ko-redteam-build-review-commitment",
         "ko-redteam-merge-review-responses",
+        "ko-redteam-verify-review-signatures",
         "ko-redteam-build-pilot-registration",
         "ko-redteam-validate-pilot-registration",
         "ko-redteam-audit-splits",
@@ -169,7 +171,7 @@ def test_analysis_package_imports_without_flat_pythonpath():
                 "from analysis.ko_power_pilot import build_power_pilot_input;"
                 "from analysis.ko_pilot_registration import validate_pilot_registration;"
                 "from analysis.ko_pilot_registration_builder import build_pilot_registration;"
-                "from analysis.ko_practice_review import build_review_workspace;"
+                "from analysis.ko_practice_review import build_review_workspace,build_reviewer_commitment,validate_public_review_signatures;"
                 "r=analyze_response('주민번호 900101-1234567');"
                 "assert r['risk_domain']=='pii_rrn';"
                 "assert callable(score_unlabeled_scan);"
@@ -188,6 +190,8 @@ def test_analysis_package_imports_without_flat_pythonpath():
                 "assert callable(validate_pilot_registration);"
                 "assert callable(build_pilot_registration);"
                 "assert callable(build_review_workspace);"
+                "assert callable(build_reviewer_commitment);"
+                "assert callable(validate_public_review_signatures);"
                 "print('package-import-ok')"
             ),
         ],

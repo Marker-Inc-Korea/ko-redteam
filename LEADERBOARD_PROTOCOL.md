@@ -212,7 +212,8 @@ appeal 기록과 외부 attestation은 공통 정책 문서만으로 대체할 �
 공식 bundle은 `ko-redteam.leaderboard-release.v3` manifest와 다음 hashed JSON artifact를 포함한다.
 
 - `pilot_registration`: reference 실행 전에 동결한 practice, anchor, 실행 설정과 power 분석 계약
-- `practice_review`: reference 출력에 blind한 2인 이상 사례별 `practice-review.v2` 승인과 packet·response·attestation commitment
+- `practice_review`: reference 출력에 blind한 2인 이상 사례별 `practice-review.v2` 승인, packet·response·attestation
+  commitment와 공개 재검증 가능한 reviewer별 Ed25519 SSHSIG
 - `preregistration_spec`: 사람이 결정한 cohort, 실행, semantic audit, calibration 및 외부 검토 정책과 다섯 선행 증거의 경로·SHA-256
 - `preregistration`: power 통과 뒤 official prompt 작성 전에 동결한 model cohort, split 배분과 통계 기준
 - `ranking_manifest`: 각 run의 네 suite report와 `core`·`mini_single` execution evidence path 및 SHA-256

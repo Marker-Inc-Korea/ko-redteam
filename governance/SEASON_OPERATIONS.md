@@ -66,6 +66,8 @@ season을 사전등록하지 않는다. S3는
 
 ```bash
 ko-redteam-check-public-hygiene --root release_bundle
+ko-redteam-verify-review-signatures \
+  release_bundle/SUCCESSOR_PILOT_PRACTICE_REVIEW.json
 ko-redteam-validate-leaderboard release_bundle/release_manifest.json \
   --output release_bundle/leaderboard_release_audit.json \
   --markdown-output release_bundle/leaderboard_release_audit.md

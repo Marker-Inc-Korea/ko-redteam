@@ -26,6 +26,7 @@ import ko_power_evidence as PE  # noqa: E402
 import ko_run_context as C  # noqa: E402
 import ko_season_preregistration as SR  # noqa: E402
 import ko_split_evidence as SP  # noqa: E402
+from tests.review_signature_support import attach_public_review_signatures  # noqa: E402
 
 
 def _sha_file(path: Path) -> str:
@@ -37,9 +38,9 @@ def _write_json(path: Path, value: dict) -> None:
     path.write_text(json.dumps(value, ensure_ascii=False, indent=1), "utf-8")
 
 
-def _practice_review_evidence(assignment_count: int) -> dict:
-    return {
-        "schema": "ko-redteam.practice-review-evidence.v1",
+def _practice_review_evidence(assignment_count: int, review_id: str) -> dict:
+    evidence = {
+        "schema": "ko-redteam.practice-review-evidence.v2",
         "review_plan_sha256": "1" * 64,
         "review_plan_file_sha256": "2" * 64,
         "review_workflow_sha256": _sha_file(
@@ -88,6 +89,10 @@ def _practice_review_evidence(assignment_count: int) -> dict:
             ROOT / "probes" / "merge_review_responses.py"
         ),
     }
+    return attach_public_review_signatures({
+        "review": {"id": review_id},
+        "evidence": evidence,
+    })["evidence"]
 
 
 def _pilot_design_sources() -> dict:
@@ -779,7 +784,10 @@ def _valid_release(
             "conflicts_resolved": True,
             "reviewer_ids": ["reviewer-a", "reviewer-b"],
         },
-        "evidence": _practice_review_evidence(sum(practice_target_counts.values())),
+        "evidence": _practice_review_evidence(
+            sum(practice_target_counts.values()),
+            "unit-practice-review",
+        ),
         "benchmarks": {
             suite: {
                 "path": f"benchmarks/{suite}.json",
@@ -1547,7 +1555,10 @@ def test_v4_power_pilot_accepts_frozen_pilot_registration_before_season(tmp_path
             "conflicts_resolved": True,
             "reviewer_ids": ["reviewer-a", "reviewer-b"],
         },
-        "evidence": _practice_review_evidence(sum(practice_counts.values())),
+        "evidence": _practice_review_evidence(
+            sum(practice_counts.values()),
+            "unit-pilot-review",
+        ),
         "benchmarks": {
             suite: {
                 "path": f"benchmarks/{suite}.json",

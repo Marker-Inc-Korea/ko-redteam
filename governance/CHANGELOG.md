@@ -5,6 +5,10 @@
 
 ## Unreleased - Evidence-Eligible Ranking Protocol
 
+- 완료된 reviewer submission을 정규화한 `reviewer-commitment.v1`과 전용 Ed25519 OpenSSH SSHSIG를 요구한다.
+  병합기와 pilot validator는 고정 namespace, 공개키 fingerprint, 서명 및 reviewer별 key uniqueness를 다시
+  검증하며, 공개 review만으로 재검증하는 CLI를 제공한다. 전자서명은 키 소유·제출물 무결성 증거이며 실제
+  신원·소속 확인을 대체하지 않는다.
 - shared server에서 blind human review가 노출되지 않도록 workspace `0700`·private evidence와 merge audit `0600`을
   생성·병합 단계에서 강제한다. 최종 review의 workflow·merge-code·merge CLI entrypoint digest도 review plan,
   pilot registration 및 이후 release에서 현재 protocol 파일과 교차 검증해 임의 digest나 검수 중·후 protocol

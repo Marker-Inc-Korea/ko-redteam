@@ -600,8 +600,18 @@ def _review(
         or evidence.get("review_packet_schema") != PACKET_SCHEMA
         or evidence.get("review_response_schema") != RESPONSE_SCHEMA
         or evidence.get("reviewer_attestation_schema") != ATTESTATION_SCHEMA
+        or evidence.get("reviewer_commitment_schema")
+        != practice_review.REVIEW_COMMITMENT_SCHEMA
+        or evidence.get("reviewer_signature_format")
+        != practice_review.SSHSIG_FORMAT
+        or evidence.get("reviewer_signature_key_type")
+        != practice_review.SSHSIG_KEY_TYPE
+        or evidence.get("reviewer_signature_namespace")
+        != practice_review.SSHSIG_NAMESPACE
         or evidence.get("all_assigned_decisions_accept") is not True
         or evidence.get("all_reviewers_attested_no_disqualifying_conflict") is not True
+        or evidence.get("all_reviewer_commitment_signatures_valid") is not True
+        or evidence.get("reviewer_signing_keys_distinct") is not True
         or evidence.get("private_evidence_files_verified") is not True
         or evidence.get("reviewer_decisions_hidden_during_review") is not True
         or evidence.get("response_notes_published") is not False
@@ -729,6 +739,7 @@ def _review(
         raise ValueError("practice review evidence assignment count does not match cases")
     if response_assignment_counts != dict(observed_reviewer_assignments):
         raise ValueError("practice review response assignment counts do not match cases")
+    practice_review.validate_public_review_signatures(review)
 
     expected_review_sha256 = registration["practice_design"]["review_artifact"][
         "canonical_sha256"
