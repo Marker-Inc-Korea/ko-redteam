@@ -143,6 +143,15 @@ S4는 단일 비교 power만 충족하고 63개 다중비교 family의 power는 
 S1은 Agent transport 측정 오류로 무효화됐으며 영향과 수정 commitment는
 [`governance/SEASON_2026Q3_S1_INVALIDATION.json`](./governance/SEASON_2026Q3_S1_INVALIDATION.json)에 있습니다.
 
+### Successor Pilot Draft
+
+7개 target stratum을 각각 20개로 확장한 140개 독립 그룹 초안과
+[검토 packet](./governance/SUCCESSOR_PILOT_PRACTICE_REVIEW_DRAFT.md)을 공개합니다. 네 benchmark는 정적 schema,
+중복 ID, target allocation과 byte 재현성 검사를 통과했지만, 상태는 `machine_assisted_draft_pending_human_review`입니다.
+reference model 출력은 사용하지 않았으며 140개 행 모두 아직 `pending_human_review`입니다. 서로 다른 두 검토자가
+한국어 자연스러움, 기대행동, 중복과 실제 개인정보 포함 여부를 승인하고 최종 `practice-review.v1`과
+`power-pilot-registration.v1`을 동결하기 전에는 anchor를 실행하거나 power·순위 근거로 사용하지 않습니다.
+
 ```bash
 PILOT_REGISTRATION=governance/PILOT_ID_REGISTRATION.json
 PRACTICE_REVIEW=governance/PILOT_ID_PRACTICE_REVIEW.json

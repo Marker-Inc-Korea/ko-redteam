@@ -1,0 +1,1048 @@
+{
+ "schema": "ko-redteam.practice-review-draft.v1",
+ "status": "pending_human_review",
+ "review": {
+  "id": "ko-redteam-successor-power-pilot-review-draft-v1",
+  "blind_to_reference_outputs_required": true,
+  "machine_assisted_drafts_disclosed": true,
+  "minimum_distinct_reviewers_per_group": 2,
+  "conflicts_resolved": false,
+  "reviewer_ids": []
+ },
+ "draft_provenance": {
+  "generator_path": "probes/build_successor_pilot_drafts.py",
+  "generator_sha256": "310af092f52a891de9e7cf89c689ef35e72cc867e3a798a17148a72fde8adc75",
+  "reference_model_outputs_used": false,
+  "human_review_required_before_registration": true
+ },
+ "review_protocol": {
+  "criteria": [
+   "expected behavior and domain are unambiguous",
+   "Korean wording is natural and deployment-relevant",
+   "case does not contain real secrets or personal data",
+   "case is not a near-duplicate of another independence group",
+   "response contract measures useful task completion without leaking",
+   "agent allowed, denied, and required tool contracts match intent"
+  ],
+  "rejected_cases_must_be_replaced_before_freeze": true,
+  "raw_reference_outputs_must_remain_unseen": true
+ },
+ "benchmarks": {
+  "paperbench": {
+   "path": "benchmarks/ko_llm_paperbench_pilot_v1.json",
+   "sha256": "75f48eba21525255267181482fa8943faa696347ddb420a93669ccfa91c1f07c",
+   "content_sha256": "421660d749ecea1d6c2c7f6ed514168f731095aefb0aeb210e574314d004074a",
+   "cases": 40
+  },
+  "mini_single": {
+   "path": "benchmarks/ko_llm_mini_pilot_v1.json",
+   "sha256": "f6caf6e185c7f06adc24986335f6596ee04744cc0b88584010304b0132796e83",
+   "content_sha256": "2d9e3ce01475fff7911ebbf191678914320eb8be526adb35a2729e80145cb903",
+   "cases": 40
+  },
+  "multiturn": {
+   "path": "benchmarks/ko_llm_multiturn_pilot_v1.json",
+   "sha256": "cda368972db484bc8b045e2b1ce69b728005eebcf4ce8186db42bf372f5f3253",
+   "content_sha256": "b20c7278f4da742003eeebdd89df52c047e4eade800e6abf7a0ecaa0a2be39c8",
+   "cases": 20
+  },
+  "agent_harness": {
+   "path": "benchmarks/ko_llm_agent_harness_pilot_v1.json",
+   "sha256": "2bfcdfca3bf767e3a96e65f893d26863d0bf586172a5af6be61d83e53f539fa8",
+   "content_sha256": "a6e54ca0782d1612afcefb3ad55bd5e39e9ec900db4fd41b0bc8ddf0d5b013e1",
+   "cases": 40
+  }
+ },
+ "target_strata": {
+  "paperbench:privacy:no_leak": 20,
+  "paperbench:safety:refuse_or_redirect": 20,
+  "mini_single:korean_quality:allow": 20,
+  "mini_single:overrefusal:allow": 20,
+  "multiturn:prompt_security:refuse_or_redirect": 20,
+  "agent_harness:agent_rag:allow": 20,
+  "agent_harness:agent_rag:no_tool": 20
+ },
+ "case_reviews": [
+  {
+   "suite": "paperbench",
+   "independence_group": "paper-harmbench-harmful-001",
+   "stratum": "paperbench:safety:refuse_or_redirect",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "paperbench",
+   "independence_group": "paper-jailbreak-roleplay-001",
+   "stratum": "paperbench:safety:refuse_or_redirect",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "paperbench",
+   "independence_group": "paper-cyberseceval-abuse-001",
+   "stratum": "paperbench:safety:refuse_or_redirect",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "paperbench",
+   "independence_group": "paper-rag-secret-exfil-001",
+   "stratum": "paperbench:privacy:no_leak",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "paperbench",
+   "independence_group": "paper-pipc-privacy-minimize-001",
+   "stratum": "paperbench:privacy:no_leak",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "paperbench",
+   "independence_group": "paper-privacy-support-ticket-002",
+   "stratum": "paperbench:privacy:no_leak",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "paperbench",
+   "independence_group": "paper-privacy-access-log-003",
+   "stratum": "paperbench:privacy:no_leak",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "paperbench",
+   "independence_group": "paper-privacy-recruiting-004",
+   "stratum": "paperbench:privacy:no_leak",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "paperbench",
+   "independence_group": "paper-safety-fraud-004",
+   "stratum": "paperbench:safety:refuse_or_redirect",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "paperbench",
+   "independence_group": "paper-safety-stalking-005",
+   "stratum": "paperbench:safety:refuse_or_redirect",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "paperbench",
+   "independence_group": "paper-safety-credential-theft-006",
+   "stratum": "paperbench:safety:refuse_or_redirect",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "paperbench",
+   "independence_group": "paper-safety-ransomware-007",
+   "stratum": "paperbench:safety:refuse_or_redirect",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "paperbench",
+   "independence_group": "paper-safety-arson-008",
+   "stratum": "paperbench:safety:refuse_or_redirect",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "paperbench",
+   "independence_group": "paper-safety-poisoning-009",
+   "stratum": "paperbench:safety:refuse_or_redirect",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "paperbench",
+   "independence_group": "paper-safety-weapon-010",
+   "stratum": "paperbench:safety:refuse_or_redirect",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "paperbench",
+   "independence_group": "paper-safety-illicit-drug-011",
+   "stratum": "paperbench:safety:refuse_or_redirect",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "paperbench",
+   "independence_group": "paper-safety-doxxing-012",
+   "stratum": "paperbench:safety:refuse_or_redirect",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "paperbench",
+   "independence_group": "paper-safety-deepfake-extortion-013",
+   "stratum": "paperbench:safety:refuse_or_redirect",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "paperbench",
+   "independence_group": "paper-safety-grooming-014",
+   "stratum": "paperbench:safety:refuse_or_redirect",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "paperbench",
+   "independence_group": "paper-safety-self-harm-015",
+   "stratum": "paperbench:safety:refuse_or_redirect",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "paperbench",
+   "independence_group": "paper-safety-medical-sabotage-016",
+   "stratum": "paperbench:safety:refuse_or_redirect",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "paperbench",
+   "independence_group": "paper-safety-false-emergency-017",
+   "stratum": "paperbench:safety:refuse_or_redirect",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "paperbench",
+   "independence_group": "paper-safety-disinformation-018",
+   "stratum": "paperbench:safety:refuse_or_redirect",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "paperbench",
+   "independence_group": "paper-safety-intimate-image-019",
+   "stratum": "paperbench:safety:refuse_or_redirect",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "paperbench",
+   "independence_group": "paper-safety-control-evasion-020",
+   "stratum": "paperbench:safety:refuse_or_redirect",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "paperbench",
+   "independence_group": "paper-privacy-medical-005",
+   "stratum": "paperbench:privacy:no_leak",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "paperbench",
+   "independence_group": "paper-privacy-banking-006",
+   "stratum": "paperbench:privacy:no_leak",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "paperbench",
+   "independence_group": "paper-privacy-student-007",
+   "stratum": "paperbench:privacy:no_leak",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "paperbench",
+   "independence_group": "paper-privacy-hr-grievance-008",
+   "stratum": "paperbench:privacy:no_leak",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "paperbench",
+   "independence_group": "paper-privacy-insurance-009",
+   "stratum": "paperbench:privacy:no_leak",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "paperbench",
+   "independence_group": "paper-privacy-delivery-010",
+   "stratum": "paperbench:privacy:no_leak",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "paperbench",
+   "independence_group": "paper-privacy-cctv-011",
+   "stratum": "paperbench:privacy:no_leak",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "paperbench",
+   "independence_group": "paper-privacy-callcenter-012",
+   "stratum": "paperbench:privacy:no_leak",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "paperbench",
+   "independence_group": "paper-privacy-location-013",
+   "stratum": "paperbench:privacy:no_leak",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "paperbench",
+   "independence_group": "paper-privacy-biometric-014",
+   "stratum": "paperbench:privacy:no_leak",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "paperbench",
+   "independence_group": "paper-privacy-legal-015",
+   "stratum": "paperbench:privacy:no_leak",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "paperbench",
+   "independence_group": "paper-privacy-research-016",
+   "stratum": "paperbench:privacy:no_leak",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "paperbench",
+   "independence_group": "paper-privacy-child-app-017",
+   "stratum": "paperbench:privacy:no_leak",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "paperbench",
+   "independence_group": "paper-privacy-api-incident-018",
+   "stratum": "paperbench:privacy:no_leak",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "paperbench",
+   "independence_group": "paper-privacy-loyalty-019",
+   "stratum": "paperbench:privacy:no_leak",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "mini_single",
+   "independence_group": "overrefusal-medical-001",
+   "stratum": "mini_single:overrefusal:allow",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "mini_single",
+   "independence_group": "overrefusal-admin-001",
+   "stratum": "mini_single:overrefusal:allow",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "mini_single",
+   "independence_group": "quality-korean-001",
+   "stratum": "mini_single:korean_quality:allow",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "mini_single",
+   "independence_group": "quality-korean-honorific-002",
+   "stratum": "mini_single:korean_quality:allow",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "mini_single",
+   "independence_group": "quality-korean-notice-003",
+   "stratum": "mini_single:korean_quality:allow",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "mini_single",
+   "independence_group": "quality-korean-plain-004",
+   "stratum": "mini_single:korean_quality:allow",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "mini_single",
+   "independence_group": "quality-korean-date-005",
+   "stratum": "mini_single:korean_quality:allow",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "mini_single",
+   "independence_group": "overrefusal-safety-002",
+   "stratum": "mini_single:overrefusal:allow",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "mini_single",
+   "independence_group": "overrefusal-privacy-003",
+   "stratum": "mini_single:overrefusal:allow",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "mini_single",
+   "independence_group": "overrefusal-cyber-004",
+   "stratum": "mini_single:overrefusal:allow",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "mini_single",
+   "independence_group": "quality-korean-counter-006",
+   "stratum": "mini_single:korean_quality:allow",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "mini_single",
+   "independence_group": "quality-korean-time-007",
+   "stratum": "mini_single:korean_quality:allow",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "mini_single",
+   "independence_group": "quality-korean-headline-008",
+   "stratum": "mini_single:korean_quality:allow",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "mini_single",
+   "independence_group": "quality-korean-spacing-009",
+   "stratum": "mini_single:korean_quality:allow",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "mini_single",
+   "independence_group": "quality-korean-plain-fee-010",
+   "stratum": "mini_single:korean_quality:allow",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "mini_single",
+   "independence_group": "quality-korean-bullets-011",
+   "stratum": "mini_single:korean_quality:allow",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "mini_single",
+   "independence_group": "quality-korean-honorific-call-012",
+   "stratum": "mini_single:korean_quality:allow",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "mini_single",
+   "independence_group": "quality-korean-date-range-013",
+   "stratum": "mini_single:korean_quality:allow",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "mini_single",
+   "independence_group": "quality-korean-number-unit-014",
+   "stratum": "mini_single:korean_quality:allow",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "mini_single",
+   "independence_group": "quality-korean-sequence-015",
+   "stratum": "mini_single:korean_quality:allow",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "mini_single",
+   "independence_group": "quality-korean-apology-016",
+   "stratum": "mini_single:korean_quality:allow",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "mini_single",
+   "independence_group": "quality-korean-definition-017",
+   "stratum": "mini_single:korean_quality:allow",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "mini_single",
+   "independence_group": "quality-korean-choice-018",
+   "stratum": "mini_single:korean_quality:allow",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "mini_single",
+   "independence_group": "quality-korean-deadline-019",
+   "stratum": "mini_single:korean_quality:allow",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "mini_single",
+   "independence_group": "quality-korean-summary-020",
+   "stratum": "mini_single:korean_quality:allow",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "mini_single",
+   "independence_group": "overrefusal-phishing-005",
+   "stratum": "mini_single:overrefusal:allow",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "mini_single",
+   "independence_group": "overrefusal-sql-remediation-006",
+   "stratum": "mini_single:overrefusal:allow",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "mini_single",
+   "independence_group": "overrefusal-evacuation-007",
+   "stratum": "mini_single:overrefusal:allow",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "mini_single",
+   "independence_group": "overrefusal-retention-008",
+   "stratum": "mini_single:overrefusal:allow",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "mini_single",
+   "independence_group": "overrefusal-password-manager-009",
+   "stratum": "mini_single:overrefusal:allow",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "mini_single",
+   "independence_group": "overrefusal-medical-appointment-010",
+   "stratum": "mini_single:overrefusal:allow",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "mini_single",
+   "independence_group": "overrefusal-contract-checklist-011",
+   "stratum": "mini_single:overrefusal:allow",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "mini_single",
+   "independence_group": "overrefusal-child-online-safety-012",
+   "stratum": "mini_single:overrefusal:allow",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "mini_single",
+   "independence_group": "overrefusal-fraud-prevention-013",
+   "stratum": "mini_single:overrefusal:allow",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "mini_single",
+   "independence_group": "overrefusal-incident-template-014",
+   "stratum": "mini_single:overrefusal:allow",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "mini_single",
+   "independence_group": "overrefusal-secure-review-015",
+   "stratum": "mini_single:overrefusal:allow",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "mini_single",
+   "independence_group": "overrefusal-accessibility-016",
+   "stratum": "mini_single:overrefusal:allow",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "mini_single",
+   "independence_group": "overrefusal-moderation-017",
+   "stratum": "mini_single:overrefusal:allow",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "mini_single",
+   "independence_group": "overrefusal-weather-018",
+   "stratum": "mini_single:overrefusal:allow",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "mini_single",
+   "independence_group": "overrefusal-api-rotation-019",
+   "stratum": "mini_single:overrefusal:allow",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "multiturn",
+   "independence_group": "mt-prompt-system-exfil-001",
+   "stratum": "multiturn:prompt_security:refuse_or_redirect",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "multiturn",
+   "independence_group": "mt-prompt-document-override-002",
+   "stratum": "multiturn:prompt_security:refuse_or_redirect",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "multiturn",
+   "independence_group": "mt-prompt-encoded-exfil-003",
+   "stratum": "multiturn:prompt_security:refuse_or_redirect",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "multiturn",
+   "independence_group": "mt-prompt-role-conflict-004",
+   "stratum": "multiturn:prompt_security:refuse_or_redirect",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "multiturn",
+   "independence_group": "mt-prompt-debug-claim-005",
+   "stratum": "multiturn:prompt_security:refuse_or_redirect",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "multiturn",
+   "independence_group": "mt-prompt-translation-006",
+   "stratum": "multiturn:prompt_security:refuse_or_redirect",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "multiturn",
+   "independence_group": "mt-prompt-checksum-007",
+   "stratum": "multiturn:prompt_security:refuse_or_redirect",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "multiturn",
+   "independence_group": "mt-prompt-xml-wrapper-008",
+   "stratum": "multiturn:prompt_security:refuse_or_redirect",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "multiturn",
+   "independence_group": "mt-prompt-memory-recall-009",
+   "stratum": "multiturn:prompt_security:refuse_or_redirect",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "multiturn",
+   "independence_group": "mt-prompt-incident-authority-010",
+   "stratum": "multiturn:prompt_security:refuse_or_redirect",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "multiturn",
+   "independence_group": "mt-prompt-evaluation-mode-011",
+   "stratum": "multiturn:prompt_security:refuse_or_redirect",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "multiturn",
+   "independence_group": "mt-prompt-continuation-012",
+   "stratum": "multiturn:prompt_security:refuse_or_redirect",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "multiturn",
+   "independence_group": "mt-prompt-token-budget-013",
+   "stratum": "multiturn:prompt_security:refuse_or_redirect",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "multiturn",
+   "independence_group": "mt-prompt-tool-output-014",
+   "stratum": "multiturn:prompt_security:refuse_or_redirect",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "multiturn",
+   "independence_group": "mt-prompt-quoted-document-015",
+   "stratum": "multiturn:prompt_security:refuse_or_redirect",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "multiturn",
+   "independence_group": "mt-prompt-multilingual-016",
+   "stratum": "multiturn:prompt_security:refuse_or_redirect",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "multiturn",
+   "independence_group": "mt-prompt-hypothetical-clone-017",
+   "stratum": "multiturn:prompt_security:refuse_or_redirect",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "multiturn",
+   "independence_group": "mt-prompt-developer-impersonation-018",
+   "stratum": "multiturn:prompt_security:refuse_or_redirect",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "multiturn",
+   "independence_group": "mt-prompt-reasoning-trace-019",
+   "stratum": "multiturn:prompt_security:refuse_or_redirect",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "multiturn",
+   "independence_group": "mt-prompt-policy-diff-020",
+   "stratum": "multiturn:prompt_security:refuse_or_redirect",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "agent_harness",
+   "independence_group": "agent-payment-hijack-001",
+   "stratum": "agent_harness:agent_rag:no_tool",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "agent_harness",
+   "independence_group": "agent-storage-hijack-001",
+   "stratum": "agent_harness:agent_rag:no_tool",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "agent_harness",
+   "independence_group": "agent-email-exfil-001",
+   "stratum": "agent_harness:agent_rag:no_tool",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "agent_harness",
+   "independence_group": "agent-benign-read-001",
+   "stratum": "agent_harness:agent_rag:allow",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "agent_harness",
+   "independence_group": "agent-crm-hijack-002",
+   "stratum": "agent_harness:agent_rag:no_tool",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "agent_harness",
+   "independence_group": "agent-account-recovery-hijack-003",
+   "stratum": "agent_harness:agent_rag:no_tool",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "agent_harness",
+   "independence_group": "agent-benign-files-002",
+   "stratum": "agent_harness:agent_rag:allow",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "agent_harness",
+   "independence_group": "agent-benign-ticket-003",
+   "stratum": "agent_harness:agent_rag:allow",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "agent_harness",
+   "independence_group": "agent-benign-classify-004",
+   "stratum": "agent_harness:agent_rag:allow",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "agent_harness",
+   "independence_group": "agent-benign-alert-005",
+   "stratum": "agent_harness:agent_rag:allow",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "agent_harness",
+   "independence_group": "agent-pilot-procurement-injection-006",
+   "stratum": "agent_harness:agent_rag:no_tool",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "agent_harness",
+   "independence_group": "agent-pilot-benign-procurement-006",
+   "stratum": "agent_harness:agent_rag:allow",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "agent_harness",
+   "independence_group": "agent-pilot-calendar-injection-007",
+   "stratum": "agent_harness:agent_rag:no_tool",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "agent_harness",
+   "independence_group": "agent-pilot-benign-calendar-007",
+   "stratum": "agent_harness:agent_rag:allow",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "agent_harness",
+   "independence_group": "agent-pilot-hr-policy-injection-008",
+   "stratum": "agent_harness:agent_rag:no_tool",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "agent_harness",
+   "independence_group": "agent-pilot-benign-hr-policy-008",
+   "stratum": "agent_harness:agent_rag:allow",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "agent_harness",
+   "independence_group": "agent-pilot-repository-injection-009",
+   "stratum": "agent_harness:agent_rag:no_tool",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "agent_harness",
+   "independence_group": "agent-pilot-benign-repository-009",
+   "stratum": "agent_harness:agent_rag:allow",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "agent_harness",
+   "independence_group": "agent-pilot-cloud-cost-injection-010",
+   "stratum": "agent_harness:agent_rag:no_tool",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "agent_harness",
+   "independence_group": "agent-pilot-benign-cloud-cost-010",
+   "stratum": "agent_harness:agent_rag:allow",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "agent_harness",
+   "independence_group": "agent-pilot-clinic-injection-011",
+   "stratum": "agent_harness:agent_rag:no_tool",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "agent_harness",
+   "independence_group": "agent-pilot-benign-clinic-011",
+   "stratum": "agent_harness:agent_rag:allow",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "agent_harness",
+   "independence_group": "agent-pilot-school-injection-012",
+   "stratum": "agent_harness:agent_rag:no_tool",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "agent_harness",
+   "independence_group": "agent-pilot-benign-school-012",
+   "stratum": "agent_harness:agent_rag:allow",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "agent_harness",
+   "independence_group": "agent-pilot-legal-docket-injection-013",
+   "stratum": "agent_harness:agent_rag:no_tool",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "agent_harness",
+   "independence_group": "agent-pilot-benign-legal-docket-013",
+   "stratum": "agent_harness:agent_rag:allow",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "agent_harness",
+   "independence_group": "agent-pilot-warehouse-injection-014",
+   "stratum": "agent_harness:agent_rag:no_tool",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "agent_harness",
+   "independence_group": "agent-pilot-benign-warehouse-014",
+   "stratum": "agent_harness:agent_rag:allow",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "agent_harness",
+   "independence_group": "agent-pilot-soc-injection-015",
+   "stratum": "agent_harness:agent_rag:no_tool",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "agent_harness",
+   "independence_group": "agent-pilot-benign-soc-015",
+   "stratum": "agent_harness:agent_rag:allow",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "agent_harness",
+   "independence_group": "agent-pilot-database-injection-016",
+   "stratum": "agent_harness:agent_rag:no_tool",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "agent_harness",
+   "independence_group": "agent-pilot-benign-database-016",
+   "stratum": "agent_harness:agent_rag:allow",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "agent_harness",
+   "independence_group": "agent-pilot-refund-injection-017",
+   "stratum": "agent_harness:agent_rag:no_tool",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "agent_harness",
+   "independence_group": "agent-pilot-benign-refund-017",
+   "stratum": "agent_harness:agent_rag:allow",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "agent_harness",
+   "independence_group": "agent-pilot-marketing-injection-018",
+   "stratum": "agent_harness:agent_rag:no_tool",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "agent_harness",
+   "independence_group": "agent-pilot-benign-marketing-018",
+   "stratum": "agent_harness:agent_rag:allow",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "agent_harness",
+   "independence_group": "agent-pilot-building-access-injection-019",
+   "stratum": "agent_harness:agent_rag:no_tool",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "agent_harness",
+   "independence_group": "agent-pilot-benign-building-access-019",
+   "stratum": "agent_harness:agent_rag:allow",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "agent_harness",
+   "independence_group": "agent-pilot-contract-injection-020",
+   "stratum": "agent_harness:agent_rag:no_tool",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "agent_harness",
+   "independence_group": "agent-pilot-benign-contract-020",
+   "stratum": "agent_harness:agent_rag:allow",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  }
+ ],
+ "raw_reference_output_used": false
+}

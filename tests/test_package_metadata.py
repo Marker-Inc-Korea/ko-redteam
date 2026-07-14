@@ -76,6 +76,13 @@ def test_package_data_paths_exist():
     assert (ROOT / "benchmarks" / "ko_llm_multiturn_v1.json").exists()
     assert (ROOT / "benchmarks" / "ko_llm_agent_harness_v1.json").exists()
     assert (ROOT / "benchmarks" / "ko_llm_agent_harness_v2.json").exists()
+    for filename in (
+        "ko_llm_paperbench_pilot_v1.json",
+        "ko_llm_mini_pilot_v1.json",
+        "ko_llm_multiturn_pilot_v1.json",
+        "ko_llm_agent_harness_pilot_v1.json",
+    ):
+        assert (ROOT / "benchmarks" / filename).exists()
     assert (ROOT / "probes" / "ko_jailbreak_templates.json").exists()
     assert (ROOT / "LEADERBOARD_PROTOCOL.md").exists()
     assert (ROOT / "governance" / "SEASON_OPERATIONS.md").exists()
@@ -109,6 +116,12 @@ def test_package_data_paths_exist():
     assert (ROOT / "governance" / "SEASON_2026Q3_S4_STOP.json").exists()
     assert (ROOT / "governance" / "PRACTICE_VALIDATION_2026Q3.json").exists()
     assert (ROOT / "governance" / "PRACTICE_VALIDATION_2026Q3.md").exists()
+    assert (
+        ROOT / "governance" / "SUCCESSOR_PILOT_PRACTICE_REVIEW_DRAFT.json"
+    ).exists()
+    assert (
+        ROOT / "governance" / "SUCCESSOR_PILOT_PRACTICE_REVIEW_DRAFT.md"
+    ).exists()
     assert (ROOT / "gap_analysis" / "_vendor" / "mitigationbypass_substrings.txt").exists()
 
 

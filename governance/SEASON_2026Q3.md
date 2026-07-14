@@ -24,6 +24,7 @@ candidate는 없다. S4의 동결된 기계 판독 사전등록은
 | S4 marginal power 분석 | 0.8002, 단일 비교 목표 0.80 충족 |
 | S4 63-comparison power 감사 | 324그룹 개별 power 0.2906, 필요 727; 전체 동시 보장 필요 1527 |
 | 후속 7모델·1-profile 정밀도 감사 | 층별 pilot 5/20로 정밀도 미달; 324그룹 개별 power 0.1056, 필요 1527; 전체 동시 보장 필요 2938 |
+| 후속 pilot practice 초안 | 7개 층 x 20개, 총 140그룹; `pending_human_review`, 미등록·실행 금지 |
 | Agent transport | `prompt_json_v1`, endpoint 오류 0건 hard gate |
 | 반복별 실행 증거 | `core`·`mini_single` v3 digest binding 필수 |
 | 공개 power-pilot practice target coverage | suite/domain/expected 7개 stratum, 각 5개 |
@@ -67,6 +68,11 @@ S4는 official split 작성 전에 중단하며 publication status는 `not_publi
 SD가 50.34로 증가함을 확인했다. 이 상한에서 개별 비교 80%에는 1,527그룹, 모든 MDE-or-larger 비교의 동시
 80%에는 2,938그룹이 필요하다. 이 감사는 successor season 사전등록이 아니며, 먼저 7개 층마다 독립 pilot
 group을 최소 20개 확보해 분산과 필요 표본을 다시 계산해야 한다.
+
+해당 target allocation을 충족하는 140그룹의 기계 보조 초안과 검토 목록은
+[`SUCCESSOR_PILOT_PRACTICE_REVIEW_DRAFT.md`](./SUCCESSOR_PILOT_PRACTICE_REVIEW_DRAFT.md)에 공개한다. 이는
+사람 검토 완료 증거가 아니다. 두 명의 독립 검토자가 140개 원형을 모두 승인하고 최종 review artifact와 pilot
+registration을 공개 commit으로 동결하기 전에는 reference anchor 실행을 시작하지 않는다.
 
 설계를 바꾸어야 하면 사전등록 파일을 덮어쓰지 않고 [`CHANGELOG.md`](./CHANGELOG.md)에 무효화 사유를
 남긴 뒤 새 season ID로 다시 사전등록한다.

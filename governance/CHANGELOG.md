@@ -23,6 +23,9 @@
   profile의 개별 비교 80% 필요량은 1,527그룹이므로 successor preregistration 전에 pilot을 확장한다. 집계
   결과는 [`SEASON_2026Q3_SUCCESSOR_PILOT_PRECISION_AUDIT.json`](./SEASON_2026Q3_SUCCESSOR_PILOT_PRECISION_AUDIT.json)에
   고정한다.
+- reference 출력을 보지 않고 7개 target stratum을 각각 20개로 확장한 140그룹의 기계 보조 초안과
+  [`SUCCESSOR_PILOT_PRACTICE_REVIEW_DRAFT.json`](./SUCCESSOR_PILOT_PRACTICE_REVIEW_DRAFT.json)을 생성한다.
+  모든 행은 `pending_human_review`이며 2인 독립 검토와 pilot 등록 전에는 anchor 실행에 사용할 수 없다.
 - breaking publication contract를 `leaderboard-release.v2`와 `season-preregistration.v2`로 승격한다. 과거
   S1-S4 `v1` 등록은 수정하지 않으며 신규 v4 pilot이나 공식 release에 재사용할 수 없다.
 
