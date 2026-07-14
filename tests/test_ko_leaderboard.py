@@ -728,6 +728,7 @@ def _valid_release(tmp_path: Path, *, groups_per_domain: int = 30) -> Path:
             "weight_profiles": ranking["method"]["weight_profiles"],
             "power_pilot": {
                 "source_schema": L.POWER_PILOT_SOURCE_SCHEMA,
+                "ranking_manifest_schema": R.RANKING_MANIFEST_SCHEMA,
                 "suites": list(R.SUITES),
                 "practice_benchmark_fingerprints": suite_fingerprints,
                 "minimum_repeats": 3,
@@ -871,6 +872,17 @@ def test_complete_release_bundle_is_publishable(tmp_path):
             preregistered_at="2026-06-01T00:00:00+09:00",
         )
 
+    changed_evidence = json.loads(json.dumps(preregistration))
+    changed_evidence["execution"]["execution_evidence"]["endpoint_smoke"][
+        "required_phrase"
+    ] = "접수되었습니다"
+    with pytest.raises(ValueError, match="execution evidence contract"):
+        PP.build_power_pilot_input(
+            tmp_path / manifest["artifacts"]["ranking_manifest"]["path"],
+            changed_evidence,
+            preregistered_at="2026-06-01T00:00:00+09:00",
+        )
+
     duplicate_reference = json.loads(json.dumps(preregistration))
     duplicate_reference["reference_models"].append(
         dict(duplicate_reference["reference_models"][0])
@@ -953,6 +965,8 @@ def test_v2_hashed_manifest_remains_valid_for_historical_power_pilots(tmp_path):
     preregistration = json.loads(
         (tmp_path / release["artifacts"]["preregistration"]["path"]).read_text("utf-8")
     )
+    preregistration["execution"].pop("execution_evidence")
+    preregistration["statistics"]["power_pilot"].pop("ranking_manifest_schema")
 
     power_input = PP.build_power_pilot_input(
         manifest_path,
@@ -963,6 +977,28 @@ def test_v2_hashed_manifest_remains_valid_for_historical_power_pilots(tmp_path):
     assert power_input["pilot_source"]["ranking_manifest_schema"] == (
         R.RANKING_MANIFEST_V2_SCHEMA
     )
+
+
+def test_current_power_pilot_rejects_historical_v2_manifest(tmp_path):
+    release_path = _valid_release(tmp_path)
+    release = json.loads(release_path.read_text("utf-8"))
+    manifest_path = tmp_path / release["artifacts"]["ranking_manifest"]["path"]
+    manifest = json.loads(manifest_path.read_text("utf-8"))
+    manifest["schema"] = R.RANKING_MANIFEST_V2_SCHEMA
+    for model in manifest["models"]:
+        for run in model["runs"]:
+            run.pop("execution_evidence")
+    _write_json(manifest_path, manifest)
+    preregistration = json.loads(
+        (tmp_path / release["artifacts"]["preregistration"]["path"]).read_text("utf-8")
+    )
+
+    with pytest.raises(ValueError, match="schema changed after preregistration"):
+        PP.build_power_pilot_input(
+            manifest_path,
+            preregistration,
+            preregistered_at="2026-06-01T00:00:00+09:00",
+        )
 
 
 def test_power_pilot_rejects_endpoint_error_rows(tmp_path):

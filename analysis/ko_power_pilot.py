@@ -230,6 +230,20 @@ def build_power_pilot_input(
     power_pilot_design = _object(
         statistics.get("power_pilot"), "preregistration.statistics.power_pilot"
     )
+    frozen_execution_evidence = execution.get("execution_evidence")
+    required_manifest_schema = power_pilot_design.get("ranking_manifest_schema")
+    if frozen_execution_evidence is not None:
+        if frozen_execution_evidence != ranking.EXECUTION_EVIDENCE_CONTRACT:
+            raise ValueError(
+                "power pilot execution evidence contract does not match preregistration"
+            )
+        if required_manifest_schema != ranking.RANKING_MANIFEST_SCHEMA:
+            raise ValueError("current power pilots must preregister the v3 manifest schema")
+    if (
+        required_manifest_schema is not None
+        and manifest.get("schema") != required_manifest_schema
+    ):
+        raise ValueError("power pilot ranking manifest schema changed after preregistration")
     frozen_fingerprints = _object(
         power_pilot_design.get("practice_benchmark_fingerprints"),
         "preregistration.statistics.power_pilot.practice_benchmark_fingerprints",
