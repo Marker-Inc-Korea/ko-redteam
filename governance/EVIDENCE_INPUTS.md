@@ -6,17 +6,20 @@ placeholder이며 공식 기준을 충족하지 않는다. 입력 파일에는 r
 
 ## Public Season Preregistration
 
-`ko-redteam.season-preregistration.v1`은 비공개 입력이 아니라 prompt 작성 전에 공개하는 동결 설계다. 최소
-suite×domain×expected 독립 그룹 행렬, Agent transport, generation settings, 통계 기준과 weight,
+`ko-redteam.season-preregistration.v2`는 비공개 입력이 아니라 prompt 작성 전에 공개하는 동결 설계다. 최소
+suite×domain×expected 독립 그룹 행렬, Agent transport, generation settings, primary·sensitivity profile,
+최대 모델 수와 comparison family, 통계 기준과 weight,
 upper/lower reference의 immutable revision, semantic overlap 설정, 사람 calibration 기준과 publication gate를 포함한다. release manifest는 이
 JSON을 상대경로와 SHA-256으로 결합하며 validator가 이후 split, ranking, power pilot builder, calibration 및 run context와
 대조한다. 변경이 필요하면 기존 파일을 덮어쓰지 않고 새 season ID를 등록한다.
+S1-S4의 `v1` 등록은 불변 이력이며 신규 v4 ranking 또는 공식 release 계약으로 재사용하지 않는다.
 
 ## Official Execution Evidence
 
 성공한 `ko-redteam-suite` 실행은 `ko-redteam.suite-execution-evidence.v1`을 함께 만든다. 이 파일은 endpoint나
 benchmark의 절대경로와 원문을 제외하고, 실행 profile, endpoint smoke 설정·결과, benchmark audit/coverage,
-measurement integrity, report doctor 단계와 report 상대경로·SHA-256을 보존한다. 공식 ranking manifest v3는 각
+measurement integrity, report doctor 단계와 report 상대경로·SHA-256을 보존한다. 공식 ranking manifest v4는
+동결된 `ko-redteam.ranking-policy.v1`과 각
 반복에서 `core`와 `mini_single` evidence를 모두 해시로 참조해야 한다. evidence와 ranking report digest가 다르거나
 필수 단계가 실패·생략됐으면 공식 분석을 시작하지 않는다.
 
@@ -64,12 +67,42 @@ measurement integrity, report doctor 단계와 report 상대경로·SHA-256을 �
 }
 ```
 
+## Official Model Cohort
+
+`preregistration.official_model_cohort`는 첫 공식 실행 전에 정확한 모델 집합을 고정한다. 모든 항목은 ranking
+manifest의 run context와 이름·model ID·불변 revision이 일치해야 한다. 등록되지 않은 모델 추가와 오류 모델의
+사후 제외는 모두 publication failure다.
+
+```json
+{
+  "frozen_at": "2026-06-01T09:00:00+09:00",
+  "selection_rule": "Capability, size, and provider strata frozen before official execution.",
+  "models": [
+    {
+      "name": "served-model-name",
+      "model_id": "provider/model-id",
+      "revision": "<40-to-64-char-immutable-revision>",
+      "selection_rationale": "Pre-declared cohort stratum and inclusion reason."
+    }
+  ]
+}
+```
+
 ## Statistical Power
 
 `difference`는 `estimand`에 적은 동일한 paired independence-group 단위의 파일럿 차이다. 최소 10개 그룹과
 10,000회 simulation이 필요하다. 공식 입력은 `ko-redteam-build-power-pilot`으로 만들며 네 suite와 frozen
-suite/domain/expected 7개 stratum을 모두 포함하고 stratum마다 최소 5개 pilot group이 필요하다. 실제
+suite/domain/expected 7개 stratum을 모두 포함하고 stratum마다 최소 20개 pilot group이 필요하다. 실제
 official group 수는 split audit의 여섯 영역 합계와 같아야 한다.
+
+`ko-redteam-analyze-power`의 단일 비교 결과만으로 publication power gate를 통과할 수 없다. 이어서
+`ko-redteam-analyze-familywise-power --power-input private/power_input.json --maximum-models 7
+--weight-profiles 1 --variance-confidence-level 0.95 --minimum-pilot-groups-per-stratum 20`을 실행하고, 최대 cohort의 모든
+primary 모델 쌍에서 `official_tier_design_supported=true`인 aggregate-only artifact를 release bundle에
+결합한다. complete-order power는 별도 진단이며 공식 tier는 완전한 순서를 주장하지 않는다.
+공식 artifact는 층별 sample variance와 target weight만 공개하고 개별 pilot 차이는 공개하지 않는다. 이 집계에서
+95% 단측 Welch-Satterthwaite 근사 분산 상한을 재계산할 수 있어야 하며, 표본 수는 관측 SD가 아니라 상한 SD를
+사용한다. `power_input_sha256`은 접근 통제된 원본 pilot input과 결합한다.
 
 Agent 층의 `no_tool`은 기존 report schema의 안정성을 위해 유지하는 내부 expected 값이다. 공식 의미는
 "denylist 또는 비인가 도구 미실행"이며, case allowlist의 저위험 조회 도구까지 금지하지 않는다. 반대로

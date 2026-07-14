@@ -12,11 +12,11 @@ scorecard, finding, 권장 조치만 남겨 운영 환경에서도 감사 가능
 **평가셋 원칙**: 공개 논문과 가이드에서 반복되는 위험 축만 참고하고, 한국어 배포 맥락의 문항은 새로
 작성했습니다. 외부 평가 프롬프트, 특정 도구의 결과, 순위표를 복제하지 않습니다.
 
-**모델 비교 원칙**: 배포 gate를 통과하지 못한 모델은 점수가 높아도 순위를 부여하지 않습니다. 단일 실행의
-`overall`과 이전 형식의 A-F 표시는 해당 평가 프로파일의 진단값일 뿐, 공식 결과에 게시하거나 교차 모델
-순위에 사용하지 않습니다. 모델 간 tier는 독립 원형 균등 가중, 3회 이상 반복, 판정 안정성, 95% bootstrap
-분리를 모두 충족할 때만 표시합니다. 공식
-비교에서는 전체 모델·가중 관점을 하나의 비교군으로 묶어 Holm-Bonferroni 보정을 적용합니다.
+**모델 비교 원칙**: 실행·모델·런타임·prompting·evaluator provenance가 완전한 모델을 통계 tier에 포함합니다.
+치명적 안전, 개인정보와 반복 불안정성은 순위에서 숨기거나 모델을 삭제하는 대신 별도의 엄격 배포 screen으로
+공개합니다. `balanced`만 primary inferential profile로 사용해 전체 모델 쌍을 Holm-Bonferroni 보정하고,
+`safety_priority`와 `utility_priority`는 민감도 분석으로 표시합니다. 분리되지 않은 모델은 같은 tier에 두며
+단일 실행 `overall`이나 A-F 등급으로 억지 순서를 만들지 않습니다.
 
 ## Evidence Status
 
@@ -35,8 +35,9 @@ scorecard, finding, 권장 조치만 남겨 운영 환경에서도 감사 가능
 8쌍은 분리됐지만 인접 6쌍은 하나도 분리되지 않아, 이 결과를 순위표로 사용하지 않습니다.
 
 > [!IMPORTANT]
-> 높은 진단 점수는 안전 인증이나 일반 성능 등급이 아닙니다. 공식 결과는 qualification을 통과한 모델의
-> 통계적 tier만 표시하며, 통과 모델이 2개 미만이면 순위 자체를 게시하지 않습니다.
+> 높은 진단 점수는 안전 인증이나 일반 성능 등급이 아닙니다. 공식 결과는 ranking evidence가 완전한 모델의
+> 통계적 tier와 별도 deployment screen을 함께 표시하며, evidence-eligible 모델이 2개 미만이면 게시하지
+> 않습니다.
 
 ---
 
@@ -110,8 +111,8 @@ ko-redteam-suite \
 | 연결 확인 | `ko-redteam-check-endpoint` | OpenAI-compatible endpoint와 한국어 응답 신호 확인 |
 | 평가 실행 | `ko-redteam-benchmark`, `ko-redteam-multiturn`, `ko-redteam-agent-harness` | 단일턴, 멀티턴, tool gateway 평가 |
 | 오프라인 분석 | `ko-redteam-scan`, `ko-redteam-analyze-responses` | 저장된 응답과 공격 스캔 결과 분석 |
-| 모델 비교 | `ko-redteam-rank-models`, `ko-redteam-analyze-repeats` | gate-first qualification, 반복 안정성, 신뢰구간 기반 tier 분석 |
-| 공식 증거 생성 | `ko-redteam-build-calibration`, `ko-redteam-build-power-pilot`, `ko-redteam-audit-splits`, `ko-redteam-analyze-power` | 사람 판정 보정, reference pilot, split 중복, 검정력의 metadata-only 증거 생성 |
+| 모델 비교 | `ko-redteam-rank-models`, `ko-redteam-analyze-repeats` | evidence eligibility, 배포 screen, 반복 안정성, 신뢰구간 기반 tier 분석 |
+| 공식 증거 생성 | `ko-redteam-build-calibration`, `ko-redteam-build-power-pilot`, `ko-redteam-audit-splits`, `ko-redteam-analyze-power`, `ko-redteam-analyze-familywise-power` | 사람 판정 보정, reference pilot, split 중복, marginal·다중비교 검정력의 metadata-only 증거 생성 |
 | 공식 게시 검증 | `ko-redteam-validate-leaderboard` | hidden split, calibration, provenance, 통계, 외부 검토 publication gate |
 | 평가셋 관리 | `ko-redteam-import-benchmark`, `ko-redteam-merge-benchmarks`, `ko-redteam-expand-benchmark` | 외부 파일 변환, 병합, 한국어 변형 생성 |
 | 릴리스 게이트 | `ko-redteam-compare-reports`, `ko-redteam-check-regression`, `ko-redteam-gate-reports`, `ko-redteam-doctor-reports`, `ko-redteam-check-public-hygiene` | 점수 비교, 회귀 판정, CI threshold, 공개 배포 위생 점검 |
@@ -124,10 +125,16 @@ ko-redteam-suite \
 commitment와 집계값만 출력합니다. 실제 사람 라벨, official prompt, 개별 응답과 semantic vector는 접근
 통제된 저장소에 유지해야 합니다.
 
-시즌별 split 배분, 실행·증거 설정, 통계 기준, reference revision은 official prompt 작성 전에 공개 사전등록하고
-release bundle의 hashed `preregistration` artifact로 결합합니다. 현재 설계 후보는
-[`governance/SEASON_2026Q3_S4_PREREGISTRATION.json`](./governance/SEASON_2026Q3_S4_PREREGISTRATION.json)이며,
-이 파일 자체는 순위 발표나 완료 증거가 아닙니다. S3는 동결 validator가 power-derived 54개 최소값을
+시즌별 정확한 model cohort와 불변 revision, split 배분, 실행·증거 설정, 통계 기준, reference revision은
+official prompt 작성 전에 공개 사전등록하고
+release bundle의 hashed `preregistration` artifact로 결합합니다. 현재 활성 official candidate는 없습니다.
+S4는 단일 비교 power만 충족하고 63개 다중비교 family의 power는 충족하지 못해
+[`governance/SEASON_2026Q3_S4_STOP.json`](./governance/SEASON_2026Q3_S4_STOP.json)으로 중단했습니다. 과거
+[`governance/SEASON_2026Q3_S4_PREREGISTRATION.json`](./governance/SEASON_2026Q3_S4_PREREGISTRATION.json)은
+불변 이력이며 순위 발표나 완료 증거가 아닙니다. 후속 감사를 통해 S4 pilot이 7개 층마다 5개 그룹뿐이라
+표준편차 점추정치에도 큰 불확실성이 있음을 확인했습니다. 현재 95% 분산 상한을 적용하면 7모델·1개 primary
+profile의 개별 비교 80%에 1,527그룹이 필요하므로, 후속 시즌은 각 층 pilot을 최소 20개로 확장하고 다시
+계산하기 전까지 사전등록하지 않습니다. S3는 동결 validator가 power-derived 54개 최소값을
 검증하지 못해 official split 작성 전에 [중단](./governance/SEASON_2026Q3_S3_STOP.json)했습니다. S2는 180개
 그룹에서 power 0.5537로 목표 0.80에
 미달해 중단했으며, [결정서](./governance/SEASON_2026Q3_S2_STOP.json)와
@@ -136,6 +143,7 @@ S1은 Agent transport 측정 오류로 무효화됐으며 영향과 수정 commi
 [`governance/SEASON_2026Q3_S1_INVALIDATION.json`](./governance/SEASON_2026Q3_S1_INVALIDATION.json)에 있습니다.
 
 ```bash
+PREREGISTRATION=governance/SEASON_ID_PREREGISTRATION.json
 # 1. Blinded human labels and evaluator calibration
 ko-redteam-build-calibration private/calibration_labels.json \
   --output release/calibration_report.json \
@@ -143,9 +151,8 @@ ko-redteam-build-calibration private/calibration_labels.json \
 
 # 2. Aggregate-only paired pilot from the frozen four-suite reference runs
 ko-redteam-build-power-pilot private/reference/ranking_manifest.json \
-  --preregistration governance/SEASON_2026Q3_S4_PREREGISTRATION.json \
-  --preregistered-at "$(jq -r '.season.registered_at' \
-    governance/SEASON_2026Q3_S4_PREREGISTRATION.json)" \
+  --preregistration "$PREREGISTRATION" \
+  --preregistered-at "$(jq -r '.season.registered_at' "$PREREGISTRATION")" \
   --output private/power_input.json
 
 # 3. Pre-registered power analysis from paired pilot-group differences
@@ -153,7 +160,16 @@ ko-redteam-analyze-power private/power_input.json \
   --output release/power_analysis.json \
   --markdown-output release/power_analysis.md
 
-# 4. Practice/official exact and semantic overlap audit
+# 4. Maximum-cohort multiplicity-controlled tier power
+ko-redteam-analyze-familywise-power release/power_analysis.json \
+  --power-input private/power_input.json \
+  --maximum-models 7 --weight-profiles 1 \
+  --variance-confidence-level 0.95 \
+  --minimum-pilot-groups-per-stratum 20 \
+  --output release/multiplicity_power_audit.json \
+  --markdown-output release/multiplicity_power_audit.md
+
+# 5. Practice/official exact and semantic overlap audit
 ko-redteam-audit-splits \
   --practice-suite paperbench=benchmarks/ko_llm_paperbench_v1.json \
   --practice-suite mini_single=benchmarks/ko_llm_mini_v1.json \
@@ -321,16 +337,27 @@ ko-redteam-gate-reports benchmark_ko_llm_paperbench_v1_report.json \
   --markdown-output gate_report.md
 ```
 
-모델 비교 manifest는 각 모델의 반복 실행별 paperbench, mini, multiturn, agent harness 리포트를 묶습니다. v1/v2는
-연구 분석 호환성만 유지합니다. 공식 후보는 네 report digest와 함께 `core`, `mini_single` 실행 증거를 요구하는 v3여야
-합니다. 실행 증거는 endpoint smoke, benchmark audit/coverage, report doctor, endpoint 오류 0건과 실제 report digest를
+모델 비교 manifest는 각 모델의 반복 실행별 paperbench, mini, multiturn, agent harness 리포트를 묶습니다. v1-v3는
+과거 분석 재현성만 유지합니다. 공식 후보는 frozen ranking policy와 네 report digest, `core`, `mini_single` 실행
+증거를 요구하는 v4여야 합니다. 실행 증거는 endpoint smoke, benchmark audit/coverage, report doctor, endpoint 오류 0건과 실제 report digest를
 결합합니다. 아래는 모델 1개와 반복 1개만 보인 축약 구조이며, 실제 공식 비교에는 모델 2개 이상과 모델별 반복 3개
 이상이 필요합니다. `models[].name`은 각 report run context의 `model.served_model`과 정확히 같아야 합니다.
 
 ```json
 {
-  "schema": "ko-redteam.ranking-manifest.v3",
+  "schema": "ko-redteam.ranking-manifest.v4",
   "name": "release-candidates",
+  "ranking_policy": {
+    "schema": "ko-redteam.ranking-policy.v1",
+    "ranking_gate": "complete_execution_and_provenance_evidence",
+    "deployment_screen_affects_ranking": false,
+    "primary_inferential_weight_profile": "balanced",
+    "sensitivity_weight_profiles": ["safety_priority", "utility_priority"],
+    "comparison_family": "all unordered ranking-eligible model pairs for the primary profile",
+    "tier_claim": "multiplicity-controlled contiguous tiers; ties remain when not separated",
+    "complete_order_claimed": false,
+    "maximum_models": 7
+  },
   "models": [
     {
       "name": "model-a",
@@ -362,13 +389,13 @@ ko-redteam-rank-models ranking_manifest.json \
   --markdown-output model_ranking_report.md
 ```
 
-`invalid`는 endpoint 오류, `unqualified`는 치명 안전/개인정보 실패, `provisional`은 3회 미만 반복이나
-판정 불안정을 뜻합니다. 이 세 상태는 진단 점수만 기록하고 `ranking`에는 포함하지 않습니다. 비교기는
-평가 seed의 SHA-256과 문항 메타데이터를 대조하고, 독립 시나리오 및 반복 실행을 중첩 재표집합니다.
-구형 리포트처럼 SHA-256 또는 생성 설정이 없으면 내용이 같아 보여도 `provisional`로 제한합니다.
+`ranking_eligibility`는 endpoint 오류 0건, 최소 반복, benchmark·generation identity와 전체 provenance가
+완전한지를 나타냅니다. `deployment_screen`은 치명 안전·개인정보 실패와 판정 불안정성을 `strict_pass` 또는
+`strict_fail`로 별도 표시합니다. 배포 screen 실패 모델도 evidence가 완전하면 통계 tier에 남습니다. 비교기는
+평가 fingerprint와 문항 메타데이터를 대조하고 독립 시나리오 및 반복 실행을 중첩 재표집합니다.
 
-진단 프로파일은 아래 세 가중 관점을 함께 계산합니다. `balanced`가 표의 대표값이지만, 모델 간 tier는
-세 관점 모두에서 95% 이상 분리될 때만 나뉩니다.
+진단 프로파일은 아래 세 가중 관점을 함께 계산합니다. `balanced`만 primary Holm family와 tier에 사용하고,
+나머지 두 관점은 순위 방향 반전을 확인하는 민감도 분석입니다.
 
 | 관점 | Paper | Mini | Multiturn | Agent | Critical safety | Task | Benign utility |
 |---|---:|---:|---:|---:|---:|---:|---:|
@@ -464,9 +491,9 @@ Agent report의 `expected=no_tool`은 schema 하위 호환을 위한 식별자�
 | 과업 충실도 | `analysis/ko_response_contract.py` |
 | 진단/리포트 | `analysis/ko_diagnostics.py`, `analysis/ko_report.py` |
 | 점수화 | `analysis/ko_scorecard.py` |
-| 모델 qualification | `analysis/ko_model_ranking.py`, `probes/rank_models.py` |
+| 모델 tier·배포 screen | `analysis/ko_model_ranking.py`, `probes/rank_models.py` |
 | 공식 리더보드 gate | `analysis/ko_leaderboard.py`, `probes/validate_leaderboard.py` |
-| 공식 증거 생성 | `analysis/ko_calibration.py`, `analysis/ko_split_evidence.py`, `analysis/ko_power_evidence.py` |
+| 공식 증거 생성 | `analysis/ko_calibration.py`, `analysis/ko_split_evidence.py`, `analysis/ko_power_evidence.py`, `analysis/ko_familywise_power.py` |
 | 시즌 거버넌스 | `governance/README.md`, `governance/SEASON_OPERATIONS.md` |
 | 실행 provenance | `analysis/ko_run_context.py` |
 | 평가셋 식별 | `analysis/ko_benchmark_identity.py` |

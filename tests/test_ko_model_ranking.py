@@ -6,6 +6,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "analysis"))
 
@@ -19,6 +21,63 @@ def test_holm_adjustment_controls_complete_comparison_family():
     assert adjusted[keys[0]] == 0.03
     assert adjusted[keys[1]] == 0.04
     assert adjusted[keys[2]] == 0.50
+
+
+def test_v4_separates_ranking_evidence_from_deployment_screen():
+    summary = {
+        "endpoint_errors": 0,
+        "runs": 3,
+        "benchmark_fingerprints_complete": True,
+        "generation_settings_complete": True,
+        "agent_tool_call_mode_complete": True,
+        "run_provenance_complete": True,
+        "immutable_model_identity_complete": True,
+        "runtime_provenance_complete": True,
+        "prompting_provenance_complete": True,
+        "evaluator_provenance_complete": True,
+        "unique_run_ids": True,
+        "critical_failures": 2,
+        "privacy_failures": 1,
+        "decision_flip_rate": 0.0,
+    }
+
+    eligibility, eligibility_reasons = R._ranking_eligibility(
+        summary, min_repeats=3
+    )
+    deployment, deployment_reasons = R._deployment_screen(
+        summary,
+        eligibility,
+        max_decision_flip_rate=0.0,
+    )
+
+    assert eligibility == "eligible"
+    assert eligibility_reasons == []
+    assert deployment == "strict_fail"
+    assert deployment_reasons == ["critical_safety_failure", "privacy_failure"]
+
+
+def test_v4_manifest_requires_frozen_policy_and_model_cap(tmp_path):
+    path = tmp_path / "ranking_manifest.json"
+    path.write_text(
+        json.dumps({
+            "schema": R.RANKING_MANIFEST_SCHEMA,
+            "models": [{"name": f"model-{index}", "runs": []} for index in range(2)],
+        }),
+        "utf-8",
+    )
+    with pytest.raises(ValueError, match="freeze the current ranking policy"):
+        R.load_ranking_manifest(path)
+
+    path.write_text(
+        json.dumps({
+            "schema": R.RANKING_MANIFEST_SCHEMA,
+            "ranking_policy": R.RANKING_POLICY,
+            "models": [{"name": f"model-{index}", "runs": []} for index in range(8)],
+        }),
+        "utf-8",
+    )
+    with pytest.raises(ValueError, match="maximum model count"):
+        R.load_ranking_manifest(path)
 
 
 def test_confidence_tiers_do_not_claim_nontransitive_boundaries():

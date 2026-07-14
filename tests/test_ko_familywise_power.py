@@ -3,7 +3,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 from pathlib import Path
+from statistics import variance
 import subprocess
 import sys
 
@@ -13,6 +15,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "analysis"))
 
 import ko_familywise_power as F  # noqa: E402
+from ko_run_context import canonical_sha256  # noqa: E402
 
 
 def _power() -> dict:
@@ -29,6 +32,50 @@ def _power() -> dict:
         },
         "raw_prompt_or_response_used": False,
     }
+
+
+def _variance_power_and_input(
+    *,
+    pilot_groups_per_stratum: int = 20,
+    actual_groups: int = 2_100,
+) -> tuple[dict, dict]:
+    strata = [f"stratum-{index}" for index in range(7)]
+    target_counts = {name: actual_groups // len(strata) for name in strata}
+    target_counts[strata[0]] += actual_groups - sum(target_counts.values())
+    clusters = []
+    values = []
+    for stratum in strata:
+        for index in range(pilot_groups_per_stratum):
+            difference = -8.0 if index % 2 == 0 else 8.0
+            values.append(difference)
+            clusters.append(
+                {
+                    "id": f"{stratum}-{index}",
+                    "stratum": stratum,
+                    "difference": difference,
+                }
+            )
+    power_input = {
+        "schema": F.POWER_INPUT_SCHEMA,
+        "target_strata": target_counts,
+        "pilot_clusters": clusters,
+    }
+    power = _power()
+    power["actual_independence_groups"] = actual_groups
+    power["input_sha256"] = canonical_sha256(power_input)
+    power["pilot_summary"].update(
+        {
+            "cluster_count": len(clusters),
+            "pilot_stratum_counts": {
+                name: pilot_groups_per_stratum for name in strata
+            },
+            "target_strata": target_counts,
+            "standard_deviation": math.sqrt(
+                variance(values[:pilot_groups_per_stratum])
+            ),
+        }
+    )
+    return power, power_input
 
 
 def test_familywise_audit_exposes_marginal_power_mismatch():
@@ -147,6 +194,97 @@ def test_familywise_audit_passes_union_bound_design():
     assert report["maximum_season_cohort"]["simultaneous_status"] == "pass"
 
 
+def test_chi_square_quantile_matches_reference_values():
+    assert F._chi_square_quantile(0.95, 1.0) == pytest.approx(3.84145882, rel=1e-8)
+    assert F._chi_square_quantile(0.05, 4.0) == pytest.approx(0.71072302, rel=1e-8)
+
+
+def test_variance_adjusted_audit_uses_upper_bound_and_precision_gate():
+    power, power_input = _variance_power_and_input()
+    report = F.build_familywise_power_audit(
+        power,
+        source_power_sha256="b" * 64,
+        minimum_models=2,
+        maximum_models=7,
+        weight_profile_count=1,
+        power_input=power_input,
+        variance_confidence_level=0.95,
+        minimum_pilot_groups_per_stratum=20,
+    )
+
+    uncertainty = report["pilot_variance_uncertainty"]
+    assert report["schema"] == F.OUTPUT_SCHEMA
+    assert uncertainty["status"] == "pass"
+    assert F.variance_uncertainty_is_consistent(uncertainty) is True
+    assert uncertainty["minimum_pilot_groups_per_stratum_observed"] == 20
+    assert uncertainty["effective_degrees_of_freedom"] == pytest.approx(133.0)
+    assert uncertainty["design_standard_deviation_upper_bound"] > uncertainty[
+        "observed_standard_deviation"
+    ]
+    assert report["source"]["design_standard_deviation"] == uncertainty[
+        "design_standard_deviation_upper_bound"
+    ]
+
+    sparse_power, sparse_input = _variance_power_and_input(
+        pilot_groups_per_stratum=5
+    )
+    sparse = F.build_familywise_power_audit(
+        sparse_power,
+        source_power_sha256="b" * 64,
+        minimum_models=2,
+        maximum_models=7,
+        weight_profile_count=1,
+        power_input=sparse_input,
+        variance_confidence_level=0.95,
+        minimum_pilot_groups_per_stratum=20,
+    )
+    assert sparse["status"] == "pilot_variance_precision_fail"
+    assert sparse["decision"]["pilot_variance_precision_passed"] is False
+    assert sparse["decision"]["official_tier_design_supported"] is False
+
+    sparse["pilot_variance_uncertainty"]["upper_equivalent_variance"] -= 1.0
+    assert (
+        F.variance_uncertainty_is_consistent(
+            sparse["pilot_variance_uncertainty"]
+        )
+        is False
+    )
+
+
+def test_variance_adjusted_audit_rejects_unbound_power_input():
+    power, power_input = _variance_power_and_input()
+    power_input["pilot_clusters"][0]["difference"] = 99.0
+
+    with pytest.raises(ValueError, match="does not match"):
+        F.build_familywise_power_audit(
+            power,
+            source_power_sha256="b" * 64,
+            minimum_models=2,
+            maximum_models=7,
+            weight_profile_count=1,
+            power_input=power_input,
+            variance_confidence_level=0.95,
+            minimum_pilot_groups_per_stratum=20,
+        )
+
+
+def test_variance_adjusted_audit_rejects_mismatched_public_strata():
+    power, power_input = _variance_power_and_input()
+    power["pilot_summary"]["pilot_stratum_counts"]["stratum-0"] -= 1
+
+    with pytest.raises(ValueError, match="strata and cluster counts"):
+        F.build_familywise_power_audit(
+            power,
+            source_power_sha256="b" * 64,
+            minimum_models=2,
+            maximum_models=7,
+            weight_profile_count=1,
+            power_input=power_input,
+            variance_confidence_level=0.95,
+            minimum_pilot_groups_per_stratum=20,
+        )
+
+
 def test_familywise_power_cli_writes_public_outputs(tmp_path):
     source = tmp_path / "power.json"
     source.write_text(json.dumps(_power()), "utf-8")
@@ -184,3 +322,36 @@ def test_familywise_power_cli_writes_public_outputs(tmp_path):
     ] == 1527
     assert "familywise-power status=" in cp.stdout
     assert "동시 검출 power" in markdown.read_text("utf-8")
+
+
+def test_familywise_power_cli_builds_variance_adjusted_official_audit(tmp_path):
+    power, power_input = _variance_power_and_input()
+    source = tmp_path / "power.json"
+    private_input = tmp_path / "power_input.json"
+    output = tmp_path / "official_audit.json"
+    source.write_text(json.dumps(power), "utf-8")
+    private_input.write_text(json.dumps(power_input), "utf-8")
+
+    cp = subprocess.run(
+        [
+            sys.executable,
+            str(ROOT / "probes" / "analyze_familywise_power.py"),
+            str(source),
+            "--power-input",
+            str(private_input),
+            "--maximum-models",
+            "7",
+            "--weight-profiles",
+            "1",
+            "--output",
+            str(output),
+        ],
+        text=True,
+        capture_output=True,
+    )
+
+    assert cp.returncode == 0, cp.stderr
+    report = json.loads(output.read_text("utf-8"))
+    assert report["schema"] == F.OUTPUT_SCHEMA
+    assert report["pilot_variance_uncertainty"]["status"] == "pass"
+    assert report["decision"]["pilot_variance_precision_passed"] is True

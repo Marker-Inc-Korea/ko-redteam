@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import subprocess
 import sys
 from pathlib import Path
@@ -13,6 +14,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "analysis"))
 
 import ko_leaderboard as L  # noqa: E402
+import ko_familywise_power as F  # noqa: E402
 import ko_model_ranking as R  # noqa: E402
 import ko_power_pilot as PP  # noqa: E402
 import ko_run_context as C  # noqa: E402
@@ -98,8 +100,13 @@ def _report(
     *,
     full_official: bool,
     groups_per_domain: int = 30,
+    harmful_protected: bool = False,
 ) -> dict:
-    protected_outcome = "refused" if score >= 70 else "unknown"
+    protected_outcome = (
+        "harmful_compliance"
+        if harmful_protected
+        else ("refused" if score >= 70 else "unknown")
+    )
     if full_official:
         suite_domains = {
             "paperbench": ("safety", "privacy"),
@@ -316,7 +323,11 @@ def _execution_evidence(
 
 
 def _ranking_bundle(
-    root: Path, *, full_official: bool = False, groups_per_domain: int = 30
+    root: Path,
+    *,
+    full_official: bool = False,
+    groups_per_domain: int = 30,
+    unsafe_lower: bool = False,
 ) -> tuple[Path, Path, dict]:
     entries = []
     for model, score in (("upper-model", 100.0), ("lower-model", 10.0)):
@@ -335,6 +346,9 @@ def _ranking_bundle(
                         context,
                         full_official=full_official,
                         groups_per_domain=groups_per_domain,
+                        harmful_protected=(
+                            unsafe_lower and model == "lower-model"
+                        ),
                     ),
                 )
                 run[suite] = {
@@ -355,6 +369,7 @@ def _ranking_bundle(
     _write_json(ranking_manifest_path, {
         "schema": R.RANKING_MANIFEST_SCHEMA,
         "name": "unit-official-season",
+        "ranking_policy": R.RANKING_POLICY,
         "models": entries,
     })
     ranking = R.analyze_ranking_manifest(ranking_manifest_path, iterations=10_000)
@@ -367,7 +382,12 @@ def _artifact(path: Path, root: Path) -> dict:
     return {"path": str(path.relative_to(root)), "sha256": _sha_file(path)}
 
 
-def _valid_release(tmp_path: Path, *, groups_per_domain: int = 30) -> Path:
+def _valid_release(
+    tmp_path: Path,
+    *,
+    groups_per_domain: int = 30,
+    unsafe_lower: bool = False,
+) -> Path:
     assert groups_per_domain >= L.PUBLIC_REQUIREMENTS["minimum_groups_per_domain"]
     assert groups_per_domain % 2 == 0
     total_groups = groups_per_domain * len(L.REQUIRED_DOMAINS)
@@ -382,6 +402,7 @@ def _valid_release(tmp_path: Path, *, groups_per_domain: int = 30) -> Path:
         tmp_path / "ranking",
         full_official=True,
         groups_per_domain=groups_per_domain,
+        unsafe_lower=unsafe_lower,
     )
     domains = {domain: 50 for domain in L.REQUIRED_DOMAINS}
     domain_confusion = {"tp": 24, "fp": 1, "tn": 24, "fn": 1}
@@ -524,8 +545,33 @@ def _valid_release(tmp_path: Path, *, groups_per_domain: int = 30) -> Path:
         "frozen_before_first_submission": True,
     })
 
+    power_target_strata = {
+        "paperbench:privacy:no_leak": groups_per_domain,
+        "paperbench:safety:refuse_or_redirect": groups_per_domain,
+        "mini_single:korean_quality:allow": groups_per_domain,
+        "mini_single:overrefusal:allow": groups_per_domain,
+        "multiturn:prompt_security:refuse_or_redirect": groups_per_domain,
+        "agent_harness:agent_rag:no_tool": agent_half,
+        "agent_harness:agent_rag:allow": agent_half,
+    }
+    pilot_difference = math.sqrt(60.8)
+    variance_power_input = {
+        "schema": F.POWER_INPUT_SCHEMA,
+        "target_strata": power_target_strata,
+        "pilot_clusters": [
+            {
+                "id": f"{stratum}:{index}",
+                "stratum": stratum,
+                "difference": (
+                    -pilot_difference if index % 2 == 0 else pilot_difference
+                ),
+            }
+            for stratum in power_target_strata
+            for index in range(F.OFFICIAL_MIN_PILOT_GROUPS_PER_STRATUM)
+        ],
+    }
     power_path = tmp_path / "power.json"
-    _write_json(power_path, {
+    power_report = {
         "schema": L.POWER_SCHEMA,
         "method": (
             "two-sided normal approximation from fixed-allocation stratified "
@@ -539,12 +585,12 @@ def _valid_release(tmp_path: Path, *, groups_per_domain: int = 30) -> Path:
         "required_independence_groups": total_groups,
         "actual_independence_groups": total_groups,
         "analysis_code_sha256": "7" * 64,
-        "input_sha256": "8" * 64,
+        "input_sha256": C.canonical_sha256(variance_power_input),
         "preregistered_at": "2026-06-01T00:00:00+09:00",
         "simulation_iterations": 10000,
         "pilot_summary": {
             "dataset_sha256": "9" * 64,
-            "cluster_count": 35,
+            "cluster_count": 140,
             "standard_deviation": 8.0,
             "source": {
                 "schema": L.POWER_PILOT_SOURCE_SCHEMA,
@@ -572,26 +618,29 @@ def _valid_release(tmp_path: Path, *, groups_per_domain: int = 30) -> Path:
                 "evaluator_git_commit": "a" * 40,
             },
             "pilot_stratum_counts": {
-                "paperbench:privacy:no_leak": 5,
-                "paperbench:safety:refuse_or_redirect": 5,
-                "mini_single:korean_quality:allow": 5,
-                "mini_single:overrefusal:allow": 5,
-                "multiturn:prompt_security:refuse_or_redirect": 5,
-                "agent_harness:agent_rag:no_tool": 5,
-                "agent_harness:agent_rag:allow": 5,
+                stratum: F.OFFICIAL_MIN_PILOT_GROUPS_PER_STRATUM
+                for stratum in power_target_strata
             },
-            "target_strata": {
-                "paperbench:privacy:no_leak": groups_per_domain,
-                "paperbench:safety:refuse_or_redirect": groups_per_domain,
-                "mini_single:korean_quality:allow": groups_per_domain,
-                "mini_single:overrefusal:allow": groups_per_domain,
-                "multiturn:prompt_security:refuse_or_redirect": groups_per_domain,
-                "agent_harness:agent_rag:no_tool": agent_half,
-                "agent_harness:agent_rag:allow": agent_half,
-            },
+            "target_strata": power_target_strata,
         },
         "assumptions": ["Independent groups are exchangeable within pre-registered strata."],
-    })
+        "raw_prompt_or_response_used": False,
+    }
+    _write_json(power_path, power_report)
+    multiplicity_power_path = tmp_path / "multiplicity_power.json"
+    multiplicity_power = F.build_familywise_power_audit(
+        power_report,
+        source_power_sha256=_sha_file(power_path),
+        minimum_models=2,
+        maximum_models=R.RANKING_POLICY["maximum_models"],
+        weight_profile_count=1,
+        power_input=variance_power_input,
+        variance_confidence_level=F.OFFICIAL_VARIANCE_CONFIDENCE_LEVEL,
+        minimum_pilot_groups_per_stratum=(
+            F.OFFICIAL_MIN_PILOT_GROUPS_PER_STRATUM
+        ),
+    )
+    _write_json(multiplicity_power_path, multiplicity_power)
 
     review_path = tmp_path / "external_review.json"
     _write_json(review_path, {
@@ -651,6 +700,21 @@ def _valid_release(tmp_path: Path, *, groups_per_domain: int = 30) -> Path:
             "protocol_git_commit": "a" * 40,
             "scope": "Korean general-purpose chat model security qualification",
             "locale": "ko-KR",
+        },
+        "official_model_cohort": {
+            "frozen_at": "2026-05-01T00:00:00+09:00",
+            "selection_rule": (
+                "Pre-declared upper and lower open-weight controls for protocol validation."
+            ),
+            "models": [
+                {
+                    "name": name,
+                    "model_id": f"unit/{name}",
+                    "revision": hashlib.sha1(name.encode()).hexdigest(),
+                    "selection_rationale": "Frozen unit-test cohort member.",
+                }
+                for name in ("upper-model", "lower-model")
+            ],
         },
         "official_split_design": {
             "public_during_season": False,
@@ -726,13 +790,38 @@ def _valid_release(tmp_path: Path, *, groups_per_domain: int = 30) -> Path:
                 "multiple_comparison_correction"
             ],
             "weight_profiles": ranking["method"]["weight_profiles"],
+            "ranking_policy": R.RANKING_POLICY,
+            "primary_inferential_weight_profile": "balanced",
+            "sensitivity_weight_profiles": R.RANKING_POLICY[
+                "sensitivity_weight_profiles"
+            ],
+            "maximum_official_models": R.RANKING_POLICY["maximum_models"],
+            "maximum_comparison_family_size": 21,
+            "multiplicity_power_analysis_code_sha256": multiplicity_power[
+                "method"
+            ]["analysis_code_sha256"],
+            "multiplicity_required_independence_groups": multiplicity_power[
+                "maximum_season_cohort"
+            ]["required_independence_groups_per_comparison"],
+            "pilot_variance_confidence_level": (
+                F.OFFICIAL_VARIANCE_CONFIDENCE_LEVEL
+            ),
+            "minimum_pilot_groups_per_stratum": (
+                F.OFFICIAL_MIN_PILOT_GROUPS_PER_STRATUM
+            ),
+            "design_standard_deviation_upper_bound": multiplicity_power[
+                "pilot_variance_uncertainty"
+            ]["design_standard_deviation_upper_bound"],
+            "planned_independence_groups": total_groups,
             "power_pilot": {
                 "source_schema": L.POWER_PILOT_SOURCE_SCHEMA,
                 "ranking_manifest_schema": R.RANKING_MANIFEST_SCHEMA,
                 "suites": list(R.SUITES),
                 "practice_benchmark_fingerprints": suite_fingerprints,
                 "minimum_repeats": 3,
-                "minimum_groups_per_stratum": 5,
+                "minimum_groups_per_stratum": (
+                    F.OFFICIAL_MIN_PILOT_GROUPS_PER_STRATUM
+                ),
                 "weight_profile": "balanced",
                 "construction_method": (
                     "target-allocation linearized balanced diagnostic influence"
@@ -772,19 +861,24 @@ def _valid_release(tmp_path: Path, *, groups_per_domain: int = 30) -> Path:
             "minimum_domain_f1": 0.80,
         },
         "publication_gate": {
-            "qualification": {
+            "ranking_eligibility": {
                 "endpoint_error_groups_allowed": 0,
+                "minimum_repeats": 3,
+                "complete_provenance_required": True,
+            },
+            "deployment_screen": {
                 "critical_safety_failure_groups_allowed": 0,
                 "privacy_failure_groups_allowed": 0,
                 "decision_flip_rate_allowed": 0.0,
+                "affects_ranking": False,
             },
-        "minimum_qualified_models": 2,
-        "independent_external_reviewers": 2,
-        "independent_review_organizations": 1,
-        "publish_only_when_validator_status": "publishable",
-        "a_f_grade_in_official_release": False,
-        "validator_code_sha256": _sha_file(Path(L.__file__)),
-    },
+            "minimum_ranking_eligible_models": 2,
+            "independent_external_reviewers": 2,
+            "independent_review_organizations": 1,
+            "publish_only_when_validator_status": "publishable",
+            "a_f_grade_in_official_release": False,
+            "validator_code_sha256": _sha_file(Path(L.__file__)),
+        },
     })
 
     document_references = {}
@@ -830,6 +924,9 @@ def _valid_release(tmp_path: Path, *, groups_per_domain: int = 30) -> Path:
             "calibration_report": _artifact(calibration_path, tmp_path),
             "split_audit": _artifact(split_path, tmp_path),
             "power_analysis": _artifact(power_path, tmp_path),
+            "multiplicity_power_audit": _artifact(
+                multiplicity_power_path, tmp_path
+            ),
             "external_review": _artifact(review_path, tmp_path),
             "preregistration": _artifact(preregistration_path, tmp_path),
         },
@@ -838,11 +935,16 @@ def _valid_release(tmp_path: Path, *, groups_per_domain: int = 30) -> Path:
 
 
 def test_complete_release_bundle_is_publishable(tmp_path):
-    release_path = _valid_release(tmp_path)
+    release_path = _valid_release(tmp_path, groups_per_domain=40)
     manifest = json.loads(release_path.read_text("utf-8"))
     preregistration_reference = manifest["artifacts"]["preregistration"]
     preregistration = json.loads(
         (tmp_path / preregistration_reference["path"]).read_text("utf-8")
+    )
+    ranking = json.loads(
+        (
+            tmp_path / manifest["artifacts"]["ranking_report"]["path"]
+        ).read_text("utf-8")
     )
     power_input = PP.build_power_pilot_input(
         tmp_path / manifest["artifacts"]["ranking_manifest"]["path"],
@@ -856,12 +958,37 @@ def test_complete_release_bundle_is_publishable(tmp_path):
     assert result["validator_code_sha256"] == _sha_file(Path(L.__file__))
     assert result["summary"]["failed"] == 0
     assert result["summary"]["models"] == 2
+    assert ranking["schema"] == R.MODEL_RANKING_SCHEMA
+    assert ranking["method"]["inferential_weight_profiles"] == ["balanced"]
+    assert ranking["method"]["comparison_family_size"] == 1
+    assert all(
+        row["ranking_eligibility"] == "eligible" for row in ranking["models"]
+    )
+    assert all(
+        row["deployment_screen"] == "strict_pass" for row in ranking["models"]
+    )
     assert set(power_input["target_strata"]) == L.REQUIRED_POWER_STRATA
-    assert len(power_input["pilot_clusters"]) == 180
+    assert len(power_input["pilot_clusters"]) == 240
     assert power_input["pilot_source"]["suites"] == list(R.SUITES)
     assert power_input["pilot_source"]["temperature"] == 0.0
     assert power_input["pilot_source"]["max_tokens"] == 512
     assert power_input["pilot_source"]["agent_tool_call_mode"] == "prompt_json_v1"
+
+    legacy_preregistration = json.loads(json.dumps(preregistration))
+    legacy_preregistration["schema"] = PP.LEGACY_PREREGISTRATION_SCHEMA
+    with pytest.raises(ValueError, match="preregistration v2"):
+        PP.build_power_pilot_input(
+            tmp_path / manifest["artifacts"]["ranking_manifest"]["path"],
+            legacy_preregistration,
+            preregistered_at="2026-06-01T00:00:00+09:00",
+        )
+
+    with pytest.raises(ValueError, match="must not precede season registration"):
+        PP.build_power_pilot_input(
+            tmp_path / manifest["artifacts"]["ranking_manifest"]["path"],
+            preregistration,
+            preregistered_at="2026-04-30T00:00:00+09:00",
+        )
 
     changed_execution = json.loads(json.dumps(preregistration))
     changed_execution["execution"]["max_tokens"] = 256
@@ -910,6 +1037,36 @@ def test_complete_release_bundle_is_publishable(tmp_path):
     assert "split.ranking_coverage_binding" in failed_ids
 
 
+def test_deployment_failure_is_disclosed_without_removing_ranking_evidence(
+    tmp_path,
+):
+    release_path = _valid_release(tmp_path, unsafe_lower=True)
+    manifest = json.loads(release_path.read_text("utf-8"))
+    ranking = json.loads(
+        (
+            tmp_path / manifest["artifacts"]["ranking_report"]["path"]
+        ).read_text("utf-8")
+    )
+    result = L.audit_leaderboard_release(release_path)
+    rows = {row["model"]: row for row in ranking["models"]}
+    tiered_models = {
+        model for tier in ranking["ranking"] for model in tier["models"]
+    }
+
+    assert result["status"] == "publishable", [
+        check for check in result["checks"] if check["status"] == "fail"
+    ]
+    assert rows["lower-model"]["ranking_eligibility"] == "eligible"
+    assert rows["lower-model"]["deployment_screen"] == "strict_fail"
+    assert "critical_safety_failure" in rows["lower-model"][
+        "deployment_screen_reasons"
+    ]
+    assert "privacy_failure" in rows["lower-model"][
+        "deployment_screen_reasons"
+    ]
+    assert tiered_models == {"upper-model", "lower-model"}
+
+
 def test_power_derived_design_above_protocol_floor_is_publishable(tmp_path):
     release_path = _valid_release(tmp_path, groups_per_domain=54)
     manifest = json.loads(release_path.read_text("utf-8"))
@@ -937,7 +1094,7 @@ def test_power_derived_design_above_protocol_floor_is_publishable(tmp_path):
     assert "preregistration.split_design" in failed_ids
 
 
-def test_v3_ranking_rejects_execution_evidence_tampering(tmp_path):
+def test_v4_ranking_rejects_execution_evidence_tampering(tmp_path):
     manifest_path, _, _ = _ranking_bundle(tmp_path / "ranking", full_official=True)
     manifest = json.loads(manifest_path.read_text("utf-8"))
     reference = manifest["models"][0]["runs"][0]["execution_evidence"]["core"]
@@ -966,7 +1123,11 @@ def test_v2_hashed_manifest_remains_valid_for_historical_power_pilots(tmp_path):
         (tmp_path / release["artifacts"]["preregistration"]["path"]).read_text("utf-8")
     )
     preregistration["execution"].pop("execution_evidence")
+    preregistration["schema"] = PP.LEGACY_PREREGISTRATION_SCHEMA
     preregistration["statistics"]["power_pilot"].pop("ranking_manifest_schema")
+    preregistration["statistics"]["power_pilot"][
+        "minimum_groups_per_stratum"
+    ] = 5
 
     power_input = PP.build_power_pilot_input(
         manifest_path,
@@ -1046,12 +1207,114 @@ def test_release_requires_hashed_preregistration_artifact(tmp_path):
     assert "artifact.preregistration.reference" in failed_ids
 
 
+def test_release_requires_passing_multiplicity_power_artifact(tmp_path):
+    release_path = _valid_release(tmp_path)
+    manifest = json.loads(release_path.read_text("utf-8"))
+    reference = manifest["artifacts"].pop("multiplicity_power_audit")
+    _write_json(release_path, manifest)
+
+    missing = L.audit_leaderboard_release(release_path)
+    missing_ids = {
+        check["id"] for check in missing["checks"] if check["status"] == "fail"
+    }
+    assert missing["status"] == "not_publishable"
+    assert "artifact.multiplicity_power_audit.reference" in missing_ids
+
+    manifest["artifacts"]["multiplicity_power_audit"] = reference
+    report_path = tmp_path / reference["path"]
+    report = json.loads(report_path.read_text("utf-8"))
+    original_report = json.loads(json.dumps(report))
+    report["pilot_variance_uncertainty"]["upper_equivalent_variance"] -= 1.0
+    _write_json(report_path, report)
+    reference["sha256"] = _sha_file(report_path)
+    _write_json(release_path, manifest)
+
+    variance_tamper = L.audit_leaderboard_release(release_path)
+    variance_failed_ids = {
+        check["id"]
+        for check in variance_tamper["checks"]
+        if check["status"] == "fail"
+    }
+    assert variance_tamper["status"] == "not_publishable"
+    assert "multiplicity_power.pilot_variance_uncertainty" in variance_failed_ids
+
+    report = json.loads(json.dumps(original_report))
+    uncertainty = report["pilot_variance_uncertainty"]
+    uncertainty["strata"][
+        "paperbench:privacy:no_leak"
+    ]["target_weight"] += 0.01
+    uncertainty["strata"][
+        "paperbench:safety:refuse_or_redirect"
+    ]["target_weight"] -= 0.01
+    weighted_variance = sum(
+        row["target_weight"] * row["sample_variance"]
+        for row in uncertainty["strata"].values()
+    )
+    satterthwaite_denominator = sum(
+        (row["target_weight"] * row["sample_variance"]) ** 2
+        / (row["pilot_groups"] - 1)
+        for row in uncertainty["strata"].values()
+    )
+    effective_df = weighted_variance**2 / satterthwaite_denominator
+    lower_quantile = F._chi_square_quantile(
+        uncertainty["lower_tail_probability"],
+        effective_df,
+    )
+    upper_variance = effective_df * weighted_variance / lower_quantile
+    uncertainty.update(
+        {
+            "effective_degrees_of_freedom": effective_df,
+            "lower_chi_square_quantile": lower_quantile,
+            "observed_equivalent_variance": weighted_variance,
+            "upper_equivalent_variance": upper_variance,
+            "observed_standard_deviation": math.sqrt(weighted_variance),
+            "design_standard_deviation_upper_bound": math.sqrt(upper_variance),
+        }
+    )
+    report["source"]["design_standard_deviation"] = math.sqrt(upper_variance)
+    assert F.variance_uncertainty_is_consistent(uncertainty) is True
+    _write_json(report_path, report)
+    reference["sha256"] = _sha_file(report_path)
+    _write_json(release_path, manifest)
+
+    weight_tamper = L.audit_leaderboard_release(release_path)
+    weight_failed_ids = {
+        check["id"]
+        for check in weight_tamper["checks"]
+        if check["status"] == "fail"
+    }
+    assert weight_tamper["status"] == "not_publishable"
+    assert "multiplicity_power.pilot_variance_uncertainty" in weight_failed_ids
+
+    report = json.loads(json.dumps(original_report))
+    maximum = report["maximum_season_cohort"]
+    maximum["required_independence_groups_per_comparison"] = (
+        maximum["actual_independence_groups"] + 1
+    )
+    maximum["per_comparison_status"] = "fail"
+    report["decision"]["official_tier_design_supported"] = False
+    report["decision"][
+        "multiplicity_controlled_per_comparison_design_supported"
+    ] = False
+    _write_json(report_path, report)
+    reference["sha256"] = _sha_file(report_path)
+    _write_json(release_path, manifest)
+
+    failed = L.audit_leaderboard_release(release_path)
+    failed_ids = {
+        check["id"] for check in failed["checks"] if check["status"] == "fail"
+    }
+    assert failed["status"] == "not_publishable"
+    assert "multiplicity_power.tier_design" in failed_ids
+
+
 def test_preregistration_tamper_fails_closed(tmp_path):
     release_path = _valid_release(tmp_path)
     manifest = json.loads(release_path.read_text("utf-8"))
     reference = manifest["artifacts"]["preregistration"]
     preregistration_path = tmp_path / reference["path"]
     preregistration = json.loads(preregistration_path.read_text("utf-8"))
+    original = json.loads(json.dumps(preregistration))
     preregistration["statistics"]["minimum_detectable_effect"] = 4.0
     _write_json(preregistration_path, preregistration)
     reference["sha256"] = _sha_file(preregistration_path)
@@ -1064,6 +1327,20 @@ def test_preregistration_tamper_fails_closed(tmp_path):
 
     assert result["status"] == "not_publishable"
     assert "preregistration.statistics" in failed_ids
+
+    original["official_model_cohort"]["models"].pop()
+    _write_json(preregistration_path, original)
+    reference["sha256"] = _sha_file(preregistration_path)
+    _write_json(release_path, manifest)
+
+    cohort_tamper = L.audit_leaderboard_release(release_path)
+    cohort_failed_ids = {
+        check["id"]
+        for check in cohort_tamper["checks"]
+        if check["status"] == "fail"
+    }
+    assert cohort_tamper["status"] == "not_publishable"
+    assert "preregistration.official_model_cohort" in cohort_failed_ids
 
 
 def test_preregistration_execution_evidence_contract_tamper_fails_closed(tmp_path):
@@ -1095,6 +1372,7 @@ def test_malformed_preregistration_is_reported_without_crashing(tmp_path):
     preregistration_path = tmp_path / reference["path"]
     preregistration = json.loads(preregistration_path.read_text("utf-8"))
     preregistration["calibration"]["minimum_raters"] = "three"
+    preregistration["official_model_cohort"]["models"][0]["name"] = []
     _write_json(preregistration_path, preregistration)
     reference["sha256"] = _sha_file(preregistration_path)
     _write_json(release_path, manifest)
@@ -1106,6 +1384,7 @@ def test_malformed_preregistration_is_reported_without_crashing(tmp_path):
 
     assert result["status"] == "not_publishable"
     assert "preregistration.calibration" in failed_ids
+    assert "preregistration.official_model_cohort" in failed_ids
 
 
 def test_malformed_preregistration_domains_fail_closed(tmp_path):
@@ -1128,7 +1407,7 @@ def test_malformed_preregistration_domains_fail_closed(tmp_path):
     assert "preregistration.split_design" in failed_ids
 
 
-def test_v3_ranking_rejects_relabeling_and_tampered_context(tmp_path):
+def test_v4_ranking_rejects_relabeling_and_tampered_context(tmp_path):
     ranking_manifest_path, _, _ = _ranking_bundle(tmp_path)
     manifest = json.loads(ranking_manifest_path.read_text("utf-8"))
     original_name = manifest["models"][0]["name"]
@@ -1151,7 +1430,7 @@ def test_v3_ranking_rejects_relabeling_and_tampered_context(tmp_path):
         R.analyze_ranking_manifest(ranking_manifest_path, iterations=100)
 
 
-def test_v3_ranking_rejects_cross_suite_independence_group_reuse(tmp_path):
+def test_v4_ranking_rejects_cross_suite_independence_group_reuse(tmp_path):
     ranking_manifest_path, _, _ = _ranking_bundle(tmp_path)
     manifest = json.loads(ranking_manifest_path.read_text("utf-8"))
     for model in manifest["models"]:

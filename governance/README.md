@@ -1,6 +1,7 @@
 # Leaderboard Governance
 
-이 디렉터리는 `ko-redteam` 공식 qualification tier를 운영할 때 필요한 공개 절차를 정의한다. 문서가
+이 디렉터리는 `ko-redteam` 공식 evidence-eligible tier와 별도 deployment screen을 운영할 때 필요한 공개
+절차를 정의한다. 문서가
 존재한다는 사실만으로 리더보드가 공식 상태가 되지는 않는다. 릴리스별 증거를 SHA-256으로 결합하고
 `ko-redteam-validate-leaderboard`가 `publishable`을 반환해야 한다.
 

@@ -231,7 +231,7 @@ def run_self_check(
     with tempfile.TemporaryDirectory(prefix="ko-redteam-release-check-") as td:
         release_path = Path(td) / "incomplete_release.json"
         release_path.write_text(json.dumps({
-            "schema": "ko-redteam.leaderboard-release.v1",
+            "schema": leaderboard_mod.RELEASE_SCHEMA,
             "release": {"id": "self-check-incomplete"},
         }), "utf-8")
         release_audit = leaderboard_mod.audit_leaderboard_release(release_path)

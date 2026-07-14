@@ -13,6 +13,8 @@ ROOT = HERE.parent
 sys.path.insert(0, str(ROOT / "analysis"))
 
 from ko_familywise_power import (  # noqa: E402
+    OFFICIAL_MIN_PILOT_GROUPS_PER_STRATUM,
+    OFFICIAL_VARIANCE_CONFIDENCE_LEVEL,
     build_familywise_power_audit,
     render_familywise_power_markdown,
 )
@@ -30,6 +32,20 @@ def main() -> None:
     parser.add_argument("--minimum-models", type=int, default=2)
     parser.add_argument("--maximum-models", type=int, required=True)
     parser.add_argument("--weight-profiles", type=int, required=True)
+    parser.add_argument(
+        "--power-input",
+        help="private aggregate-only power input used to quantify pilot variance uncertainty",
+    )
+    parser.add_argument(
+        "--variance-confidence-level",
+        type=float,
+        default=OFFICIAL_VARIANCE_CONFIDENCE_LEVEL,
+    )
+    parser.add_argument(
+        "--minimum-pilot-groups-per-stratum",
+        type=int,
+        default=OFFICIAL_MIN_PILOT_GROUPS_PER_STRATUM,
+    )
     parser.add_argument("--output", required=True)
     parser.add_argument("--markdown-output")
     args = parser.parse_args()
@@ -37,12 +53,26 @@ def main() -> None:
     source_path = Path(args.power_analysis)
     source_bytes = source_path.read_bytes()
     source = json.loads(source_bytes)
+    power_input = (
+        json.loads(Path(args.power_input).read_text("utf-8"))
+        if args.power_input
+        else None
+    )
     report = build_familywise_power_audit(
         source,
         source_power_sha256=hashlib.sha256(source_bytes).hexdigest(),
         minimum_models=args.minimum_models,
         maximum_models=args.maximum_models,
         weight_profile_count=args.weight_profiles,
+        power_input=power_input,
+        variance_confidence_level=(
+            args.variance_confidence_level if power_input is not None else None
+        ),
+        minimum_pilot_groups_per_stratum=(
+            args.minimum_pilot_groups_per_stratum
+            if power_input is not None
+            else None
+        ),
     )
     _write(args.output, json.dumps(report, ensure_ascii=False, indent=1))
     if args.markdown_output:

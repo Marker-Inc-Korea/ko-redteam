@@ -3,6 +3,22 @@
 프로토콜과 시즌 결과의 변경 이력을 분리해 기록한다. `Unreleased` 항목은 공식 시즌에 적용됐다는 뜻이
 아니며, release bundle에 포함된 동결 commit과 문서 digest가 최종 근거다.
 
+## Unreleased - Evidence-Eligible Ranking Protocol
+
+- ranking manifest v4부터 실행·provenance evidence eligibility와 엄격 deployment screen을 분리한다. critical,
+  privacy 또는 반복 불안정성은 공개 위험 판정에 남지만 evidence-complete 모델을 통계 tier에서 삭제하지 않는다.
+- `balanced`를 유일한 primary inferential profile로 고정하고 최대 7모델의 21개 pair를 Holm family로 묶는다.
+  safety·utility profile은 민감도 분석이며 complete-order recovery를 주장하지 않는다.
+- 공식 release bundle에 최대 cohort의 보정 후 MDE power를 검증한 `multiplicity_power_audit`를 추가한다.
+  v1-v3 manifest와 model-ranking v2 동작은 과거 결과 재현을 위해 보존한다.
+- 공식 모델 cohort의 이름·ID·불변 revision을 실행 전에 정확히 동결하고 ranking manifest와 불일치하면
+  게시를 거부한다. 사후 모델 제외·추가로 comparison family를 바꿀 수 없다.
+- 층별 최소 20개 reference pilot과 95% 단측 Welch-Satterthwaite 분산 상한을 공식 power gate에 추가한다.
+  S4의 층별 5개 pilot을 이 기준으로 재감사하면 design SD가 32.11에서 50.34로 올라가고, 7모델·1개 primary
+  profile의 개별 비교 80% 필요량은 1,527그룹이므로 successor preregistration 전에 pilot을 확장한다.
+- breaking publication contract를 `leaderboard-release.v2`와 `season-preregistration.v2`로 승격한다. 과거
+  S1-S4 `v1` 등록은 수정하지 않으며 신규 v4 pilot이나 공식 release에 재사용할 수 없다.
+
 ## 2026-07-14 - S3 Protocol Stop And S4 Preregistration
 
 - S3의 영역별 54개 power-derived 설계와 power 0.801은 기준을 충족했지만, 동결 validator는 선언 최소값을

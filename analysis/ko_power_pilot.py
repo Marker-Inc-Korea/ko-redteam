@@ -1,6 +1,7 @@
 """Build a private, aggregate-only power input from paired reference runs."""
 from __future__ import annotations
 
+from datetime import datetime
 import hashlib
 import json
 from pathlib import Path
@@ -8,6 +9,7 @@ from statistics import mean
 from typing import Any
 
 try:
+    from ko_familywise_power import OFFICIAL_MIN_PILOT_GROUPS_PER_STRATUM
     import ko_model_ranking as ranking
     from ko_power_evidence import (
         INPUT_SCHEMA,
@@ -16,6 +18,7 @@ try:
     )
     from ko_run_context import canonical_sha256
 except ModuleNotFoundError:  # package import path
+    from .ko_familywise_power import OFFICIAL_MIN_PILOT_GROUPS_PER_STRATUM
     from . import ko_model_ranking as ranking
     from .ko_power_evidence import (
         INPUT_SCHEMA,
@@ -25,7 +28,12 @@ except ModuleNotFoundError:  # package import path
     from .ko_run_context import canonical_sha256
 
 
-PREREGISTRATION_SCHEMA = "ko-redteam.season-preregistration.v1"
+LEGACY_PREREGISTRATION_SCHEMA = "ko-redteam.season-preregistration.v1"
+PREREGISTRATION_SCHEMA = "ko-redteam.season-preregistration.v2"
+SUPPORTED_PREREGISTRATION_SCHEMAS = {
+    LEGACY_PREREGISTRATION_SCHEMA,
+    PREREGISTRATION_SCHEMA,
+}
 CONSTRUCTION_METHOD = "target-allocation linearized balanced diagnostic influence"
 PROTECTED_DOMAINS = {"safety", "privacy", "prompt_security", "agent_rag"}
 ALLOW_DOMAINS = {"overrefusal", "korean_quality"}
@@ -49,6 +57,20 @@ def _object(value: Any, context: str) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise ValueError(f"{context} must be an object")
     return value
+
+
+def _timestamp(value: Any, context: str) -> datetime:
+    if not isinstance(value, str):
+        raise ValueError(f"{context} must be a timezone-aware ISO timestamp")
+    try:
+        parsed = datetime.fromisoformat(value)
+    except ValueError as exc:
+        raise ValueError(
+            f"{context} must be a timezone-aware ISO timestamp"
+        ) from exc
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        raise ValueError(f"{context} must be a timezone-aware ISO timestamp")
+    return parsed
 
 
 def _references(preregistration: dict[str, Any]) -> dict[str, dict[str, Any]]:
@@ -191,14 +213,22 @@ def build_power_pilot_input(
     simulation_iterations: int = 10_000,
     seed: int = 20260713,
 ) -> dict[str, Any]:
-    if preregistration.get("schema") != PREREGISTRATION_SCHEMA:
-        raise ValueError(f"preregistration schema must be {PREREGISTRATION_SCHEMA}")
+    preregistration_schema = preregistration.get("schema")
+    if preregistration_schema not in SUPPORTED_PREREGISTRATION_SCHEMAS:
+        raise ValueError(
+            "preregistration schema must be a supported season registration"
+        )
     manifest_path = Path(ranking_manifest_path).resolve()
     manifest, runs_by_model, suites = ranking.load_ranking_manifest(manifest_path)
     if manifest.get("schema") not in ranking.POWER_PILOT_RANKING_MANIFEST_SCHEMAS:
-        raise ValueError("power pilot requires a v2 or v3 hashed ranking manifest")
+        raise ValueError("power pilot requires a v2, v3, or v4 hashed ranking manifest")
     if suites != ranking.OFFICIAL_SUITES:
         raise ValueError("power pilot requires all four official suites")
+    if (
+        manifest.get("schema") == ranking.RANKING_MANIFEST_SCHEMA
+        and preregistration_schema != PREREGISTRATION_SCHEMA
+    ):
+        raise ValueError("v4 power pilots require season preregistration v2")
     for model_name, runs in runs_by_model.items():
         for run_index, run in enumerate(runs, 1):
             for suite in suites:
@@ -226,6 +256,19 @@ def build_power_pilot_input(
         raise ValueError("both anchors must meet the pre-registered repeat count")
 
     season = _object(preregistration.get("season"), "preregistration.season")
+    if preregistration_schema == PREREGISTRATION_SCHEMA:
+        season_registered_at = _timestamp(
+            season.get("registered_at"),
+            "preregistration.season.registered_at",
+        )
+        power_preregistered_at = _timestamp(
+            preregistered_at,
+            "power pilot preregistered_at",
+        )
+        if power_preregistered_at < season_registered_at:
+            raise ValueError(
+                "power pilot preregistered_at must not precede season registration"
+            )
     statistics = _object(preregistration.get("statistics"), "preregistration.statistics")
     power_pilot_design = _object(
         statistics.get("power_pilot"), "preregistration.statistics.power_pilot"
@@ -233,12 +276,19 @@ def build_power_pilot_input(
     frozen_execution_evidence = execution.get("execution_evidence")
     required_manifest_schema = power_pilot_design.get("ranking_manifest_schema")
     if frozen_execution_evidence is not None:
-        if frozen_execution_evidence != ranking.EXECUTION_EVIDENCE_CONTRACT:
+        expected_execution_evidence = {
+            **ranking.EXECUTION_EVIDENCE_CONTRACT,
+            "ranking_manifest_schema": required_manifest_schema,
+        }
+        if frozen_execution_evidence != expected_execution_evidence:
             raise ValueError(
                 "power pilot execution evidence contract does not match preregistration"
             )
-        if required_manifest_schema != ranking.RANKING_MANIFEST_SCHEMA:
-            raise ValueError("current power pilots must preregister the v3 manifest schema")
+        if (
+            required_manifest_schema
+            not in ranking.EXECUTION_EVIDENCE_RANKING_MANIFEST_SCHEMAS
+        ):
+            raise ValueError("execution-evidence power pilots require v3 or v4")
     if (
         required_manifest_schema is not None
         and manifest.get("schema") != required_manifest_schema
@@ -249,6 +299,11 @@ def build_power_pilot_input(
         "preregistration.statistics.power_pilot.practice_benchmark_fingerprints",
     )
     builder_code_sha256 = _file_sha256(Path(__file__))
+    required_pilot_groups_per_stratum = (
+        OFFICIAL_MIN_PILOT_GROUPS_PER_STRATUM
+        if manifest.get("schema") == ranking.RANKING_MANIFEST_SCHEMA
+        else MIN_PILOT_CLUSTERS_PER_STRATUM
+    )
     if (
         power_pilot_design.get("suites") != list(suites)
         or set(frozen_fingerprints) != set(suites)
@@ -256,6 +311,8 @@ def build_power_pilot_input(
         or power_pilot_design.get("weight_profile") != "balanced"
         or power_pilot_design.get("construction_method") != CONSTRUCTION_METHOD
         or power_pilot_design.get("builder_code_sha256") != builder_code_sha256
+        or power_pilot_design.get("minimum_groups_per_stratum")
+        != required_pilot_groups_per_stratum
     ):
         raise ValueError("power pilot procedure does not match preregistration")
     temperature = execution.get("temperature")
@@ -381,7 +438,7 @@ def build_power_pilot_input(
     sparse = {
         key: count
         for key, count in pilot_stratum_counts.items()
-        if count < MIN_PILOT_CLUSTERS_PER_STRATUM
+        if count < required_pilot_groups_per_stratum
     }
     if sparse:
         details = ", ".join(f"{key}={value}" for key, value in sorted(sparse.items()))

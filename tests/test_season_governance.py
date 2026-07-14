@@ -14,7 +14,6 @@ REPO = ROOT.parent
 sys.path.insert(0, str(ROOT / "analysis"))
 
 import ko_benchmark_identity as I  # noqa: E402
-import ko_familywise_power as F  # noqa: E402
 import ko_model_ranking as R  # noqa: E402
 import ko_power_pilot as P  # noqa: E402
 
@@ -37,6 +36,9 @@ S1_REGISTRATION_COMMIT = "6de04e588d29fddb2cae5db1d4f481c68883f6f8"
 S2_REGISTRATION_COMMIT = "7d2eef959b8b039162d9bc89e1c77218d33000df"
 S3_REGISTRATION_COMMIT = "46ecc81d88e7437f22ef23a128d05894905d737f"
 S4_REGISTRATION_COMMIT = "0742bdd37b16fde426cb35b9d6053d1996a39be2"
+S4_FAMILYWISE_IMPLEMENTATION_COMMIT = (
+    "d0c344d2f18a6071c6a53aca143e7849d10cd8c3"
+)
 S2_POWER_SHA256 = "e01a1570a7ca298d34b17bd4fb743b7b6e1ea16be1588417e83d8aaca509dd11"
 S4_POWER_SHA256 = "7721fa0f33c4c5d41e136df16d53993ea0ecc9767a5b4c7b085f11f43aa8486e"
 S4_FAMILYWISE_SHA256 = "8eb3b380a2f0a222f769191817c83302824b94aa7ea7f9647c46190c89be4211"
@@ -99,7 +101,10 @@ def test_frozen_seasons_are_preserved_and_s4_supersedes_stopped_s3():
     assert s3["season"]["release_status"] == "candidate_pre_data"
     assert s4["season"]["release_status"] == "candidate_pre_data"
     assert s4["execution"]["agent_tool_call_mode"] == "prompt_json_v1"
-    assert s4["execution"]["execution_evidence"] == R.EXECUTION_EVIDENCE_CONTRACT
+    assert s4["execution"]["execution_evidence"] == {
+        **R.EXECUTION_EVIDENCE_CONTRACT,
+        "ranking_manifest_schema": R.RANKING_MANIFEST_V3_SCHEMA,
+    }
     assert datetime.fromisoformat(incident["detected_at"]) < datetime.fromisoformat(
         s2["season"]["registered_at"]
     )
@@ -259,7 +264,7 @@ def test_s4_power_evidence_uses_the_frozen_v3_execution_contract():
     assert power["pilot_summary"]["pilot_stratum_counts"] == {
         key: 5 for key in target_strata
     }
-    assert source["ranking_manifest_schema"] == R.RANKING_MANIFEST_SCHEMA
+    assert source["ranking_manifest_schema"] == R.RANKING_MANIFEST_V3_SCHEMA
     assert source["evaluator_git_commit"] == s4["season"]["protocol_git_commit"]
     assert source["builder_code_sha256"] == s4["statistics"]["power_pilot"][
         "builder_code_sha256"
@@ -293,7 +298,10 @@ def test_s4_multiplicity_audit_stops_the_official_design_before_data():
         S4_POWER_PATH.read_bytes()
     ).hexdigest()
     assert audit["method"]["analysis_code_sha256"] == hashlib.sha256(
-        Path(F.__file__).read_bytes()
+        _git_blob(
+            S4_FAMILYWISE_IMPLEMENTATION_COMMIT,
+            "analysis/ko_familywise_power.py",
+        )
     ).hexdigest()
     assert audit["minimum_publication_cohort"]["model_count"] == 2
     assert audit["minimum_publication_cohort"][
@@ -387,9 +395,12 @@ def test_s3_stop_preserves_the_power_derived_s4_design_and_thresholds():
         for model in s3["reference_models"]
     ]
     assert s4["statistics"]["power_pilot"]["ranking_manifest_schema"] == (
-        R.RANKING_MANIFEST_SCHEMA
+        R.RANKING_MANIFEST_V3_SCHEMA
     )
-    assert s4["execution"]["execution_evidence"] == R.EXECUTION_EVIDENCE_CONTRACT
+    assert s4["execution"]["execution_evidence"] == {
+        **R.EXECUTION_EVIDENCE_CONTRACT,
+        "ranking_manifest_schema": R.RANKING_MANIFEST_V3_SCHEMA,
+    }
 
     public_text = S3_STOP_PATH.read_text("utf-8") + S4_PATH.read_text("utf-8")
     assert "/data1/" not in public_text

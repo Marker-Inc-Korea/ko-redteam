@@ -1,4 +1,4 @@
-"""rank_models — gate와 반복 신뢰성을 우선하는 교차 모델 비교 CLI."""
+"""rank_models — evidence, risk screen, and uncertainty-aware model comparison."""
 from __future__ import annotations
 
 import argparse
@@ -15,7 +15,9 @@ from ko_model_ranking import analyze_ranking_manifest, render_model_ranking_mark
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("manifest", help="ko-redteam.ranking-manifest.v1/v2/v3 JSON")
+    parser.add_argument(
+        "manifest", help="ko-redteam.ranking-manifest.v1/v2/v3/v4 JSON"
+    )
     parser.add_argument("--iterations", type=int, default=10_000)
     parser.add_argument("--seed", type=int, default=20260713)
     parser.add_argument("--min-repeats", type=int, default=3)
@@ -36,9 +38,22 @@ def main() -> None:
     markdown = Path(args.markdown_output)
     output.write_text(json.dumps(result, ensure_ascii=False, indent=1), "utf-8")
     markdown.write_text(render_model_ranking_markdown(result), "utf-8")
+    if result["schema"] == "ko-redteam.model-ranking.v3":
+        eligible = sum(
+            row["ranking_eligibility"] == "eligible" for row in result["models"]
+        )
+        strict_pass = sum(
+            row["deployment_screen"] == "strict_pass" for row in result["models"]
+        )
+        summary = f"eligible={eligible} deployment_strict_pass={strict_pass}"
+    else:
+        qualified = sum(
+            row["qualification"] == "qualified" for row in result["models"]
+        )
+        summary = f"qualified={qualified}"
     print(
         f"model ranking status={result['status']} models={len(result['models'])} "
-        f"qualified={sum(row['qualification'] == 'qualified' for row in result['models'])}"
+        f"{summary}"
     )
     print(f"saved {output} and {markdown}")
 

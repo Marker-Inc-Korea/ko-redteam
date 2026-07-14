@@ -185,5 +185,6 @@ def test_leaderboard_protocol_uses_current_official_manifest_contract():
 
     assert "공식 v2" not in protocol
     assert "v2 manifest만" not in protocol
-    assert "공식 v3 증거" in protocol
-    assert "v3 manifest만" in protocol
+    assert "protocol v2 공식 결과" in protocol
+    assert "v4 manifest를 사용한다" in protocol
+    assert "v3 manifest만" not in protocol
