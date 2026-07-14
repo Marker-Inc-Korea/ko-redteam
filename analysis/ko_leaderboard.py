@@ -12,6 +12,7 @@ from typing import Any
 
 try:
     from ko_model_ranking import (
+        EXECUTION_EVIDENCE_CONTRACT,
         OFFICIAL_SUITES,
         POWER_PILOT_RANKING_MANIFEST_SCHEMAS,
         RANKING_MANIFEST_SCHEMA,
@@ -21,6 +22,7 @@ try:
     from ko_run_context import canonical_sha256, validate_run_context
 except ModuleNotFoundError:  # package import path
     from .ko_model_ranking import (
+        EXECUTION_EVIDENCE_CONTRACT,
         OFFICIAL_SUITES,
         POWER_PILOT_RANKING_MANIFEST_SCHEMAS,
         RANKING_MANIFEST_SCHEMA,
@@ -1817,6 +1819,7 @@ def _audit_preregistration(
     frozen_temperature = _number(execution.get("temperature"))
     frozen_max_tokens = execution.get("max_tokens")
     frozen_agent_tool_call_mode = execution.get("agent_tool_call_mode")
+    frozen_execution_evidence = execution.get("execution_evidence")
     generation_settings_valid = (
         set(suite_generation_settings) == set(SUITES)
         and frozen_temperature is not None
@@ -1849,8 +1852,9 @@ def _audit_preregistration(
         and execution.get("immutable_model_revision_required") is True
         and execution.get("clean_evaluator_commit_required") is True
         and frozen_agent_tool_call_mode == "prompt_json_v1"
+        and frozen_execution_evidence == EXECUTION_EVIDENCE_CONTRACT
         and generation_settings_valid,
-        "ranking suites, generation settings, repeats, provenance, and submission limits must match preregistration",
+        "ranking suites, generation settings, execution evidence, repeats, provenance, and submission limits must match preregistration",
     )
 
     statistics = (

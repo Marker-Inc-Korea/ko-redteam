@@ -702,6 +702,9 @@ def _valid_release(tmp_path: Path, *, groups_per_domain: int = 30) -> Path:
             "temperature": 0.0,
             "max_tokens": 512,
             "agent_tool_call_mode": "prompt_json_v1",
+            "execution_evidence": json.loads(
+                json.dumps(R.EXECUTION_EVIDENCE_CONTRACT)
+            ),
             "max_decision_flip_rate": 0.0,
             "maximum_official_submissions_per_model": 2,
             "immutable_model_revision_required": True,
@@ -1025,6 +1028,28 @@ def test_preregistration_tamper_fails_closed(tmp_path):
 
     assert result["status"] == "not_publishable"
     assert "preregistration.statistics" in failed_ids
+
+
+def test_preregistration_execution_evidence_contract_tamper_fails_closed(tmp_path):
+    release_path = _valid_release(tmp_path)
+    manifest = json.loads(release_path.read_text("utf-8"))
+    reference = manifest["artifacts"]["preregistration"]
+    preregistration_path = tmp_path / reference["path"]
+    preregistration = json.loads(preregistration_path.read_text("utf-8"))
+    preregistration["execution"]["execution_evidence"]["endpoint_smoke"][
+        "required_phrase"
+    ] = "접수되었습니다"
+    _write_json(preregistration_path, preregistration)
+    reference["sha256"] = _sha_file(preregistration_path)
+    _write_json(release_path, manifest)
+
+    result = L.audit_leaderboard_release(release_path)
+    failed_ids = {
+        check["id"] for check in result["checks"] if check["status"] == "fail"
+    }
+
+    assert result["status"] == "not_publishable"
+    assert "preregistration.execution" in failed_ids
 
 
 def test_malformed_preregistration_is_reported_without_crashing(tmp_path):

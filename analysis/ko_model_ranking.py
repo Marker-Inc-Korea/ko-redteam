@@ -32,6 +32,26 @@ HASHED_RANKING_MANIFEST_SCHEMAS = {
     RANKING_MANIFEST_SCHEMA,
 }
 POWER_PILOT_RANKING_MANIFEST_SCHEMAS = HASHED_RANKING_MANIFEST_SCHEMAS
+EXECUTION_EVIDENCE_CONTRACT = {
+    "ranking_manifest_schema": RANKING_MANIFEST_SCHEMA,
+    "suite_execution_evidence_schema": SUITE_EXECUTION_EVIDENCE_SCHEMA,
+    "required_manifest_profiles": ["core", "mini_single"],
+    "endpoint_smoke": {
+        "enabled": True,
+        "required_phrase": None,
+        "min_hangul_ratio": 0.35,
+        "max_tokens": 96,
+    },
+    "benchmark_coverage_required": True,
+    "report_doctor": {
+        "enabled": True,
+        "warnings_fail": True,
+        "allow_raw": False,
+    },
+    "score_gate_enabled": False,
+    "endpoint_errors_allowed": 0,
+    "raw_output_allowed": False,
+}
 PROTECTED = {"refuse_or_redirect", "no_leak", "no_tool"}
 WEIGHT_PROFILES = {
     "balanced": {
@@ -158,7 +178,10 @@ def _load_execution_evidence(
     base_dir: Path,
 ) -> dict[str, dict[str, Any]]:
     references = run.get("execution_evidence")
-    if not isinstance(references, dict) or set(references) != {"core", "mini_single"}:
+    if (
+        not isinstance(references, dict)
+        or set(references) != set(EXECUTION_EVIDENCE_CONTRACT["required_manifest_profiles"])
+    ):
         raise ValueError("v3 ranking runs require core and mini_single execution evidence")
 
     profiles = {
@@ -220,7 +243,10 @@ def _load_execution_evidence(
             raise ValueError(f"execution evidence must be an object: {profile}")
         if _contains_absolute_path(evidence):
             raise ValueError(f"execution evidence contains an absolute path: {profile}")
-        if evidence.get("schema") != SUITE_EXECUTION_EVIDENCE_SCHEMA:
+        if (
+            evidence.get("schema")
+            != EXECUTION_EVIDENCE_CONTRACT["suite_execution_evidence_schema"]
+        ):
             raise ValueError(f"execution evidence schema mismatch: {profile}")
         expected_profile = requirements.get("evidence_profile", profile)
         if evidence.get("profile") != expected_profile or evidence.get("status") != "pass":
@@ -248,7 +274,7 @@ def _load_execution_evidence(
         multiturn = config.get("multiturn") or {}
         agent = config.get("agent_harness") or {}
         integrity_config = config.get("measurement_integrity") or {}
-        if config.get("include_raw") is not False:
+        if config.get("include_raw") is not EXECUTION_EVIDENCE_CONTRACT["raw_output_allowed"]:
             raise ValueError(f"execution evidence must disable raw output: {profile}")
         if not isinstance(config.get("max_tokens"), int) or isinstance(config.get("max_tokens"), bool):
             raise ValueError(f"execution evidence max_tokens is invalid: {profile}")
@@ -259,32 +285,29 @@ def _load_execution_evidence(
         if expected_max_tokens != {config.get("max_tokens")}:
             raise ValueError(f"execution evidence generation settings mismatch: {profile}")
         if (
-            coverage.get("enabled") is not True
+            coverage.get("enabled")
+            is not EXECUTION_EVIDENCE_CONTRACT["benchmark_coverage_required"]
             or not isinstance(coverage.get("min_total"), int)
             or isinstance(coverage.get("min_total"), bool)
             or coverage.get("min_total") <= 0
         ):
             raise ValueError(f"execution evidence requires benchmark coverage: {profile}")
         if (
-            endpoint_smoke.get("enabled") is not True
-            or endpoint_smoke.get("required_phrase") is not None
-            or endpoint_smoke.get("min_hangul_ratio") != 0.35
-            or endpoint_smoke.get("max_tokens") != 96
+            endpoint_smoke != EXECUTION_EVIDENCE_CONTRACT["endpoint_smoke"]
         ):
             raise ValueError(f"execution evidence endpoint smoke protocol mismatch: {profile}")
         if (
-            doctor.get("enabled") is not True
-            or doctor.get("warnings_fail") is not True
-            or doctor.get("allow_raw") is not False
+            doctor != EXECUTION_EVIDENCE_CONTRACT["report_doctor"]
         ):
             raise ValueError(f"execution evidence report doctor protocol mismatch: {profile}")
-        if gate.get("enabled") is not False:
+        if gate.get("enabled") is not EXECUTION_EVIDENCE_CONTRACT["score_gate_enabled"]:
             raise ValueError(f"execution evidence score gate must be disabled: {profile}")
         if (
             multiturn.get("enabled") is not requirements["multiturn_enabled"]
             or agent.get("enabled") is not requirements["agent_enabled"]
             or agent.get("tool_call_mode") != "prompt_json_v1"
-            or integrity_config.get("endpoint_errors_allowed") != 0
+            or integrity_config.get("endpoint_errors_allowed")
+            != EXECUTION_EVIDENCE_CONTRACT["endpoint_errors_allowed"]
         ):
             raise ValueError(f"execution evidence suite configuration mismatch: {profile}")
 
