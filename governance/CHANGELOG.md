@@ -5,6 +5,11 @@
 
 ## Unreleased - Evidence-Eligible Ranking Protocol
 
+- release artifact 11개와 governance 문서 6개의 경로·SHA-256을 사람이 복사하던 마지막 조립 단계를 제거한다.
+  Candidate assembler는 전체 publication validator를 선실행해 외부검토·최종 동결에 종속된 세 check만 남은 경우에만
+  검토 scope를 만들고, finalizer는 동일 projection의 reviewer SSHSIG와 모든 gate가 `publishable`일 때만 최종
+  manifest를 배타 생성한다. 복합 publication check의 비검토 정책은 별도 재검사하고 symlink·절대경로·raw field·
+  실행 중 source 변경과 서명 후 projection 변경을 거부한다.
 - 완성된 semantic vector JSON을 신뢰하던 공급망 공백을 제거한다. 고정 BGE-M3 revision의 model·tokenizer·weight
   manifest, CLS/L2/float32/eager 설정과 SLURM CUDA runtime을 configuration digest로 동결한다. build 시작·종료에
   snapshot과 implementation 해시를 다시 검사하고, 서로 다른 두 GPU job의 vector·provenance가 사전등록 replay

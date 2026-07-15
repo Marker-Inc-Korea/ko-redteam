@@ -5,9 +5,11 @@
 
 ## 1. Freeze The Review Scope
 
-모든 필수 artifact와 governance 문서를 candidate release directory 아래에 둔다. manifest에는 최종
-`external_review` 파일을 제외한 모든 artifact의 상대경로와 실제 SHA-256을 기록한다. statement builder는 다음을
-검증하고 하나의 `external-review-statement.v1`에 고정한다.
+모든 필수 artifact와 governance 문서를 candidate release directory 아래에 둔다. Candidate manifest는
+[`RELEASE_MANIFEST_WORKFLOW.md`](./RELEASE_MANIFEST_WORKFLOW.md)의
+`ko-redteam-build-release-manifest candidate`로만 생성한다. 생성기는 최종 `external_review`를 제외한 모든 artifact의 상대경로와 실제 SHA-256을
+계산하고, 외부 검토 의존 check 외 전체 publication gate를 선검증한다. Statement builder는 다음을 검증하고 하나의
+`external-review-statement.v1`에 고정한다.
 
 - 필수 release artifact 11개의 파일 존재와 SHA-256
 - methodology, limitations, conflicts, appeal, incident, changelog 문서의 파일 존재와 SHA-256
@@ -76,11 +78,18 @@ ko-redteam-assemble-external-review \
 
 ## 4. Finalize And Verify
 
-조립 뒤 candidate manifest에 `external_review.json`의 상대경로와 실제 SHA-256을 넣고 release `frozen_at`을
-확정한다. 서명 뒤 허용되는 manifest 변경은 이 두 순환 필드뿐이다. 다른 필드 변경은 scope 불일치로 검증에
-실패해야 한다.
+조립 뒤 finalizer가 `external_review.json`의 상대경로와 실제 SHA-256 및 release `frozen_at`만 더한다. 서명 뒤
+허용되는 manifest 변경은 이 두 순환 필드뿐이다. 다른 필드 변경은 scope 불일치로 실패한다. Finalizer는 전체
+publication audit이 `publishable`일 때만 최종 manifest를 생성한다.
 
 ```bash
+ko-redteam-build-release-manifest finalize \
+  release_manifest.candidate.json external_review.json \
+  --root . \
+  --frozen-at 2026-09-01T09:00:00+09:00 \
+  --output release_manifest.json \
+  --audit-output leaderboard_release_audit.json
+
 ko-redteam-verify-external-review \
   release_manifest.json \
   external_review.json \
@@ -88,7 +97,7 @@ ko-redteam-verify-external-review \
 
 ko-redteam-validate-leaderboard \
   release_manifest.json \
-  --output leaderboard_release_audit.json \
+  --output leaderboard_release_audit.replay.json \
   --markdown-output leaderboard_release_audit.md
 ```
 

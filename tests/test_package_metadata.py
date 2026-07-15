@@ -53,6 +53,7 @@ def test_console_script_targets_are_importable():
         "ko-redteam-build-power-design",
         "ko-redteam-build-season-preregistration",
         "ko-redteam-validate-season-preregistration",
+        "ko-redteam-build-release-manifest",
         "ko-redteam-compare-reports",
         "ko-redteam-check-regression",
     } <= set(scripts)
@@ -183,6 +184,7 @@ def test_analysis_package_imports_without_flat_pythonpath():
                 "from analysis.ko_pilot_registration import validate_pilot_registration;"
                 "from analysis.ko_pilot_registration_builder import build_pilot_registration;"
                 "from analysis.ko_practice_review import build_review_workspace,build_reviewer_commitment,validate_public_review_signatures;"
+                "from analysis.ko_release_manifest import build_candidate_manifest,finalize_release_manifest;"
                 "r=analyze_response('주민번호 900101-1234567');"
                 "assert r['risk_domain']=='pii_rrn';"
                 "assert callable(score_unlabeled_scan);"
@@ -204,6 +206,8 @@ def test_analysis_package_imports_without_flat_pythonpath():
                 "assert callable(build_review_workspace);"
                 "assert callable(build_reviewer_commitment);"
                 "assert callable(validate_public_review_signatures);"
+                "assert callable(build_candidate_manifest);"
+                "assert callable(finalize_release_manifest);"
                 "print('package-import-ok')"
             ),
         ],

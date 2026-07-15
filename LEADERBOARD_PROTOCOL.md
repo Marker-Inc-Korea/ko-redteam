@@ -218,6 +218,9 @@ appeal 기록과 외부 attestation은 공통 정책 문서만으로 대체할 �
 ## 9. Release Bundle
 
 공식 bundle은 `ko-redteam.leaderboard-release.v3` manifest와 다음 hashed JSON artifact를 포함한다.
+Manifest의 경로·digest는 수동 입력하지 않는다. `release-manifest-spec.v1`의 상대경로를
+`ko-redteam-build-release-manifest candidate`가 실제 파일과 결합하고, 외부 검토 뒤 `finalize`가 전체 validator
+`publishable`을 재생한 경우에만 최종 manifest를 만든다.
 
 - `pilot_registration`: reference 실행 전에 동결한 practice, anchor, 실행 설정과 power 분석 계약
 - `practice_review`: reference 출력에 blind한 2인 이상 사례별 `practice-review.v2` 승인, packet·response·attestation
@@ -236,8 +239,17 @@ appeal 기록과 외부 attestation은 공통 정책 문서만으로 대체할 �
 검증 명령:
 
 ```bash
+ko-redteam-build-release-manifest candidate release_manifest_spec.json \
+  --root . --output release_manifest.candidate.json \
+  --audit-output release_manifest.candidate.audit.json
+# Signed external-review.v2가 준비된 뒤에만 실행한다.
+ko-redteam-build-release-manifest finalize \
+  release_manifest.candidate.json external_review.json \
+  --root . --frozen-at 2026-09-01T09:00:00+09:00 \
+  --output release_manifest.json \
+  --audit-output leaderboard_release_audit.json
 ko-redteam-validate-leaderboard release_manifest.json \
-  --output leaderboard_release_audit.json \
+  --output leaderboard_release_audit.replay.json \
   --markdown-output leaderboard_release_audit.md
 ```
 
@@ -302,7 +314,10 @@ ko-redteam-audit-splits --help
 ```
 
 비공개 입력 구조는 [`governance/EVIDENCE_INPUTS.md`](./governance/EVIDENCE_INPUTS.md)에 정의한다. 생성된
-JSON이 존재하는 것만으로 충분하지 않으며, release manifest가 각 상대경로와 SHA-256을 결합해야 한다.
+JSON이 존재하는 것만으로 충분하지 않으며, release manifest assembler가 각 상대경로의 실제 SHA-256을 결합해야 한다.
+Candidate preflight는 `frozen_at`, `external_review` reference와 이에 종속된 사전등록 외부검토 check만 미충족이어야
+하며, 같은 복합 check의 비검토 정책도 별도로 통과해야 한다. 다른 실패가 있으면 외부 검토를 시작하지 않는다. 상세 절차는
+[`governance/RELEASE_MANIFEST_WORKFLOW.md`](./governance/RELEASE_MANIFEST_WORKFLOW.md)를 따른다.
 사전등록 spec과 생성 artifact의 season, protocol commit, suite×domain×expected 그룹 행렬, generation settings, execution
 evidence 계약, MDE, weight, reference model revision, semantic 감사 설정과 calibration 기준은 실제 artifact 및
 run provenance와 정확히 일치해야 한다. 사후 수정은 기존 season을 무효화하고 새 season ID로 다시 등록한다.

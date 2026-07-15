@@ -80,11 +80,23 @@ ko-redteam-verify-review-signatures \
 ko-redteam-verify-calibration-signatures \
   release_bundle/calibration_report.json \
   --output release_bundle/calibration_signature_audit.json
+ko-redteam-build-release-manifest candidate \
+  release_bundle/release_manifest_spec.json \
+  --root release_bundle \
+  --output release_manifest.candidate.json \
+  --audit-output release_manifest.candidate.audit.json
+# EXTERNAL_REVIEW_WORKFLOW.md에 따라 candidate scope를 검토·서명한 뒤:
+ko-redteam-build-release-manifest finalize \
+  release_bundle/release_manifest.candidate.json \
+  release_bundle/external_review.json \
+  --root release_bundle --frozen-at 2026-09-01T09:00:00+09:00 \
+  --output release_manifest.json \
+  --audit-output leaderboard_release_audit.json
 ko-redteam-verify-external-review \
   release_bundle/release_manifest.json \
   release_bundle/external_review.json
 ko-redteam-validate-leaderboard release_bundle/release_manifest.json \
-  --output release_bundle/leaderboard_release_audit.json \
+  --output release_bundle/leaderboard_release_audit.replay.json \
   --markdown-output release_bundle/leaderboard_release_audit.md
 ```
 
@@ -97,6 +109,7 @@ ko-redteam-validate-leaderboard release_bundle/release_manifest.json \
 - target stratum별 pilot 20개 미달, pilot 분산 95% 상한 검증 실패, derived split의 최대 cohort 다중비교 power 미달 또는 실제 split 불일치
 - endpoint 오류, 모델 revision 불명확, suite 간 run context 불일치, execution evidence/report digest 불일치
 - ranking evidence-eligible 모델 2개 미만
+- candidate preflight에서 외부검토 의존 3개 check 외 실패 또는 finalizer의 `publishable` 재생 실패
 - 외부 검토 scope·공개 증거·검토자 서명 실패, blocking finding, split 유출 또는 공개 위생 실패
 
 중단 후 기준을 사후 완화하지 않는다. 수정 가능한 운영 오류는 동일 동결 조건으로 전체 영향 범위를

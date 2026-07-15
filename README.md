@@ -117,7 +117,7 @@ ko-redteam-suite \
 | 사람 calibration | `ko-redteam-calibration-collection`, `ko-redteam-calibration-response` | rater별 blinded 라벨, expert disagreement 합의, 독립 SSHSIG와 최종 v3 commitment 조립 |
 | 모델 비교 | `ko-redteam-rank-models`, `ko-redteam-analyze-repeats` | evidence eligibility, 배포 screen, 반복 안정성, 신뢰구간 기반 tier 분석 |
 | 공식 증거 생성 | `ko-redteam-validate-pilot-registration`, `ko-redteam-build-calibration-commitments`, `ko-redteam-build-calibration`, `ko-redteam-verify-calibration-signatures`, `ko-redteam-build-power-pilot`, `ko-redteam-semantic-embeddings`, `ko-redteam-audit-splits`, `ko-redteam-analyze-power`, `ko-redteam-analyze-familywise-power`, `ko-redteam-build-power-design` | practice 검토·등록, signed 사람 판정 보정, 고정 GPU semantic replay, split 중복, marginal·다중비교 검정력과 공식 분할 규모의 metadata-only 증거 생성 |
-| 공식 게시 검증 | `ko-redteam-build-external-review-statement`, `ko-redteam-assemble-external-review`, `ko-redteam-verify-external-review`, `ko-redteam-validate-leaderboard` | signed 외부 검토 scope와 hidden split, calibration, provenance, 통계 publication gate |
+| 공식 게시 검증 | `ko-redteam-build-release-manifest`, `ko-redteam-build-external-review-statement`, `ko-redteam-assemble-external-review`, `ko-redteam-verify-external-review`, `ko-redteam-validate-leaderboard` | deterministic manifest 조립, signed 외부 검토 scope와 hidden split, calibration, provenance, 통계 publication gate |
 | 평가셋 관리 | `ko-redteam-import-benchmark`, `ko-redteam-merge-benchmarks`, `ko-redteam-expand-benchmark` | 외부 파일 변환, 병합, 한국어 변형 생성 |
 | 릴리스 게이트 | `ko-redteam-compare-reports`, `ko-redteam-check-regression`, `ko-redteam-gate-reports`, `ko-redteam-doctor-reports`, `ko-redteam-check-public-hygiene` | 점수 비교, 회귀 판정, CI threshold, 공개 배포 위생 점검 |
 
@@ -568,6 +568,12 @@ ko-redteam-rank-models ranking_manifest.json \
 공식 release bundle 검증:
 
 ```bash
+ko-redteam-build-release-manifest candidate \
+  release_manifest_spec.json \
+  --root . \
+  --output release_manifest.candidate.json \
+  --audit-output release_manifest.candidate.audit.json
+
 ko-redteam-build-external-review-statement \
   release_manifest.candidate.json external_review_declaration.json \
   --output external_review_statement.json
@@ -579,13 +585,24 @@ ko-redteam-assemble-external-review \
   --signature external-reviewer-b=external-reviewer-b.sig \
   --output external_review.json
 
+ko-redteam-build-release-manifest finalize \
+  release_manifest.candidate.json external_review.json \
+  --root . \
+  --frozen-at 2026-09-01T09:00:00+09:00 \
+  --output release_manifest.json \
+  --audit-output leaderboard_release_audit.json
+
 ko-redteam-verify-external-review \
   release_manifest.json external_review.json
 
 ko-redteam-validate-leaderboard release_manifest.json \
-  --output leaderboard_release_audit.json \
+  --output leaderboard_release_audit.replay.json \
   --markdown-output leaderboard_release_audit.md
 ```
+
+Candidate assembler는 외부 검토와 최종 동결에 종속된 세 check 외 publication failure가 있으면 manifest를 만들지
+않습니다. Finalizer도 전체 validator가 `publishable`일 때만 최종 파일을 생성합니다. Spec 필드와 fail-closed 절차는
+[`governance/RELEASE_MANIFEST_WORKFLOW.md`](./governance/RELEASE_MANIFEST_WORKFLOW.md)를 따릅니다.
 
 외부 검토 v2는 공개 reviewer attestation·기관 보고서, 모든 검토 대상 artifact·governance 문서와 최종 순환 필드를
 제외한 manifest projection을 하나의 canonical statement에 묶습니다. 서명은 키 소유를 증명하지만 실제 신원과

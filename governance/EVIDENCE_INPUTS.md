@@ -4,6 +4,17 @@
 placeholder이며 공식 기준을 충족하지 않는다. 입력 파일에는 raw prompt, response, message 또는 credential을
 넣지 않는다.
 
+## Public Release Manifest Spec
+
+`ko-redteam.release-manifest-spec.v1`은 release metadata, 두 reference anchor의 이름·역할·선정 근거, 11개 필수
+artifact와 6개 governance 문서의 상대경로만 기록한다. SHA-256이나 자체 readiness 판정은 입력하지 않는다.
+`ko-redteam-build-release-manifest candidate`가 실제 파일 digest와 전체 publication preflight를 계산하며,
+외부검토와 최종 freeze에 직접 종속된 세 check 외 실패가 있으면 candidate를 만들지 않는다.
+
+서명된 `external-review.v2`가 준비되면 `finalize`가 candidate projection, reviewer SSHSIG, 공개 기관 증거와 전체
+leaderboard validator를 재생한다. `publishable`이 아니면 audit만 남기고 최종 manifest는 생성하지 않는다. 경로
+계약과 실행 순서는 [`RELEASE_MANIFEST_WORKFLOW.md`](./RELEASE_MANIFEST_WORKFLOW.md)를 따른다.
+
 ## Public Power-Pilot Registration
 
 `ko-redteam.power-pilot-registration.v2`는 reference 출력 관측 전에 공개한다. 정확한 upper/lower revision,
