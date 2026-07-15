@@ -66,6 +66,31 @@ def main() -> None:
         required=True,
         help="private ko-redteam.semantic-overlap.v1 JSON",
     )
+    parser.add_argument(
+        "--semantic-configuration",
+        required=True,
+        help="frozen semantic embedding configuration JSON",
+    )
+    parser.add_argument(
+        "--semantic-provenance",
+        required=True,
+        help="private provenance bound to --semantic-vectors",
+    )
+    parser.add_argument(
+        "--semantic-replay-vectors",
+        required=True,
+        help="private vectors from a second independent SLURM job",
+    )
+    parser.add_argument(
+        "--semantic-replay-provenance",
+        required=True,
+        help="private provenance bound to --semantic-replay-vectors",
+    )
+    parser.add_argument(
+        "--semantic-reproducibility",
+        required=True,
+        help="metadata-only comparison of the two semantic executions",
+    )
     parser.add_argument("--threshold", required=True, type=float)
     parser.add_argument("--audited-at", required=True)
     parser.add_argument("--frozen-at", required=True)
@@ -86,6 +111,11 @@ def main() -> None:
         practice,
         official,
         load_json_object(args.semantic_vectors),
+        load_json_object(args.semantic_configuration),
+        load_json_object(args.semantic_provenance),
+        load_json_object(args.semantic_replay_vectors),
+        load_json_object(args.semantic_replay_provenance),
+        load_json_object(args.semantic_reproducibility),
         threshold=args.threshold,
         audited_at=args.audited_at,
         frozen_at=args.frozen_at,

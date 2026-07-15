@@ -1,6 +1,7 @@
 """Practice/official split evidence regression tests."""
 from __future__ import annotations
 
+from copy import deepcopy
 import hashlib
 import json
 import subprocess
@@ -13,6 +14,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "analysis"))
 
 import ko_split_evidence as S  # noqa: E402
+import ko_semantic_embeddings as E  # noqa: E402
 
 
 SUITE_SCHEMAS = {
@@ -87,6 +89,54 @@ def _prompt_hashes(suites: dict[str, dict]) -> dict[str, str]:
     return values
 
 
+def _configuration(dimension: int) -> dict:
+    model_id = "unit/semantic-model"
+    revision = "a" * 40
+    paths = sorted((*E.MODEL_METADATA_FILES, "pytorch_model.bin"))
+    files = [
+        {"path": path, "bytes": index + 1, "sha256": f"{index + 1:x}" * 64}
+        for index, path in enumerate(paths)
+    ]
+    model = {
+        "id": model_id,
+        "revision": revision,
+        "revision_sha256": hashlib.sha256(
+            f"{model_id}@{revision}".encode("utf-8")
+        ).hexdigest(),
+        "dimension": dimension,
+        "weight_file": "pytorch_model.bin",
+        "files": files,
+        "snapshot_manifest_sha256": E.canonical_sha256(files),
+    }
+    body = {
+        "model": model,
+        "encoding": {
+            **E.ENCODING_CONSTANTS,
+            "dimension": dimension,
+            "max_length": 8192,
+            "batch_size": 8,
+        },
+        "determinism": {**E.DETERMINISM_CONSTANTS, "seed": 7},
+        "runtime": {
+            "python": "3.12.0",
+            "torch": "2.7.0",
+            "transformers": "4.51.3",
+            "tokenizers": "0.21.1",
+            "huggingface_hub": "0.30.2",
+            "cuda_runtime": "12.6",
+            "cudnn": "90501",
+            "accelerator": "Unit GPU",
+            "compute_capability": "8.9",
+        },
+        "execution": dict(E.EXECUTION_CONSTANTS),
+    }
+    return {
+        "schema": E.CONFIGURATION_SCHEMA,
+        "configuration_sha256": E.canonical_sha256(body),
+        "configuration": body,
+    }
+
+
 def _semantic(practice: dict[str, dict], official: dict[str, dict]) -> dict:
     practice_hashes = _prompt_hashes(practice)
     official_hashes = _prompt_hashes(official)
@@ -102,22 +152,86 @@ def _semantic(practice: dict[str, dict], official: dict[str, dict]) -> dict:
                 "values": values,
             }
             index += 1
+    configuration = _configuration(dimension)
     return {
         "schema": S.SEMANTIC_SCHEMA,
         "model": {
             "id": "unit/semantic-model",
-            "revision": "a" * 64,
-            "configuration_sha256": "b" * 64,
+            "revision": configuration["configuration"]["model"][
+                "revision_sha256"
+            ],
+            "configuration_sha256": configuration["configuration_sha256"],
         },
         "vectors": vectors,
     }
 
 
+def _split_commitment(suites: dict[str, dict], split: str) -> dict:
+    materials, _, _, _, fingerprints = S._collect_split(suites, split)
+    return {
+        "cases": len(materials),
+        "content_sha256": E.canonical_sha256(fingerprints),
+        "suite_fingerprints": fingerprints,
+        "suite_case_counts": {
+            suite: len(suites[suite]["cases"]) for suite in S.OFFICIAL_SUITES
+        },
+    }
+
+
+def _provenance(
+    practice: dict[str, dict],
+    official: dict[str, dict],
+    configuration: dict,
+    semantic: dict,
+    *,
+    job: str,
+) -> dict:
+    return {
+        "schema": E.PROVENANCE_SCHEMA,
+        "status": "complete",
+        "configuration_sha256": configuration["configuration_sha256"],
+        "configuration_document_sha256": E.canonical_sha256(configuration),
+        "semantic_vectors_sha256": E.canonical_sha256(semantic),
+        "model_revision_sha256": configuration["configuration"]["model"][
+            "revision_sha256"
+        ],
+        "practice": _split_commitment(practice, "practice"),
+        "official": _split_commitment(official, "official"),
+        "execution": {
+            "slurm_job_id": job,
+            "slurm_node": "unit-node",
+            "builder_path": E.BUILDER_PATH,
+            "builder_code_sha256": "b" * 64,
+            "entrypoint_path": E.ENTRYPOINT_PATH,
+            "entrypoint_code_sha256": "c" * 64,
+            "offline": True,
+            "visible_gpus": 1,
+        },
+    }
+
+
 def _build(practice: dict[str, dict], official: dict[str, dict], semantic: dict) -> dict:
+    dimension = len(next(iter(semantic["vectors"]["official"].values()))["values"])
+    configuration = _configuration(dimension)
+    provenance = _provenance(
+        practice, official, configuration, semantic, job="100"
+    )
+    replay = deepcopy(semantic)
+    replay_provenance = _provenance(
+        practice, official, configuration, replay, job="101"
+    )
+    reproducibility = E.compare_semantic_bundles(
+        semantic, provenance, replay, replay_provenance
+    )
     return S.build_split_audit(
         practice,
         official,
         semantic,
+        configuration,
+        provenance,
+        replay,
+        replay_provenance,
+        reproducibility,
         threshold=0.90,
         audited_at="2026-06-01T00:00:00+09:00",
         frozen_at="2026-06-02T00:00:00+09:00",
@@ -210,7 +324,7 @@ def test_split_audit_rejects_unbound_or_missing_vectors():
 
     semantic = _semantic(practice, official)
     semantic["vectors"]["practice"].pop(next(iter(semantic["vectors"]["practice"])))
-    with pytest.raises(ValueError, match="IDs must exactly match"):
+    with pytest.raises(ValueError, match="vector IDs do not match"):
         _build(practice, official, semantic)
 
 
@@ -230,7 +344,31 @@ def test_split_audit_cli_writes_public_outputs(tmp_path):
     official = _suites("official")
     semantic_path = tmp_path / "private" / "semantic.json"
     semantic_path.parent.mkdir()
-    semantic_path.write_text(json.dumps(_semantic(practice, official)), "utf-8")
+    semantic = _semantic(practice, official)
+    dimension = len(next(iter(semantic["vectors"]["official"].values()))["values"])
+    configuration = _configuration(dimension)
+    provenance = _provenance(
+        practice, official, configuration, semantic, job="100"
+    )
+    replay = deepcopy(semantic)
+    replay_provenance = _provenance(
+        practice, official, configuration, replay, job="101"
+    )
+    reproducibility = E.compare_semantic_bundles(
+        semantic, provenance, replay, replay_provenance
+    )
+    semantic_path.write_text(json.dumps(semantic), "utf-8")
+    extra_paths = {}
+    for name, value in {
+        "configuration": configuration,
+        "provenance": provenance,
+        "replay": replay,
+        "replay_provenance": replay_provenance,
+        "reproducibility": reproducibility,
+    }.items():
+        path = tmp_path / "private" / f"{name}.json"
+        path.write_text(json.dumps(value), "utf-8")
+        extra_paths[name] = path
     command = [sys.executable, str(ROOT / "probes" / "audit_splits.py")]
     for split_name, suites in (("practice", practice), ("official", official)):
         for suite, benchmark in suites.items():
@@ -241,6 +379,11 @@ def test_split_audit_cli_writes_public_outputs(tmp_path):
     markdown = tmp_path / "public" / "split.md"
     command.extend([
         "--semantic-vectors", str(semantic_path),
+        "--semantic-configuration", str(extra_paths["configuration"]),
+        "--semantic-provenance", str(extra_paths["provenance"]),
+        "--semantic-replay-vectors", str(extra_paths["replay"]),
+        "--semantic-replay-provenance", str(extra_paths["replay_provenance"]),
+        "--semantic-reproducibility", str(extra_paths["reproducibility"]),
         "--threshold", "0.9",
         "--audited-at", "2026-06-01T00:00:00+09:00",
         "--frozen-at", "2026-06-02T00:00:00+09:00",

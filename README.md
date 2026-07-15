@@ -116,7 +116,7 @@ ko-redteam-suite \
 | 사람 검토 | `ko-redteam-review-handoff`, `ko-redteam-review-response`, `ko-redteam-build-review-commitment`, `ko-redteam-merge-review-responses` | reviewer별 격리 반출, 항목별 blind 판정, 비공개 증거 서약, 서명 동결과 fail-closed 병합 |
 | 사람 calibration | `ko-redteam-calibration-collection`, `ko-redteam-calibration-response` | rater별 blinded 라벨, expert disagreement 합의, 독립 SSHSIG와 최종 v3 commitment 조립 |
 | 모델 비교 | `ko-redteam-rank-models`, `ko-redteam-analyze-repeats` | evidence eligibility, 배포 screen, 반복 안정성, 신뢰구간 기반 tier 분석 |
-| 공식 증거 생성 | `ko-redteam-validate-pilot-registration`, `ko-redteam-build-calibration-commitments`, `ko-redteam-build-calibration`, `ko-redteam-verify-calibration-signatures`, `ko-redteam-build-power-pilot`, `ko-redteam-audit-splits`, `ko-redteam-analyze-power`, `ko-redteam-analyze-familywise-power`, `ko-redteam-build-power-design` | practice 검토·등록, signed 사람 판정 보정, reference pilot, split 중복, marginal·다중비교 검정력과 공식 분할 규모의 metadata-only 증거 생성 |
+| 공식 증거 생성 | `ko-redteam-validate-pilot-registration`, `ko-redteam-build-calibration-commitments`, `ko-redteam-build-calibration`, `ko-redteam-verify-calibration-signatures`, `ko-redteam-build-power-pilot`, `ko-redteam-semantic-embeddings`, `ko-redteam-audit-splits`, `ko-redteam-analyze-power`, `ko-redteam-analyze-familywise-power`, `ko-redteam-build-power-design` | practice 검토·등록, signed 사람 판정 보정, 고정 GPU semantic replay, split 중복, marginal·다중비교 검정력과 공식 분할 규모의 metadata-only 증거 생성 |
 | 공식 게시 검증 | `ko-redteam-build-external-review-statement`, `ko-redteam-assemble-external-review`, `ko-redteam-verify-external-review`, `ko-redteam-validate-leaderboard` | signed 외부 검토 scope와 hidden split, calibration, provenance, 통계 publication gate |
 | 평가셋 관리 | `ko-redteam-import-benchmark`, `ko-redteam-merge-benchmarks`, `ko-redteam-expand-benchmark` | 외부 파일 변환, 병합, 한국어 변형 생성 |
 | 릴리스 게이트 | `ko-redteam-compare-reports`, `ko-redteam-check-regression`, `ko-redteam-gate-reports`, `ko-redteam-doctor-reports`, `ko-redteam-check-public-hygiene` | 점수 비교, 회귀 판정, CI threshold, 공개 배포 위생 점검 |
@@ -253,6 +253,12 @@ ko-redteam-build-power-design release/multiplicity_power_audit.json \
   --output release/power_derived_split_design.json \
   --markdown-output release/power_derived_split_design.md
 
+# 5a. Before writing official prompts, freeze the pinned embedding snapshot and
+# SLURM GPU runtime. Put its configuration_sha256 in the human-authored spec.
+# Full sbatch command and stop conditions:
+# governance/SEMANTIC_OVERLAP_WORKFLOW.md
+ko-redteam-semantic-embeddings inspect --help
+
 # 6. Commit the five frozen evidence artifacts and human-authored season spec.
 SEASON_SPEC=governance/SEASON_ID_PREREGISTRATION_SPEC.json
 PREREGISTRATION=governance/SEASON_ID_PREREGISTRATION.json
@@ -296,7 +302,12 @@ ko-redteam-verify-calibration-signatures \
   release/calibration_report.json \
   --output release/calibration_signature_audit.json
 
-# 8. Audit practice/official split overlap.
+# 8. Build two independent SLURM GPU bundles and compare them exactly.
+# The workflow creates private run-a/run-b vectors, provenance and replay evidence.
+ko-redteam-semantic-embeddings build --help
+ko-redteam-semantic-embeddings compare --help
+
+# 9. Audit practice/official split overlap only after replay passes.
 ko-redteam-audit-splits \
   --practice-suite paperbench=benchmarks/ko_llm_paperbench_v1.json \
   --practice-suite mini_single=benchmarks/ko_llm_mini_v1.json \
@@ -306,7 +317,12 @@ ko-redteam-audit-splits \
   --official-suite mini_single=private/official/mini.json \
   --official-suite multiturn=private/official/multiturn.json \
   --official-suite agent_harness=private/official/agent.json \
-  --semantic-vectors private/semantic_vectors.json \
+  --semantic-vectors private/semantic/run-a.vectors.json \
+  --semantic-configuration private/semantic/configuration.json \
+  --semantic-provenance private/semantic/run-a.provenance.json \
+  --semantic-replay-vectors private/semantic/run-b.vectors.json \
+  --semantic-replay-provenance private/semantic/run-b.provenance.json \
+  --semantic-reproducibility private/semantic/reproducibility.json \
   --threshold 0.90 \
   --audited-at 2026-06-01T09:00:00+09:00 \
   --frozen-at 2026-06-02T09:00:00+09:00 \
@@ -324,10 +340,13 @@ Power pilot builder는 등록 시각 이후 시작되고 `POWER_FROZEN_AT` 이�
 run context의 시작 시각과 `core`·`mini_single` execution evidence의 생성·완료 시각이 이 구간을 벗어나면
 결과 내용과 관계없이 중단됩니다.
 
-Semantic vector 입력은 immutable 모델·설정 digest와 각 벡터의 정규화 문항 SHA-256을 포함해야 하며,
-ID 누락, 문항-벡터 불일치, cross-split 중복 또는 official 내부의 서로 다른 독립 그룹 간 의미 중복이 있으면
-감사가 중단됩니다. official suite별 case/group 집계도 ranking report와 정확히 일치해야 합니다. 입력 계약,
-사전등록, 실행 순서와 중단 조건은
+Semantic vector 입력은 immutable 모델·설정 digest와 각 벡터의 정규화 문항 SHA-256을 포함해야 합니다. 임의
+JSON은 허용하지 않으며 고정 BGE-M3 snapshot의 CLS/L2/float32 configuration, 생성 전후 source·snapshot 재검사,
+서로 다른 두 SLURM GPU job의 provenance와 exact replay가 모두 필요합니다. ID 누락, 문항-벡터 불일치,
+cross-split 중복 또는 official 내부의 서로 다른 독립 그룹 간 의미 중복이 있으면 감사가 중단됩니다. official
+suite별 case/group 집계도 ranking report와 정확히 일치해야 합니다. 상세 절차는
+[`governance/SEMANTIC_OVERLAP_WORKFLOW.md`](./governance/SEMANTIC_OVERLAP_WORKFLOW.md), 입력 계약,
+사전등록, 실행 순서와 기타 중단 조건은
 [`LEADERBOARD_PROTOCOL.md`](./LEADERBOARD_PROTOCOL.md)와
 [`governance/SEASON_OPERATIONS.md`](./governance/SEASON_OPERATIONS.md)를 따릅니다.
 

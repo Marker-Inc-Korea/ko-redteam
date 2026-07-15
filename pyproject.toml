@@ -24,6 +24,12 @@ dependencies = []
 
 [project.optional-dependencies]
 dev = ["pytest>=8,<9", "build>=1,<2"]
+semantic = [
+    "torch>=2.6,<3",
+    "transformers>=4.48,<6",
+    "tokenizers>=0.21,<1",
+    "huggingface-hub>=0.28,<2",
+]
 
 [project.scripts]
 ko-redteam-self-check = "probes.self_check:main"
@@ -61,6 +67,7 @@ ko-redteam-verify-external-review = "probes.verify_external_review:main"
 ko-redteam-build-pilot-registration = "probes.build_pilot_registration:main"
 ko-redteam-validate-pilot-registration = "probes.validate_pilot_registration:main"
 ko-redteam-audit-splits = "probes.audit_splits:main"
+ko-redteam-semantic-embeddings = "probes.semantic_embeddings:main"
 ko-redteam-analyze-power = "probes.analyze_power:main"
 ko-redteam-analyze-familywise-power = "probes.analyze_familywise_power:main"
 ko-redteam-build-power-design = "probes.build_power_design:main"

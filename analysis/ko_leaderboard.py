@@ -22,6 +22,7 @@ try:
     import ko_pilot_registration as pilot_registration
     import ko_power_design as power_design
     import ko_power_evidence as power_evidence
+    import ko_semantic_embeddings as semantic_embeddings
     from ko_familywise_power import (
         OFFICIAL_MIN_PILOT_GROUPS_PER_STRATUM,
         OFFICIAL_VARIANCE_CONFIDENCE_LEVEL,
@@ -58,6 +59,7 @@ except ModuleNotFoundError:  # package import path
     from . import ko_pilot_registration as pilot_registration
     from . import ko_power_design as power_design
     from . import ko_power_evidence as power_evidence
+    from . import ko_semantic_embeddings as semantic_embeddings
     from .ko_familywise_power import (
         OFFICIAL_MIN_PILOT_GROUPS_PER_STRATUM,
         OFFICIAL_VARIANCE_CONFIDENCE_LEVEL,
@@ -1719,7 +1721,14 @@ def _audit_split(audit: _Audit, split: dict[str, Any], ranking: dict[str, Any] |
         and bool(split_audit.get("semantic_model", "").strip())
         and bool(SHA256_RE.fullmatch(str(split_audit.get("semantic_model_revision") or "")))
         and bool(SHA256_RE.fullmatch(str(split_audit.get("semantic_configuration_sha256") or "")))
+        and bool(SHA256_RE.fullmatch(str(split_audit.get("semantic_configuration_document_sha256") or "")))
         and bool(SHA256_RE.fullmatch(str(split_audit.get("semantic_input_sha256") or "")))
+        and bool(SHA256_RE.fullmatch(str(split_audit.get("semantic_provenance_sha256") or "")))
+        and bool(SHA256_RE.fullmatch(str(split_audit.get("semantic_replay_input_sha256") or "")))
+        and bool(SHA256_RE.fullmatch(str(split_audit.get("semantic_replay_provenance_sha256") or "")))
+        and bool(SHA256_RE.fullmatch(str(split_audit.get("semantic_reproducibility_sha256") or "")))
+        and bool(SHA256_RE.fullmatch(str(split_audit.get("semantic_builder_code_sha256") or "")))
+        and bool(SHA256_RE.fullmatch(str(split_audit.get("semantic_entrypoint_code_sha256") or "")))
         and isinstance(split_audit.get("semantic_dimension"), int)
         and not isinstance(split_audit.get("semantic_dimension"), bool)
         and split_audit.get("semantic_dimension") >= 2
@@ -3406,6 +3415,16 @@ def _audit_preregistration(
         == split_audit.get("semantic_model_revision")
         and semantic.get("model_configuration_sha256")
         == split_audit.get("semantic_configuration_sha256")
+        and semantic.get("embedding_configuration_schema")
+        == semantic_embeddings.CONFIGURATION_SCHEMA
+        and semantic.get("embedding_provenance_schema")
+        == semantic_embeddings.PROVENANCE_SCHEMA
+        and semantic.get("embedding_reproducibility_schema")
+        == semantic_embeddings.REPRODUCIBILITY_SCHEMA
+        and semantic.get("embedding_builder_code_sha256")
+        == split_audit.get("semantic_builder_code_sha256")
+        and semantic.get("embedding_entrypoint_code_sha256")
+        == split_audit.get("semantic_entrypoint_code_sha256")
         and semantic.get("embedding_dimension")
         == split_audit.get("semantic_dimension")
         and semantic_threshold is not None
@@ -3416,8 +3435,7 @@ def _audit_preregistration(
         and semantic.get("normalization_sha256")
         == split_audit.get("normalization_sha256")
         and semantic.get("normalized_embeddings") is True
-        and isinstance(semantic.get("pooling"), str)
-        and bool(semantic.get("pooling", "").strip()),
+        and semantic.get("pooling") == "cls",
         "semantic model revision and overlap threshold must match preregistration",
     )
 

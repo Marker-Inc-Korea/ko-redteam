@@ -236,16 +236,30 @@ Agent 층의 `no_tool`은 기존 report schema의 안정성을 위해 유지하�
 
 ## Semantic Overlap
 
-`ko-redteam-audit-splits`은 별도 `ko-redteam.semantic-overlap.v1` 벡터 파일을 받는다. `practice`와 `official`
-map의 key는 각각 네 suite의 `suite:case_id` 전체 집합과 정확히 같아야 한다. 각 record의
-`normalized_prompt_sha256`은 감사 코드가 계산한 값과 일치해야 한다.
+`ko-redteam-audit-splits`은 임의 벡터 파일 하나를 신뢰하지 않는다. 다음 여섯 입력이 모두 필요하다.
+
+1. `ko-redteam.semantic-embedding-configuration.v1`
+2. 첫 `ko-redteam.semantic-overlap.v1`
+3. 첫 `ko-redteam.semantic-embedding-provenance.v1`
+4. 독립 SLURM job의 두 번째 `ko-redteam.semantic-overlap.v1`
+5. 두 번째 provenance
+6. 두 bundle을 재계산한 `ko-redteam.semantic-embedding-reproducibility.v1`
+
+configuration은 model ID, 원 revision과 그 commitment, 사용한 snapshot 파일 전체의 path·size·SHA-256,
+CLS/L2/float32/eager encoding, max length, batch size, seed, PyTorch·Transformers·CUDA·GPU runtime을 canonical
+digest로 결합한다. build는 시작과 종료에 snapshot, runtime, builder와 entrypoint를 다시 검사한다. 두 provenance의
+SLURM job ID는 달라야 하고 기본 replay 기준은 모든 float가 동일한 `max_absolute_delta=0`,
+`minimum_cosine=1`이다.
+
+두 vector 문서의 `practice`와 `official` map key는 각각 네 suite의 `suite:case_id` 전체 집합과 정확히 같아야
+한다. 각 record의 `normalized_prompt_sha256`은 감사 코드가 계산한 값과 일치해야 한다.
 
 ```json
 {
   "schema": "ko-redteam.semantic-overlap.v1",
   "model": {
-    "id": "organization/embedding-model",
-    "revision": "<immutable-revision-sha256>",
+    "id": "BAAI/bge-m3",
+    "revision": "<sha256-of-model-id-at-immutable-revision>",
     "configuration_sha256": "<tokenizer-pooling-environment-sha256>"
   },
   "vectors": {
@@ -265,5 +279,8 @@ map의 key는 각각 네 suite의 `suite:case_id` 전체 집합과 정확히 같
 }
 ```
 
-공개 report는 item ID, 개별 label, cluster ID와 vector를 제거하고 집계값과 입력 commitment만 남긴다.
-외부 검토자는 공개 report의 digest와 접근 통제된 원본 입력을 대조해야 한다.
+vector와 provenance는 group/other 권한이 없는 directory에 `0600`으로 보관하고 덮어쓰지 않는다. 공개 report는
+item ID, 개별 label, cluster ID와 vector를 제거하고 configuration, 두 vector/provenance, replay report와 구현
+코드의 commitment 및 overlap 집계만 남긴다. 외부 검토자는 공개 report digest와 접근 통제된 여섯 원본 입력,
+SLURM accounting record를 대조해야 한다. 전체 실행 순서는
+[`SEMANTIC_OVERLAP_WORKFLOW.md`](./SEMANTIC_OVERLAP_WORKFLOW.md)를 따른다.

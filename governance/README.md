@@ -20,6 +20,8 @@
 | [`REVIEWER_RESPONSE_TOOL.md`](./REVIEWER_RESPONSE_TOOL.md) | 자동 승인 없는 항목별 offline reviewer response 작성 도구 |
 | [`REVIEW_HANDOFF_WORKFLOW.md`](./REVIEW_HANDOFF_WORKFLOW.md) | reviewer별 최소 workspace 격리 반출·서명 제출 검증·원자적 회수 절차 |
 | [`CALIBRATION_REVIEW_WORKFLOW.md`](./CALIBRATION_REVIEW_WORKFLOW.md) | 격리된 rater 라벨, 독립 expert 합의, SSHSIG와 private 신원·자격 확인 절차 |
+| [`SEMANTIC_OVERLAP_WORKFLOW.md`](./SEMANTIC_OVERLAP_WORKFLOW.md) | 고정 BGE-M3 snapshot, 두 SLURM GPU replay와 split 중복 감사 절차 |
+| [`SEMANTIC_RUNTIME_VALIDATION_2026Q3.md`](./SEMANTIC_RUNTIME_VALIDATION_2026Q3.md) | 공개 split negative-control로 검증한 비공식 embedding 공급망 smoke evidence |
 | [`EXTERNAL_REVIEW_WORKFLOW.md`](./EXTERNAL_REVIEW_WORKFLOW.md) | 공식 release scope와 공개 검토 증거를 검토자별 SSHSIG로 결합하는 절차 |
 | [`SUCCESSOR_PILOT_REGISTRATION_SPEC.json`](./SUCCESSOR_PILOT_REGISTRATION_SPEC.json) | 사람 검수 후 재현 가능한 v2 pilot registration을 생성하는 공개 사양 |
 | [`SEASON_2026Q3.md`](./SEASON_2026Q3.md) | S4 중단 상태와 S1·S2·S3 변경 이력 |

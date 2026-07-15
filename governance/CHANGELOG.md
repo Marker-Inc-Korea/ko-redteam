@@ -5,6 +5,11 @@
 
 ## Unreleased - Evidence-Eligible Ranking Protocol
 
+- 완성된 semantic vector JSON을 신뢰하던 공급망 공백을 제거한다. 고정 BGE-M3 revision의 model·tokenizer·weight
+  manifest, CLS/L2/float32/eager 설정과 SLURM CUDA runtime을 configuration digest로 동결한다. build 시작·종료에
+  snapshot과 implementation 해시를 다시 검사하고, 서로 다른 두 GPU job의 vector·provenance가 사전등록 replay
+  기준을 통과해야만 split audit이 입력을 받는다. private vector는 `0600`·무덮어쓰기로 만들고 공개 audit에는
+  여섯 입력과 builder·entrypoint commitment 및 overlap count만 남긴다.
 - 완성된 calibration JSON을 coordinator가 수작업으로 조립하던 운영 공백을 제거한다. 3명 이상의 rater에게
   evaluator label·model metadata·peer label이 없는 `0700` handoff를 각각 만들고, 300개 항목을 한 건씩만
   기록하게 한다. 모든 독립 response SSHSIG가 유효한 뒤에만 두 expert의 disagreement packet을 만들며 두

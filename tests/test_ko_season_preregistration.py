@@ -85,7 +85,7 @@ def _spec() -> dict:
             "configuration_sha256": "4" * 64,
             "dimension": 768,
             "near_duplicate_threshold": 0.90,
-            "pooling": "normalized mean pooling",
+            "pooling": "cls",
         },
         "calibration": {
             "held_out_samples": 300,
@@ -124,6 +124,7 @@ def test_season_spec_accepts_only_preexecution_immutable_policy():
     assert "probes/ko_jailbreak_templates.json" in protocol_paths
     assert "gap_analysis/_vendor/mitigationbypass_substrings.txt" in protocol_paths
     assert "governance/PRACTICE_REVIEW_WORKFLOW.md" in protocol_paths
+    assert "governance/SEMANTIC_OVERLAP_WORKFLOW.md" in protocol_paths
 
 
 @pytest.mark.parametrize(

@@ -261,6 +261,11 @@ def build_split_audit(
     practice_suites: dict[str, dict[str, Any]],
     official_suites: dict[str, dict[str, Any]],
     semantic: dict[str, Any],
+    semantic_configuration: dict[str, Any],
+    semantic_provenance: dict[str, Any],
+    semantic_replay: dict[str, Any],
+    semantic_replay_provenance: dict[str, Any],
+    semantic_reproducibility: dict[str, Any],
     *,
     threshold: float,
     audited_at: str,
@@ -290,6 +295,48 @@ def build_split_audit(
         official_fingerprints,
     ) = _collect_split(official_suites, "official")
     exact_overlap = len(set(practice_hashes.values()) & set(official_hashes.values()))
+
+    try:
+        from ko_semantic_embeddings import (
+            validate_reproducibility_evidence,
+            validate_semantic_bundle,
+        )
+    except ModuleNotFoundError:  # package import path
+        from .ko_semantic_embeddings import (
+            validate_reproducibility_evidence,
+            validate_semantic_bundle,
+        )
+    semantic_bundle = validate_semantic_bundle(
+        practice_suites,
+        official_suites,
+        semantic_configuration,
+        semantic,
+        semantic_provenance,
+    )
+    replay_bundle = validate_semantic_bundle(
+        practice_suites,
+        official_suites,
+        semantic_configuration,
+        semantic_replay,
+        semantic_replay_provenance,
+    )
+    validate_reproducibility_evidence(
+        semantic,
+        semantic_provenance,
+        semantic_replay,
+        semantic_replay_provenance,
+        semantic_reproducibility,
+    )
+    for key in (
+        "configuration_sha256",
+        "builder_code_sha256",
+        "entrypoint_code_sha256",
+        "dimension",
+        "practice_cases",
+        "official_cases",
+    ):
+        if semantic_bundle[key] != replay_bundle[key]:
+            raise ValueError(f"semantic replay {key} mismatch")
 
     def suite_counts(
         materials: dict[str, str], groups: dict[str, str]
@@ -436,7 +483,24 @@ def build_split_audit(
             "semantic_model": model_id,
             "semantic_model_revision": model_revision,
             "semantic_configuration_sha256": model_configuration_sha256,
+            "semantic_configuration_document_sha256": canonical_sha256(
+                semantic_configuration
+            ),
             "semantic_input_sha256": canonical_sha256(semantic),
+            "semantic_provenance_sha256": canonical_sha256(semantic_provenance),
+            "semantic_replay_input_sha256": canonical_sha256(semantic_replay),
+            "semantic_replay_provenance_sha256": canonical_sha256(
+                semantic_replay_provenance
+            ),
+            "semantic_reproducibility_sha256": canonical_sha256(
+                semantic_reproducibility
+            ),
+            "semantic_builder_code_sha256": semantic_bundle[
+                "builder_code_sha256"
+            ],
+            "semantic_entrypoint_code_sha256": semantic_bundle[
+                "entrypoint_code_sha256"
+            ],
             "semantic_dimension": dimension,
             "semantic_comparisons": comparisons,
             "official_cross_group_semantic_comparisons": (

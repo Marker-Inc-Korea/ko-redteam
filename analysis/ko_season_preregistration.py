@@ -17,6 +17,7 @@ try:
     import ko_pilot_registration as pilot_registration
     import ko_power_design as power_design
     import ko_power_pilot as power_pilot
+    import ko_semantic_embeddings as semantic_embeddings
     from ko_run_context import canonical_sha256
     import ko_split_evidence as split_evidence
 except ModuleNotFoundError:  # package import path
@@ -26,6 +27,7 @@ except ModuleNotFoundError:  # package import path
     from . import ko_pilot_registration as pilot_registration
     from . import ko_power_design as power_design
     from . import ko_power_pilot as power_pilot
+    from . import ko_semantic_embeddings as semantic_embeddings
     from .ko_run_context import canonical_sha256
     from . import ko_split_evidence as split_evidence
 
@@ -62,6 +64,8 @@ IMPLEMENTATION_PATHS = {
     "practice_review_validator": "analysis/ko_practice_review.py",
     "run_context": "analysis/ko_run_context.py",
     "split_audit_builder": "analysis/ko_split_evidence.py",
+    "semantic_embedding_builder": semantic_embeddings.BUILDER_PATH,
+    "semantic_embedding_entrypoint": semantic_embeddings.ENTRYPOINT_PATH,
     "calibration_builder": "analysis/ko_calibration.py",
     "calibration_evidence": "analysis/ko_calibration_evidence.py",
     "calibration_collection": "analysis/ko_calibration_collection.py",
@@ -79,6 +83,7 @@ PROTOCOL_SOURCE_PATHS = (
     "gap_analysis/_vendor/mitigationbypass_substrings.txt",
     "governance/PRACTICE_REVIEW_WORKFLOW.md",
     "governance/CALIBRATION_REVIEW_WORKFLOW.md",
+    "governance/SEMANTIC_OVERLAP_WORKFLOW.md",
     "pyproject.toml",
 )
 PROTOCOL_PACKAGE_ROOTS = ("analysis", "probes", "detectors")
@@ -86,6 +91,7 @@ PROTOCOL_DATA_PATHS = (
     "gap_analysis/_vendor/mitigationbypass_substrings.txt",
     "governance/PRACTICE_REVIEW_WORKFLOW.md",
     "governance/CALIBRATION_REVIEW_WORKFLOW.md",
+    "governance/SEMANTIC_OVERLAP_WORKFLOW.md",
     "probes/ko_jailbreak_templates.json",
 )
 
@@ -429,7 +435,8 @@ def validate_season_preregistration_spec(spec: dict[str, Any]) -> dict[str, Any]
     )
     if not 0.0 < threshold < 1.0:
         raise ValueError("semantic overlap threshold must be between zero and one")
-    _string(semantic.get("pooling"), "spec.semantic_overlap.pooling")
+    if _string(semantic.get("pooling"), "spec.semantic_overlap.pooling") != "cls":
+        raise ValueError("semantic overlap pooling must be cls")
 
     calibration_spec = _object(spec.get("calibration"), "spec.calibration")
     _require_fields(
@@ -914,6 +921,19 @@ def _expected_preregistration(
             "model_revision_sha256": semantic_revision_sha256,
             "model_configuration_sha256": semantic_spec["configuration_sha256"],
             "embedding_dimension": semantic_spec["dimension"],
+            "embedding_configuration_schema": (
+                semantic_embeddings.CONFIGURATION_SCHEMA
+            ),
+            "embedding_provenance_schema": semantic_embeddings.PROVENANCE_SCHEMA,
+            "embedding_reproducibility_schema": (
+                semantic_embeddings.REPRODUCIBILITY_SCHEMA
+            ),
+            "embedding_builder_code_sha256": implementations[
+                "semantic_embedding_builder"
+            ]["sha256"],
+            "embedding_entrypoint_code_sha256": implementations[
+                "semantic_embedding_entrypoint"
+            ]["sha256"],
             "split_audit_code_sha256": implementations["split_audit_builder"][
                 "sha256"
             ],

@@ -28,7 +28,8 @@
    gate가 미달하면 official season과 split을 만들기 전에 중단한다.
 4. 고정 MDE·alpha·target power와 최대 7모델의 최소 Holm 임계값으로 `power-derived-split-design.v1`을 만들고,
    계획 표본 수에서 tier power를 재생한다. 관측 평균 차이로 표본 수를 줄이거나 threshold를 완화하지 않는다.
-5. 통과한 다섯 선행 증거와 사람이 결정한 immutable model cohort, 실행·semantic·calibration 정책을
+5. official prompt 작성 전에 고정 BGE-M3 snapshot과 SLURM GPU runtime을 inspect해 CLS/L2/float32 configuration
+   commitment를 만든다. 통과한 다섯 선행 증거와 사람이 결정한 immutable model cohort, 실행·semantic·calibration 정책을
    `season-preregistration-spec.v1`에 결합해 commit/push한다. clean HEAD의
    `ko-redteam-build-season-preregistration`으로만 `season-preregistration.v3`를 만들고 별도 commit/push한 뒤
    official prompt를 작성한다. evidence commit이 pilot evaluator commit보다 뒤인 것은 정상이나, 그 사이 protocol
@@ -37,7 +38,9 @@
    두 expert의 독립 disagreement proposal·exact consensus, collection receipt와 최종 서명을 검증한다. private
    신원·자격 evidence binding을 확인하고 기준 미달 시 중단한다. calibration은 season 등록 뒤 시작해 첫
    제출 전에 expert adjudication까지 끝낸다.
-7. practice와 official split의 exact·semantic overlap을 감사한다.
+7. official split 작성 뒤 서로 다른 두 SLURM GPU job에서 고정 configuration으로 semantic vector와 provenance를
+   생성한다. 시작·종료 snapshot·source 검증과 exact replay를 통과한 뒤 practice/official exact·semantic overlap,
+   official 내부 cross-group semantic overlap을 감사한다.
 8. official split과 모든 scoring/evaluator 설정을 첫 제출 전에 동결한다.
 9. 모델별 최대 2회 제출을 접수하고 immutable model/runtime/prompting/evaluator provenance를 기록한다.
 10. 모델별 최소 3회, 반복마다 네 suite를 동일 run context로 실행하고 `core`·`mini_single` execution evidence가
@@ -65,7 +68,8 @@ season을 사전등록하지 않는다. S3는
 
 ## Evidence Handling
 
-비공개 저장소에는 official prompt, 개별 응답, label matrix, adjudication log와 semantic vector 입력을 둔다.
+비공개 저장소에는 official prompt, 개별 응답, label matrix, adjudication log, semantic configuration, 두 vector와
+두 provenance 입력을 둔다.
 공개 bundle에는 집계 confusion matrix, commitment, split fingerprint, 중복 개수, power 결과, sanitized report와
 검토 attestation만 둔다. 공개 전 다음을 확인한다.
 
@@ -89,7 +93,7 @@ ko-redteam-validate-leaderboard release_bundle/release_manifest.json \
 다음 중 하나라도 발생하면 신규 제출과 게시를 중단한다.
 
 - calibration 최저 기준, rater·expert 서명, private evidence binding, 사전등록 뒤 시작·첫 제출 전 완료 또는 reference control 분리 실패
-- practice/official exact·semantic overlap 또는 official cross-group semantic overlap 1건 이상
+- semantic snapshot/runtime/source 재검사, 독립 SLURM GPU replay 실패, practice/official exact·semantic overlap 또는 official cross-group semantic overlap 1건 이상
 - target stratum별 pilot 20개 미달, pilot 분산 95% 상한 검증 실패, derived split의 최대 cohort 다중비교 power 미달 또는 실제 split 불일치
 - endpoint 오류, 모델 revision 불명확, suite 간 run context 불일치, execution evidence/report digest 불일치
 - ranking evidence-eligible 모델 2개 미만

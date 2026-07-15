@@ -24,6 +24,7 @@ import ko_power_pilot as PP  # noqa: E402
 import ko_power_design as D  # noqa: E402
 import ko_power_evidence as PE  # noqa: E402
 import ko_run_context as C  # noqa: E402
+import ko_semantic_embeddings as SE  # noqa: E402
 import ko_season_preregistration as SR  # noqa: E402
 import ko_split_evidence as SP  # noqa: E402
 from tests.review_signature_support import (  # noqa: E402
@@ -689,7 +690,16 @@ def _valid_release(
             "semantic_model": semantic_model,
             "semantic_model_revision": semantic_revision_sha256,
             "semantic_configuration_sha256": "9" * 64,
+            "semantic_configuration_document_sha256": "8" * 64,
             "semantic_input_sha256": "0" * 64,
+            "semantic_provenance_sha256": "1" * 64,
+            "semantic_replay_input_sha256": "2" * 64,
+            "semantic_replay_provenance_sha256": "3" * 64,
+            "semantic_reproducibility_sha256": "4" * 64,
+            "semantic_builder_code_sha256": _sha_file(Path(SE.__file__)),
+            "semantic_entrypoint_code_sha256": _sha_file(
+                ROOT / "probes" / "semantic_embeddings.py"
+            ),
             "semantic_dimension": 8,
             "semantic_comparisons": 180 * total_groups,
             "official_cross_group_semantic_comparisons": (
@@ -1197,7 +1207,7 @@ def _valid_release(
             "configuration_sha256": "9" * 64,
             "dimension": 8,
             "near_duplicate_threshold": 0.90,
-            "pooling": "unit sentence embedding",
+            "pooling": "cls",
         },
         "calibration": {
             "held_out_samples": 300,

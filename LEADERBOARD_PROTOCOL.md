@@ -47,7 +47,9 @@
 - official 내부에서도 서로 다른 `independence_group` 간 의미 기반 near-duplicate가 0이어야 한다. 같은 원형의
   허용된 변형은 동일 group 안에서만 유지한다.
 - semantic vector 입력은 immutable model revision과 tokenizer/pooling/environment 설정 digest를 포함하고,
-  각 vector를 정규화 prompt SHA-256과 결합한다. ID 누락이나 commitment 불일치는 감사 실패다.
+  각 vector를 정규화 prompt SHA-256과 결합한다. 임의 vector JSON은 허용하지 않는다. 고정 BGE-M3 snapshot을
+  CLS/L2/float32로 두 독립 SLURM GPU job에서 실행하고, 생성 전후 snapshot·source 재검사와 사전등록된 replay
+  tolerance를 통과한 provenance가 필요하다. ID 누락이나 commitment 불일치는 감사 실패다.
 - `independence_group` ID는 네 suite 전체에서 재사용하지 않는다. 상관된 변형은 한 suite 안에서 같은 group에
   묶고, suite 간 중복 시나리오는 official 표본에서 제거한다.
 - 시즌 종료 후 official 문항을 공개할 수 있지만, 공개 즉시 해당 split은 다음 시즌 공식 평가에서 은퇴한다.
@@ -293,6 +295,9 @@ ko-redteam-build-calibration private/calibration/signed/calibration-input.json \
   --evidence-root private/calibration/signed \
   --output release/calibration_report.json
 ko-redteam-verify-calibration-signatures release/calibration_report.json
+ko-redteam-semantic-embeddings inspect --help
+ko-redteam-semantic-embeddings build --help
+ko-redteam-semantic-embeddings compare --help
 ko-redteam-audit-splits --help
 ```
 
@@ -306,8 +311,8 @@ run provenance와 정확히 일치해야 한다. 사후 수정은 기존 season�
 SHA-256을 기록한다. 파일이 존재한다는 사실, self-report된 점수,
 부분 checksum만으로는 통과하지 않는다.
 
-split audit은 중복 검사 코드·정규화 규칙·semantic model revision·embedding configuration·dimension·threshold를
-digest로 고정한다. power
+split audit은 중복 검사 코드·정규화 규칙·semantic model revision·embedding configuration·dimension·threshold,
+두 vector/provenance와 재현성 report, embedding builder·entrypoint를 digest로 고정한다. power
 analysis는 코드와 입력 commitment, 파일럿 등록·검토 digest, 최초·최종 anchor 실행 시각, 최종 execution
 evidence 완료 시각, 분석 동결 시각과 최소 10,000회 simulation을 기록한다. 검증기는 power가
 선언한 파일럿 baseline과 power-derived 계획 표본 수, official split의 영역·suite별 독립 원형 합계 및 ranking report의 실제 case/group 수를
