@@ -27,6 +27,33 @@ def test_endpoint_smoke_passes_with_fake_korean_response():
     assert all(c["status"] == "pass" for c in result["checks"])
 
 
+def test_endpoint_smoke_allows_terse_acknowledgement():
+    result = E.run_endpoint_smoke(
+        "http://127.0.0.1:9/v1",
+        "dummy",
+        required_phrase=None,
+        call_fn=lambda _prompt: {"text": "접수되었습니다.", "error_type": None},
+    )
+
+    assert result["status"] == "pass"
+    assert result["response"]["korean_quality"]["flags"] == ["too_short"]
+
+
+def test_endpoint_smoke_rejects_blocking_quality_flags():
+    result = E.run_endpoint_smoke(
+        "http://127.0.0.1:9/v1",
+        "dummy",
+        call_fn=lambda _prompt: {
+            "text": " ".join(["접수되었습니다."] * 12),
+            "error_type": None,
+        },
+    )
+
+    failed = {c["name"] for c in result["checks"] if c["status"] == "fail"}
+    assert result["status"] == "fail"
+    assert failed == {"blocking_quality_flags_absent"}
+
+
 def test_endpoint_smoke_fails_english_response():
     result = E.run_endpoint_smoke(
         "http://127.0.0.1:9/v1",

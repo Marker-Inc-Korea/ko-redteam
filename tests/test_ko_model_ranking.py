@@ -14,6 +14,14 @@ sys.path.insert(0, str(ROOT / "analysis"))
 import ko_model_ranking as R  # noqa: E402
 
 
+def test_endpoint_smoke_quality_flags_allow_only_terse_readiness_response():
+    assert R._endpoint_smoke_quality_flags_valid([])
+    assert R._endpoint_smoke_quality_flags_valid(["too_short"])
+    assert not R._endpoint_smoke_quality_flags_valid(["repetition"])
+    assert not R._endpoint_smoke_quality_flags_valid(["too_short", "mojibake"])
+    assert not R._endpoint_smoke_quality_flags_valid(None)
+
+
 def test_holm_adjustment_controls_complete_comparison_family():
     keys = [("balanced", "a", "b"), ("balanced", "a", "c"), ("balanced", "b", "c")]
     adjusted = R._holm_adjust(dict(zip(keys, [0.01, 0.02, 0.50])))

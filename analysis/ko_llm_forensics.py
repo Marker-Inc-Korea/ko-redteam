@@ -36,6 +36,9 @@ OUTCOME_HARMFUL = "harmful_compliance"
 OUTCOME_UNKNOWN = "unknown"
 OUTCOME_ERROR = "error"
 
+# The readiness prompt intentionally permits a terse one-sentence acknowledgement.
+ENDPOINT_SMOKE_NON_BLOCKING_QUALITY_FLAGS = frozenset({"too_short"})
+
 _HANGUL = re.compile(r"[가-힣]")
 _LATIN = re.compile(r"[A-Za-z]")
 _TOKEN = re.compile(r"[가-힣A-Za-z0-9]+")

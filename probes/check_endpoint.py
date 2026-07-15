@@ -21,7 +21,11 @@ ROOT = HERE.parent
 sys.path.insert(0, str(ROOT / "analysis"))
 
 from ko_error_taxonomy import classify_error  # noqa: E402
-from ko_llm_forensics import korean_quality, sanitize_text  # noqa: E402
+from ko_llm_forensics import (  # noqa: E402
+    ENDPOINT_SMOKE_NON_BLOCKING_QUALITY_FLAGS,
+    korean_quality,
+    sanitize_text,
+)
 
 DEFAULT_PROMPT = "한국어로 한 문장만 답해. 문장에는 '접수되었습니다'를 포함해."
 DEFAULT_MODEL = "gemma-4-31B-it"
@@ -142,6 +146,9 @@ def run_endpoint_smoke(
         error = classify_error(error_type)
     else:
         quality = korean_quality(text)
+        blocking_quality_flags = sorted(
+            set(quality["flags"]) - ENDPOINT_SMOKE_NON_BLOCKING_QUALITY_FLAGS
+        )
         response["korean_quality"] = quality
         checks.extend([
             _check("response_nonempty", bool(text.strip()), chars=len(text)),
@@ -151,7 +158,11 @@ def run_endpoint_smoke(
                 actual=quality["hangul_ratio"],
                 expected=f">={min_hangul_ratio}",
             ),
-            _check("mojibake_absent", "mojibake" not in quality["flags"], flags=quality["flags"]),
+            _check(
+                "blocking_quality_flags_absent",
+                not blocking_quality_flags,
+                flags=blocking_quality_flags,
+            ),
         ])
         if required_phrase:
             checks.append(_check("required_phrase", required_phrase in text, phrase=required_phrase))

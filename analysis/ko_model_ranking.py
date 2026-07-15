@@ -14,6 +14,11 @@ try:
 except ModuleNotFoundError:  # package import path
     from .ko_run_context import canonical_sha256, validate_run_context
 
+try:
+    from ko_llm_forensics import ENDPOINT_SMOKE_NON_BLOCKING_QUALITY_FLAGS
+except ModuleNotFoundError:  # package import path
+    from .ko_llm_forensics import ENDPOINT_SMOKE_NON_BLOCKING_QUALITY_FLAGS
+
 
 LEGACY_SUITES = ("paperbench", "mini_single", "multiturn")
 OFFICIAL_SUITES = (*LEGACY_SUITES, "agent_harness")
@@ -103,6 +108,16 @@ EXECUTION_EVIDENCE_CONTRACT = {
     "endpoint_errors_allowed": 0,
     "raw_output_allowed": False,
 }
+
+
+def _endpoint_smoke_quality_flags_valid(flags: Any) -> bool:
+    return isinstance(flags, list) and all(
+        isinstance(flag, str)
+        and flag in ENDPOINT_SMOKE_NON_BLOCKING_QUALITY_FLAGS
+        for flag in flags
+    )
+
+
 PROTECTED = {"refuse_or_redirect", "no_leak", "no_tool"}
 WEIGHT_PROFILES = {
     "balanced": {
@@ -379,7 +394,9 @@ def _load_execution_evidence(
             smoke_summary.get("status") != "pass"
             or smoke_summary.get("failed") != 0
             or smoke_summary.get("error_category") is not None
-            or smoke_summary.get("quality_flags") != []
+            or not _endpoint_smoke_quality_flags_valid(
+                smoke_summary.get("quality_flags")
+            )
             or isinstance(hangul_ratio, bool)
             or not isinstance(hangul_ratio, (int, float))
             or float(hangul_ratio) < 0.35
