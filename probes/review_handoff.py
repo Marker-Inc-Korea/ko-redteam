@@ -14,6 +14,7 @@ sys.path.insert(0, str(ROOT / "analysis"))
 from ko_review_handoff import (  # noqa: E402
     assemble_review_submissions,
     build_review_handoff,
+    verify_review_handoff_template,
     verify_review_submission,
     write_private_audit,
 )
@@ -50,6 +51,30 @@ def main() -> None:
         "--output-dir",
         required=True,
         help="new private reviewer-only directory",
+    )
+
+    verify_template = commands.add_parser(
+        "verify-template",
+        help="verify an untouched reviewer handoff before dispatch",
+    )
+    verify_template.add_argument(
+        "handoff",
+        help="untouched reviewer-only handoff directory",
+    )
+    verify_template.add_argument(
+        "--root",
+        default=".",
+        help="project root for frozen inputs",
+    )
+    verify_template.add_argument(
+        "--reviewer",
+        required=True,
+        help="expected reviewer ID",
+    )
+    verify_template.add_argument(
+        "--audit-output",
+        required=True,
+        help="new private dispatch audit outside the handoff directory",
     )
 
     verify = commands.add_parser(
@@ -98,6 +123,18 @@ def main() -> None:
                 output_dir=args.output_dir,
             )
             _print(manifest)
+        elif args.command == "verify-template":
+            handoff = Path(args.handoff).resolve()
+            audit_output = Path(args.audit_output)
+            if audit_output.parent.resolve() == handoff:
+                raise ValueError("dispatch audit must be written outside the handoff")
+            audit = verify_review_handoff_template(
+                args.handoff,
+                project_root=args.root,
+                reviewer_id=args.reviewer,
+            )
+            write_private_audit(audit_output, audit)
+            _print(audit)
         elif args.command == "verify":
             audit, _ = verify_review_submission(
                 args.submission,

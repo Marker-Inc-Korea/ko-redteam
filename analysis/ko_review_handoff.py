@@ -17,6 +17,7 @@ except ModuleNotFoundError:  # package import path
 
 
 HANDOFF_SCHEMA = "ko-redteam.review-handoff.v1"
+DISPATCH_AUDIT_SCHEMA = "ko-redteam.review-handoff-dispatch-audit.v1"
 SUBMISSION_AUDIT_SCHEMA = "ko-redteam.review-submission-audit.v1"
 ASSEMBLY_AUDIT_SCHEMA = "ko-redteam.review-submission-assembly.v1"
 HANDOFF_MANIFEST_NAME = "review-handoff.json"
@@ -102,6 +103,15 @@ def _file_sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _require_no_symlink_components(path: str | Path, label: str) -> None:
+    absolute = Path(os.path.abspath(path))
+    current = Path(absolute.anchor)
+    for part in absolute.parts[1:]:
+        current /= part
+        if current.is_symlink():
+            raise ValueError(f"{label} must not traverse a symlink")
+
+
 def _require_private_path(path: Path, label: str, *, directory: bool = False) -> None:
     if path.is_symlink():
         raise ValueError(f"{label} must not be a symlink")
@@ -152,8 +162,7 @@ def _write_private_bytes(path: Path, value: bytes) -> None:
 
 def write_private_audit(path: str | Path, audit: dict[str, Any]) -> Path:
     output = Path(path)
-    if output.parent.is_symlink():
-        raise ValueError("audit output parent must not be a symlink")
+    _require_no_symlink_components(output.parent, "audit output parent")
     parent = output.parent.resolve()
     _require_private_path(parent, "audit output parent", directory=True)
     if output.name != _top_level_name(
@@ -188,8 +197,7 @@ def _scan_flat_private_directory(root: Path) -> set[str]:
 
 def _review_context(plan_path: str | Path, project_root: str | Path) -> dict[str, Any]:
     unresolved = Path(plan_path)
-    if unresolved.is_symlink():
-        raise ValueError("review plan must not be a symlink")
+    _require_no_symlink_components(unresolved, "review plan")
     context = review._review_workspace_context(unresolved, project_root)
     _top_level_name(context["plan_file"].name, "review plan filename")
     if context["plan_file"].read_bytes() != _json_bytes(context["plan"]):
@@ -331,8 +339,7 @@ def _validate_pristine_source(
 def _destination(path: str | Path, label: str) -> tuple[Path, Path]:
     requested = Path(path)
     name = _top_level_name(requested.name, f"{label} name")
-    if requested.parent.is_symlink():
-        raise ValueError(f"{label} parent must not be a symlink")
+    _require_no_symlink_components(requested.parent, f"{label} parent")
     parent = requested.parent.resolve()
     _require_private_path(parent, f"{label} parent", directory=True)
     destination = parent / name
@@ -412,6 +419,113 @@ def _load_handoff_manifest(root: Path, reviewer_id: str) -> dict[str, Any]:
     return manifest
 
 
+def verify_review_handoff_template(
+    handoff_dir: str | Path,
+    *,
+    project_root: str | Path,
+    reviewer_id: str,
+) -> dict[str, Any]:
+    """Verify an untouched reviewer-only workspace before it is dispatched."""
+    implementation_paths = {
+        "dispatch_verifier_sha256": Path(__file__).resolve(),
+        "dispatch_entrypoint_sha256": (
+            Path(__file__).resolve().parent.parent / "probes" / "review_handoff.py"
+        ),
+    }
+    implementation_before = {
+        name: _file_sha256(path) for name, path in implementation_paths.items()
+    }
+    unresolved = Path(handoff_dir)
+    _require_no_symlink_components(unresolved, "review handoff directory")
+    root = unresolved.resolve()
+    _require_private_path(root, "review handoff directory", directory=True)
+    manifest = _load_handoff_manifest(root, reviewer_id)
+    plan_name = _top_level_name(manifest.get("plan_path"), "handoff plan path")
+    context = _review_context(root / plan_name, project_root)
+    names, templates, expected_manifest = _expected_material(context, reviewer_id)
+    if manifest != expected_manifest:
+        raise ValueError("review handoff manifest does not match frozen sources")
+
+    expected_files = {
+        HANDOFF_MANIFEST_NAME,
+        names["plan_path"],
+        names["packet_path"],
+        names["response_path"],
+        names["attestation_path"],
+    }
+    observed_files = _scan_flat_private_directory(root)
+    if observed_files != expected_files:
+        missing = sorted(expected_files - observed_files)
+        unknown = sorted(observed_files - expected_files)
+        details = []
+        if missing:
+            details.append(f"missing: {', '.join(missing)}")
+        if unknown:
+            details.append(f"unsupported: {', '.join(unknown)}")
+        raise ValueError(
+            f"pristine review handoff file set mismatch ({'; '.join(details)})"
+        )
+
+    tree_before = _workspace_tree_sha256(root)
+    for key in ("packet_path", "response_path", "attestation_path"):
+        filename = names[key]
+        path = _private_file(root, filename, f"handoff reviewer {key}")
+        if path.read_bytes() != templates[filename]:
+            raise ValueError(
+                f"handoff reviewer {key} is not the frozen dispatch template"
+            )
+
+    # Replay from project sources after reading the handoff to catch concurrent changes.
+    replay_context = _review_context(root / plan_name, project_root)
+    replay_names, replay_templates, replay_manifest = _expected_material(
+        replay_context,
+        reviewer_id,
+    )
+    if (
+        replay_names != names
+        or replay_templates != templates
+        or replay_manifest != expected_manifest
+    ):
+        raise ValueError("review handoff frozen sources changed during verification")
+    manifest_sha256 = _file_sha256(root / HANDOFF_MANIFEST_NAME)
+    tree_after = _workspace_tree_sha256(root)
+    if tree_after != tree_before:
+        raise ValueError("review handoff changed during dispatch verification")
+    implementation_after = {
+        name: _file_sha256(path) for name, path in implementation_paths.items()
+    }
+    if implementation_after != implementation_before:
+        raise ValueError("dispatch verification implementation changed during execution")
+
+    return {
+        "schema": DISPATCH_AUDIT_SCHEMA,
+        "status": "ready_for_dispatch",
+        "review_id": context["plan"]["review_id"],
+        "reviewer_id": reviewer_id,
+        "plan_canonical_sha256": context["plan_sha256"],
+        "plan_file_sha256": context["plan_file_sha256"],
+        "handoff_manifest_sha256": manifest_sha256,
+        "handoff_workspace_tree_sha256": tree_after,
+        "packet_sha256": manifest["packet_sha256"],
+        "response_template_sha256": manifest["response_template_sha256"],
+        "attestation_template_sha256": manifest["attestation_template_sha256"],
+        "workflow_sha256": manifest["workflow_sha256"],
+        "merge_code_sha256": manifest["merge_code_sha256"],
+        "merge_entrypoint_sha256": manifest["merge_entrypoint_sha256"],
+        **implementation_before,
+        "assignment_count": manifest["assignment_count"],
+        "handoff_file_count": len(expected_files),
+        "source_reproduction_verified": True,
+        "empty_human_templates_verified": True,
+        "handoff_file_isolation_verified": True,
+        "blind_to_reference_outputs": True,
+        "other_reviewer_decisions_included": False,
+        "raw_reference_output_included": False,
+        "human_review_completed": False,
+        "distinct_human_identity_proven": False,
+    }
+
+
 def verify_review_submission(
     submission_dir: str | Path,
     *,
@@ -420,8 +534,7 @@ def verify_review_submission(
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Verify one completed reviewer handoff without requiring the peer response."""
     unresolved = Path(submission_dir)
-    if unresolved.is_symlink():
-        raise ValueError("review submission directory must not be a symlink")
+    _require_no_symlink_components(unresolved, "review submission directory")
     root = unresolved.resolve()
     _require_private_path(root, "review submission directory", directory=True)
     manifest = _load_handoff_manifest(root, reviewer_id)

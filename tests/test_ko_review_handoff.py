@@ -143,6 +143,59 @@ def test_review_handoff_contains_only_one_reviewer_templates(tmp_path):
         _build_handoff(plan_path, handoff, "reviewer-a")
 
 
+def test_review_handoff_template_is_dispatch_ready_and_rejects_changes(tmp_path):
+    _, plan_path = _central_workspace(tmp_path)
+    handoff = _build_handoff(plan_path, tmp_path / "handoff-a", "reviewer-a")
+
+    audit = H.verify_review_handoff_template(
+        handoff,
+        project_root=ROOT,
+        reviewer_id="reviewer-a",
+    )
+    assert audit["schema"] == H.DISPATCH_AUDIT_SCHEMA
+    assert audit["status"] == "ready_for_dispatch"
+    assert audit["assignment_count"] == 140
+    assert audit["handoff_file_count"] == 5
+    assert audit["source_reproduction_verified"] is True
+    assert audit["empty_human_templates_verified"] is True
+    assert len(audit["dispatch_verifier_sha256"]) == 64
+    assert len(audit["dispatch_entrypoint_sha256"]) == 64
+    assert audit["human_review_completed"] is False
+    assert audit["distinct_human_identity_proven"] is False
+
+    parent_link = tmp_path / "handoff-parent-link"
+    parent_link.symlink_to(handoff.parent, target_is_directory=True)
+    with pytest.raises(ValueError, match="must not traverse a symlink"):
+        H.verify_review_handoff_template(
+            parent_link / handoff.name,
+            project_root=ROOT,
+            reviewer_id="reviewer-a",
+        )
+
+    unexpected = handoff / "coordinator-note.txt"
+    unexpected.write_text("must remain outside the reviewer handoff\n", "utf-8")
+    unexpected.chmod(0o600)
+    with pytest.raises(ValueError, match="unsupported: coordinator-note.txt"):
+        H.verify_review_handoff_template(
+            handoff,
+            project_root=ROOT,
+            reviewer_id="reviewer-a",
+        )
+    unexpected.unlink()
+
+    manifest = _load(handoff / H.HANDOFF_MANIFEST_NAME)
+    response_path = handoff / manifest["response_path"]
+    response = _load(response_path)
+    response["status"] = "tampered-before-dispatch"
+    _write_private(response_path, response)
+    with pytest.raises(ValueError, match="not the frozen dispatch template"):
+        H.verify_review_handoff_template(
+            handoff,
+            project_root=ROOT,
+            reviewer_id="reviewer-a",
+        )
+
+
 def test_review_handoff_rejects_started_source_and_symlink_submission(tmp_path):
     central, plan_path = _central_workspace(tmp_path)
     packet_path = central / "reviewer-01.packet.json"
@@ -162,7 +215,7 @@ def test_review_handoff_rejects_started_source_and_symlink_submission(tmp_path):
     _complete_handoff(handoff, "reviewer-a")
     link = tmp_path / "submission-link"
     link.symlink_to(handoff, target_is_directory=True)
-    with pytest.raises(ValueError, match="must not be a symlink"):
+    with pytest.raises(ValueError, match="must not traverse a symlink"):
         H.verify_review_submission(link, project_root=ROOT, reviewer_id="reviewer-a")
 
 
@@ -353,6 +406,29 @@ def test_review_handoff_cli_build_verify_and_assemble(tmp_path):
             text=True,
         )
         assert json.loads(build.stdout)["reviewer_id"] == reviewer_id
+
+        dispatch_audit = tmp_path / f"dispatch-{suffix}-audit.json"
+        dispatch = subprocess.run(
+            [
+                sys.executable,
+                cli,
+                "verify-template",
+                str(handoff),
+                "--root",
+                str(ROOT),
+                "--reviewer",
+                reviewer_id,
+                "--audit-output",
+                str(dispatch_audit),
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        assert json.loads(dispatch.stdout)["status"] == "ready_for_dispatch"
+        assert _load(dispatch_audit)["human_review_completed"] is False
+        assert dispatch_audit.stat().st_mode & 0o077 == 0
+
         _complete_handoff(handoff, reviewer_id)
         handoffs[reviewer_id] = handoff
 

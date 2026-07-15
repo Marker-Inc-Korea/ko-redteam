@@ -44,7 +44,31 @@ ko-redteam-review-handoff build \
 각 reviewer에게는 본인 디렉터리 하나와 frozen Git commit만 별도 채널로 전달한다. `review-handoff.json`의 plan,
 packet, 빈 template SHA-256은 reviewer가 제출할 때 다시 계산된다.
 
-## 2. Review And Sign Independently
+## 2. Verify Before Dispatch
+
+각 디렉터리를 전달하기 직전에 untouched template 상태를 별도 audit으로 재검증한다. Audit은 handoff의 정확한 파일
+집합을 바꾸지 않도록 반드시 handoff 밖의 private 경로에 쓴다.
+
+```bash
+ko-redteam-review-handoff verify-template \
+  private/review-handoffs/reviewer-a \
+  --root . \
+  --reviewer reviewer-a \
+  --audit-output private/reviewer-a-dispatch-audit.json
+
+ko-redteam-review-handoff verify-template \
+  private/review-handoffs/reviewer-b \
+  --root . \
+  --reviewer reviewer-b \
+  --audit-output private/reviewer-b-dispatch-audit.json
+```
+
+`status=ready_for_dispatch`는 frozen source 재생, plan·packet·빈 response·attestation의 byte 해시, `0700/0600`
+권한, reviewer별 5개 파일 격리, verifier·entrypoint 구현 해시와 실행 중 변경이 없음을 뜻한다. 사람 검토 완료나
+서로 다른 실제 신원을 증명하지 않으며 audit에도 `human_review_completed=false`,
+`distinct_human_identity_proven=false`를 기록한다.
+
+## 3. Review And Sign Independently
 
 Reviewer는 자신의 handoff 안에서만 항목별 판정과 attestation을 완료한다. Ed25519 private key와 `.pub` 파일은
 handoff 밖에 둔다. `ko-redteam-review-response` 사용법과 다섯 개의 명시적 서약은
@@ -86,7 +110,7 @@ ko-redteam-review-handoff verify \
 `status=valid`는 서명 제출물의 구조와 무결성이 유효하다는 뜻이다. reject가 있으면 제출은 유효할 수 있지만 최종
 review는 `not_ready`가 된다. reviewer가 reject를 accept로 바꾸도록 요구하지 않는다.
 
-## 3. Assemble Without Overwriting Central Evidence
+## 4. Assemble Without Overwriting Central Evidence
 
 Coordinator는 두 handoff를 서로 분리된 채널로 회수하고 각각 `verify`한 뒤, untouched central plan을 기준으로 새
 merge workspace를 만든다. central 빈 template과 reviewer 제출 디렉터리는 수정하지 않는다.

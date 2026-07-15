@@ -163,7 +163,8 @@ attestation, reviewer가 직접 서명하는 Ed25519 commitment와 fail-closed �
 한 항목의 여섯 기준을 모두 직접 입력하게 하며 자동·일괄 승인을 제공하지 않습니다. 140개 판정 후에는 사람이
 제출한 identity·affiliation·signed statement의 digest와 전용 공개키를 `attest` 명령으로 결합합니다.
 [격리 handoff 절차](./governance/REVIEW_HANDOFF_WORKFLOW.md)는 중앙 빈 template을 덮어쓰지 않고 reviewer별 최소
-workspace를 분리 생성하며, 서명 제출물을 단독 검증한 뒤 새 merge workspace로 조립합니다.
+workspace를 분리 생성합니다. `verify-template`이 발송 직전 frozen source·빈 template·권한·파일 격리를 재검증하고,
+완료 후에는 서명 제출물을 단독 검증한 뒤 새 merge workspace로 조립합니다.
 
 ```bash
 ko-redteam-build-review-packets \

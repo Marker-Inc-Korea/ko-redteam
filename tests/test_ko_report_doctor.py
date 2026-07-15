@@ -131,9 +131,12 @@ def test_doctor_recognizes_new_evidence_contract_schemas(tmp_path):
             "ko-redteam.calibration-signature-evidence.v1",
             "ko-redteam.calibration-signature-audit.v1",
             "ko-redteam.review-handoff.v1",
+            "ko-redteam.review-handoff-dispatch-audit.v1",
             "ko-redteam.review-submission-audit.v1",
             "ko-redteam.review-submission-assembly.v1",
             "ko-redteam.review-response-progress.v1",
+            "ko-redteam.release-manifest-spec.v1",
+            "ko-redteam.release-manifest-candidate-audit.v1",
         )
     ):
         path = tmp_path / f"calibration-contract-{index}.json"

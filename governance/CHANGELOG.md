@@ -5,6 +5,9 @@
 
 ## Unreleased - Evidence-Eligible Ranking Protocol
 
+- 독립 reviewer에게 handoff를 보내기 전에 `verify-template`이 frozen source, 5개 파일 격리, `0700/0600` 권한과
+  빈 response·attestation을 다시 검증한다. Dispatch audit은 사람 검토·서로 다른 신원이 아직 증명되지 않았음을
+  명시하며 handoff 밖에 배타 생성한다.
 - release artifact 11개와 governance 문서 6개의 경로·SHA-256을 사람이 복사하던 마지막 조립 단계를 제거한다.
   Candidate assembler는 전체 publication validator를 선실행해 외부검토·최종 동결에 종속된 세 check만 남은 경우에만
   검토 scope를 만들고, finalizer는 동일 projection의 reviewer SSHSIG와 모든 gate가 `publishable`일 때만 최종
