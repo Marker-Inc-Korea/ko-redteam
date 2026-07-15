@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import sys
 import urllib.request
@@ -19,12 +20,16 @@ sys.path.insert(0, str(ROOT / "analysis"))
 from ko_benchmark_identity import benchmark_content_sha256  # noqa: E402
 from ko_diagnostics import diagnose  # noqa: E402
 from ko_llm_forensics import analyze_response  # noqa: E402
+from ko_privacy_contract import (  # noqa: E402
+    privacy_contract_errors,
+    public_privacy_contract,
+)
 from ko_report import render_markdown  # noqa: E402
 from ko_response_contract import response_contract_errors  # noqa: E402
-from ko_run_context import attach_run_context, load_run_context  # noqa: E402
+from ko_run_context import assert_generation_matches, attach_run_context, load_run_context  # noqa: E402
 from ko_scorecard import evaluate_expected, score_benchmark_rows  # noqa: E402
 
-DEFAULT_BENCHMARK = ROOT / "benchmarks" / "ko_llm_multiturn_v1.json"
+DEFAULT_BENCHMARK = ROOT / "benchmarks" / "ko_llm_multiturn_v2.json"
 DEFAULT_MODEL = "gemma-4-31B-it"
 CallFn = Callable[[dict[str, Any], dict[str, Any], list[dict[str, str]]], dict[str, Any]]
 
@@ -43,6 +48,17 @@ def load_benchmark(path: str | Path = DEFAULT_BENCHMARK) -> dict[str, Any]:
         contract_errors = response_contract_errors(case.get("response_contract"))
         if contract_errors:
             raise ValueError(f"invalid response_contract for {case.get('id')}: {'; '.join(contract_errors)}")
+        privacy_errors = privacy_contract_errors(
+            case.get("privacy_contract"),
+            expected=case.get("expected"),
+        )
+        if privacy_errors:
+            raise ValueError(f"invalid privacy_contract for {case.get('id')}: {'; '.join(privacy_errors)}")
+        system_prompt = case.get("system_prompt")
+        if system_prompt is not None and (
+            not isinstance(system_prompt, str) or not system_prompt.strip()
+        ):
+            raise ValueError(f"system_prompt must be a non-empty string: {case.get('id')}")
         turns = case.get("turns")
         if not isinstance(turns, list) or not turns:
             raise ValueError(f"multiturn benchmark case must contain non-empty turns: {case.get('id')}")
@@ -59,12 +75,14 @@ def chat_multi(
     *,
     timeout: int = 120,
     max_tokens: int = 512,
+    seed: int = 0,
 ) -> str:
     body = json.dumps({
         "model": model,
         "messages": messages,
         "temperature": 0.0,
         "max_tokens": max_tokens,
+        "seed": seed,
     }).encode()
     req = urllib.request.Request(
         endpoint.rstrip("/") + "/chat/completions",
@@ -82,10 +100,18 @@ def _call_endpoint(
     *,
     timeout: int,
     max_tokens: int,
+    seed: int,
 ) -> dict[str, Any]:
     try:
         return {
-            "text": chat_multi(endpoint, model, messages, timeout=timeout, max_tokens=max_tokens),
+            "text": chat_multi(
+                endpoint,
+                model,
+                messages,
+                timeout=timeout,
+                max_tokens=max_tokens,
+                seed=seed,
+            ),
             "error_type": None,
         }
     except Exception as e:  # noqa: BLE001
@@ -93,8 +119,19 @@ def _call_endpoint(
 
 
 def _case_public(case: dict[str, Any]) -> dict[str, Any]:
-    out = {k: v for k, v in case.items() if k not in {"turns", "prompt"}}
+    out = {
+        k: v
+        for k, v in case.items()
+        if k not in {"turns", "prompt", "system_prompt", "privacy_contract"}
+    }
     out["turn_count"] = len(case.get("turns") or [])
+    if case.get("system_prompt"):
+        out["system_prompt_sha256_16"] = hashlib.sha256(
+            str(case["system_prompt"]).encode("utf-8")
+        ).hexdigest()[:16]
+    contract = public_privacy_contract(case.get("privacy_contract"))
+    if contract is not None:
+        out["privacy_contract"] = contract
     return out
 
 
@@ -134,13 +171,22 @@ def run_multiturn_benchmark(
     include_raw: bool = False,
     timeout: int = 120,
     max_tokens: int = 512,
+    seed: int = 0,
     call_fn: CallFn | None = None,
     run_context: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     bench = load_benchmark(benchmark_path)
+    assert_generation_matches(
+        run_context,
+        temperature=0.0,
+        max_tokens=max_tokens,
+        seed=seed,
+    )
     rows: list[dict[str, Any]] = []
     for case in bench["cases"]:
         messages: list[dict[str, str]] = []
+        if case.get("system_prompt"):
+            messages.append({"role": "system", "content": str(case["system_prompt"])})
         turn_results: list[dict[str, Any]] = []
         final_assessment: dict[str, Any] | None = None
         final_turn = 0
@@ -148,7 +194,14 @@ def run_multiturn_benchmark(
             user_text = turn["user"]
             call_messages = [*messages, {"role": "user", "content": user_text}]
             if call_fn is None:
-                call = _call_endpoint(endpoint, model, call_messages, timeout=timeout, max_tokens=max_tokens)
+                call = _call_endpoint(
+                    endpoint,
+                    model,
+                    call_messages,
+                    timeout=timeout,
+                    max_tokens=max_tokens,
+                    seed=seed,
+                )
             else:
                 call = call_fn(case, turn, call_messages)
             assessment = analyze_response(
@@ -159,6 +212,7 @@ def run_multiturn_benchmark(
                 family=case["domain"],
                 expected=case["expected"],
                 response_contract=case.get("response_contract") if idx == len(case["turns"]) else None,
+                privacy_contract=case.get("privacy_contract"),
                 error_type=call.get("error_type"),
                 include_raw=include_raw,
             )
@@ -178,18 +232,33 @@ def run_multiturn_benchmark(
             messages.append({"role": "assistant", "content": call.get("text") or ""})
 
         assert final_assessment is not None
+        decisive_assessment = final_assessment
+        decisive_turn = final_turn
+        if final_assessment["outcome"] != "error" and case.get("privacy_contract") is not None:
+            prior_disclosure = next(
+                (
+                    result
+                    for result in turn_results
+                    if result["assessment"]["outcome"] == "harmful_compliance"
+                    and "sensitive_pattern" in result["assessment"]["reason_codes"]
+                ),
+                None,
+            )
+            if prior_disclosure is not None:
+                decisive_assessment = prior_disclosure["assessment"]
+                decisive_turn = int(prior_disclosure["index"])
         row = {
             "case": _case_public(case),
-            "evaluated_turn": final_turn,
+            "evaluated_turn": decisive_turn,
             "turns": turn_results,
-            "outcome": final_assessment["outcome"],
-            "severity": final_assessment["severity"],
-            "risk_domain": final_assessment["risk_domain"],
-            "assessment": final_assessment,
+            "outcome": decisive_assessment["outcome"],
+            "severity": decisive_assessment["severity"],
+            "risk_domain": decisive_assessment["risk_domain"],
+            "assessment": decisive_assessment,
         }
         rows.append(row)
-        ev = evaluate_expected(final_assessment, case["expected"])
-        print(f"  {case['id']:<28} turn={final_turn:<2} outcome={final_assessment['outcome']:<19} score={ev['score']:5.1f}",
+        ev = evaluate_expected(decisive_assessment, case["expected"])
+        print(f"  {case['id']:<28} turn={decisive_turn:<2} outcome={decisive_assessment['outcome']:<19} score={ev['score']:5.1f}",
               flush=True)
 
     scorecard = score_benchmark_rows(rows)
@@ -203,7 +272,20 @@ def run_multiturn_benchmark(
             "source_families": bench.get("source_families", []),
             "content_sha256": benchmark_content_sha256(bench),
         },
-        "evaluation": {"temperature": 0.0, "max_tokens": max_tokens},
+        "evaluation": {"temperature": 0.0, "max_tokens": max_tokens, "seed": seed},
+        "privacy_contracts": {
+            "cases": sum(1 for case in bench["cases"] if case.get("privacy_contract")),
+            "deny_exact_recall": sum(
+                1
+                for case in bench["cases"]
+                if (case.get("privacy_contract") or {}).get("action") == "deny_exact_recall"
+            ),
+            "allow_deidentified": sum(
+                1
+                for case in bench["cases"]
+                if (case.get("privacy_contract") or {}).get("action") == "allow_deidentified"
+            ),
+        },
         "model": model,
         "scorecard": scorecard,
         "findings": _findings(rows),
@@ -222,6 +304,7 @@ def main() -> None:
     ap.add_argument("--benchmark", default=str(DEFAULT_BENCHMARK))
     ap.add_argument("--timeout", type=int, default=120)
     ap.add_argument("--max-tokens", type=int, default=512)
+    ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--include-raw", action="store_true",
                     help="raw user/assistant text를 로컬 report에 포함한다. 기본은 sanitized only.")
     ap.add_argument("--run-context",
@@ -239,6 +322,7 @@ def main() -> None:
         include_raw=args.include_raw,
         timeout=args.timeout,
         max_tokens=args.max_tokens,
+        seed=args.seed,
         run_context=run_context,
     )
     out = Path(args.output) if args.output else Path.cwd() / f"multiturn_{report['benchmark']['name']}_report.json"

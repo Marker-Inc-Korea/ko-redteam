@@ -38,7 +38,7 @@ from ko_benchmark_coverage import (  # noqa: E402
 from ko_gate import evaluate_reports, parse_thresholds as parse_score_thresholds, render_gate_markdown  # noqa: E402
 from ko_report import render_markdown  # noqa: E402
 from ko_report_doctor import doctor_reports, render_doctor_markdown  # noqa: E402
-from ko_run_context import canonical_sha256, load_run_context  # noqa: E402
+from ko_run_context import canonical_sha256, load_run_context, validate_run_context  # noqa: E402
 from multiturn_benchmark import DEFAULT_BENCHMARK as DEFAULT_MULTITURN_BENCHMARK  # noqa: E402
 from multiturn_benchmark import run_multiturn_benchmark  # noqa: E402
 
@@ -46,6 +46,9 @@ DEFAULT_BENCHMARK = ROOT / "benchmarks" / "ko_llm_paperbench_v1.json"
 DEFAULT_MODEL = "gemma-4-31B-it"
 SUITE_MANIFEST_SCHEMA = "ko-redteam.suite-manifest.v1"
 SUITE_EXECUTION_EVIDENCE_SCHEMA = "ko-redteam.suite-execution-evidence.v1"
+DEPLOYMENT_PROFILES = {"core_v1", "single_v1"}
+DEPLOYMENT_PROTOCOL_PREFIX = "internal-deployment-v6-"
+DEPLOYMENT_BENCHMARK_PROFILE = "ko-redteam.internal-deployment.v1"
 
 
 def _now() -> str:
@@ -269,6 +272,7 @@ def _new_manifest(
     include_raw: bool,
     timeout: int,
     max_tokens: int,
+    seed: int,
     obfuscations: list[str] | None,
     framings: list[str] | None,
     framing_per_family: bool,
@@ -300,6 +304,7 @@ def _new_manifest(
     max_rates: dict[str, float],
     max_findings: int | None,
     max_critical_high: int | None,
+    deployment_profile: str | None,
 ) -> dict[str, Any]:
     return {
         "schema": SUITE_MANIFEST_SCHEMA,
@@ -314,6 +319,7 @@ def _new_manifest(
             "include_raw": include_raw,
             "timeout": timeout,
             "max_tokens": max_tokens,
+            "seed": seed,
             "obfuscations": obfuscations,
             "framings": framings,
             "framing_per_family": framing_per_family,
@@ -360,11 +366,111 @@ def _new_manifest(
             "measurement_integrity": {
                 "endpoint_errors_allowed": 0,
             },
+            "deployment_profile": deployment_profile,
         },
         "steps": [],
         "artifacts": {},
         "summaries": {},
     }
+
+
+def _benchmark_header(path: Path) -> dict[str, Any]:
+    data = json.loads(path.read_text("utf-8"))
+    if not isinstance(data, dict):
+        raise ValueError(f"benchmark root must be an object: {path}")
+    return data
+
+
+def _deployment_profile_errors(
+    profile: str | None,
+    *,
+    benchmark_path: Path,
+    multiturn_benchmark_path: Path,
+    agent_benchmark_path: Path,
+    expand: bool,
+    include_raw: bool,
+    max_tokens: int,
+    seed: int,
+    coverage_enabled: bool,
+    coverage_min_total: int,
+    endpoint_smoke_enabled: bool,
+    doctor_enabled: bool,
+    doctor_warnings_fail: bool,
+    doctor_allow_raw: bool,
+    multiturn_enabled: bool,
+    agent_harness_enabled: bool,
+    agent_tool_call_mode: str,
+    run_context: dict[str, Any] | None,
+) -> list[str]:
+    if profile is None:
+        return []
+    if profile not in DEPLOYMENT_PROFILES:
+        return [f"unsupported deployment profile: {profile}"]
+
+    errors: list[str] = []
+    if include_raw:
+        errors.append("deployment profiles forbid include_raw")
+    if not coverage_enabled:
+        errors.append("deployment profiles require benchmark coverage")
+    if not endpoint_smoke_enabled:
+        errors.append("deployment profiles require endpoint smoke")
+    if not doctor_enabled or not doctor_warnings_fail or doctor_allow_raw:
+        errors.append("deployment profiles require strict report doctor with raw fields forbidden")
+    if run_context is None or run_context.get("schema") != "ko-redteam.run-context.v2":
+        errors.append("deployment profiles require ko-redteam.run-context.v2")
+    else:
+        context_errors = validate_run_context(run_context)
+        if context_errors:
+            errors.append("deployment run context is invalid: " + "; ".join(context_errors))
+        evaluation = run_context.get("evaluation") or {}
+        execution = run_context.get("execution") or {}
+        generation = run_context.get("generation") or {}
+        model = run_context.get("model") or {}
+        if evaluation.get("source_dirty") is not False:
+            errors.append("deployment profiles require source_dirty=false")
+        if not str(evaluation.get("protocol_version") or "").startswith(DEPLOYMENT_PROTOCOL_PREFIX):
+            errors.append(
+                f"deployment protocol_version must start with {DEPLOYMENT_PROTOCOL_PREFIX}"
+            )
+        if model.get("access") == "open_weights" and execution.get("scheduler") != "slurm":
+            errors.append("open-weight deployment evaluation requires scheduler=slurm")
+        if generation != {"temperature": 0.0, "max_tokens": max_tokens, "seed": seed}:
+            errors.append("deployment run context generation must match suite settings")
+
+    benchmark = _benchmark_header(benchmark_path)
+    if profile == "core_v1":
+        if benchmark.get("name") != "ko_llm_paperbench_v1":
+            errors.append("core_v1 requires ko_llm_paperbench_v1")
+        if not expand:
+            errors.append("core_v1 requires benchmark expansion")
+        if coverage_min_total < 20:
+            errors.append("core_v1 requires coverage_min_total>=20")
+        if not multiturn_enabled or not agent_harness_enabled:
+            errors.append("core_v1 requires multiturn and agent harness")
+        if agent_tool_call_mode != "prompt_json_v1":
+            errors.append("core_v1 requires agent tool_call_mode=prompt_json_v1")
+        multiturn = _benchmark_header(multiturn_benchmark_path)
+        agent = _benchmark_header(agent_benchmark_path)
+        if (
+            multiturn.get("name") != "ko_llm_multiturn_v2"
+            or multiturn.get("deployment_profile") != DEPLOYMENT_BENCHMARK_PROFILE
+        ):
+            errors.append("core_v1 requires deployment-profiled ko_llm_multiturn_v2")
+        if (
+            agent.get("name") != "ko_llm_agent_harness_v2"
+            or agent.get("deployment_profile") != DEPLOYMENT_BENCHMARK_PROFILE
+        ):
+            errors.append("core_v1 requires deployment-profiled ko_llm_agent_harness_v2")
+    else:
+        if benchmark.get("name") != "ko_llm_mini_v1":
+            errors.append("single_v1 requires ko_llm_mini_v1")
+        if expand:
+            errors.append("single_v1 forbids benchmark expansion")
+        if coverage_min_total < 17:
+            errors.append("single_v1 requires coverage_min_total>=17")
+        if multiturn_enabled or agent_harness_enabled:
+            errors.append("single_v1 must not enable multiturn or agent harness")
+    return errors
 
 
 def _add_step(manifest: dict[str, Any], name: str, status: str, **extra: Any) -> None:
@@ -421,10 +527,12 @@ def _build_execution_evidence(
             "sha256": _file_sha256(manifest_path),
         },
         "config": {
+            "deployment_profile": config.get("deployment_profile"),
             "expand": config.get("expand"),
             "include_raw": config.get("include_raw"),
             "timeout": config.get("timeout"),
             "max_tokens": config.get("max_tokens"),
+            "seed": config.get("seed"),
             "coverage": config.get("coverage"),
             "endpoint_smoke": {
                 "enabled": endpoint_smoke.get("enabled"),
@@ -689,6 +797,7 @@ def run_suite(
     include_raw: bool = False,
     timeout: int = 120,
     max_tokens: int = 512,
+    seed: int = 0,
     obfuscations: list[str] | None = None,
     framings: list[str] | None = None,
     framing_per_family: bool = True,
@@ -723,6 +832,7 @@ def run_suite(
     max_findings: int | None = None,
     max_critical_high: int | None = None,
     run_context: dict[str, Any] | None = None,
+    deployment_profile: str | None = None,
     call_fn: Callable[[dict[str, Any]], dict[str, Any]] | None = None,
     multiturn_call_fn: Callable[[dict[str, Any], dict[str, Any], list[dict[str, str]]], dict[str, Any]] | None = None,
     agent_call_fn: Callable[[dict[str, Any], list[dict[str, str]], list[dict[str, Any]]], dict[str, Any]] | None = None,
@@ -745,6 +855,29 @@ def run_suite(
     if endpoint_smoke_api_key is None and endpoint_smoke_api_key_env:
         endpoint_smoke_api_key = os.environ.get(endpoint_smoke_api_key_env)
 
+    profile_errors = _deployment_profile_errors(
+        deployment_profile,
+        benchmark_path=benchmark_path,
+        multiturn_benchmark_path=multiturn_benchmark_path,
+        agent_benchmark_path=agent_benchmark_path,
+        expand=expand,
+        include_raw=include_raw,
+        max_tokens=max_tokens,
+        seed=seed,
+        coverage_enabled=coverage_enabled,
+        coverage_min_total=coverage_min_total,
+        endpoint_smoke_enabled=endpoint_smoke_enabled,
+        doctor_enabled=doctor_enabled,
+        doctor_warnings_fail=doctor_warnings_fail,
+        doctor_allow_raw=doctor_allow_raw,
+        multiturn_enabled=multiturn_enabled,
+        agent_harness_enabled=agent_harness_enabled,
+        agent_tool_call_mode=agent_tool_call_mode,
+        run_context=run_context,
+    )
+    if profile_errors:
+        raise ValueError("invalid deployment profile: " + "; ".join(profile_errors))
+
     manifest_path = out_dir / "suite_manifest.json"
     suite_md_path = out_dir / "suite_report.md"
     manifest = _new_manifest(
@@ -756,6 +889,7 @@ def run_suite(
         include_raw=include_raw,
         timeout=timeout,
         max_tokens=max_tokens,
+        seed=seed,
         obfuscations=obfuscations,
         framings=framings,
         framing_per_family=framing_per_family,
@@ -787,7 +921,15 @@ def run_suite(
         max_rates=max_rates,
         max_findings=max_findings,
         max_critical_high=max_critical_high,
+        deployment_profile=deployment_profile,
     )
+    if deployment_profile is not None:
+        _add_step(
+            manifest,
+            "deployment_profile",
+            "pass",
+            status_reason=deployment_profile,
+        )
     if run_context is not None:
         manifest["run_context"] = {
             "run_id": run_context.get("run_id"),
@@ -940,6 +1082,7 @@ def run_suite(
             include_raw=include_raw,
             timeout=timeout,
             max_tokens=max_tokens,
+            seed=seed,
             call_fn=call_fn,
             run_context=run_context,
         )
@@ -968,6 +1111,7 @@ def run_suite(
                 include_raw=include_raw,
                 timeout=timeout,
                 max_tokens=max_tokens,
+                seed=seed,
                 call_fn=multiturn_call_fn,
                 run_context=run_context,
             )
@@ -997,6 +1141,7 @@ def run_suite(
                 include_raw=include_raw,
                 timeout=timeout,
                 max_tokens=max_tokens,
+                seed=seed,
                 tool_call_mode=agent_tool_call_mode,
                 call_fn=agent_call_fn,
                 run_context=run_context,
@@ -1102,10 +1247,14 @@ def main() -> None:
     ap.add_argument("--out-dir", default=None, help="기본: ./suite_<benchmark-stem>")
     ap.add_argument("--timeout", type=int, default=120)
     ap.add_argument("--max-tokens", type=int, default=512)
+    ap.add_argument("--seed", type=int, default=0,
+                    help="OpenAI-compatible generation seed; deployment runs must record this in run context")
     ap.add_argument("--include-raw", action="store_true",
                     help="raw prompt/response 를 benchmark report에 포함한다. 기본은 sanitized only.")
     ap.add_argument("--run-context",
                     help="immutable model/runtime provenance JSON for official evaluations")
+    ap.add_argument("--deployment-profile", choices=sorted(DEPLOYMENT_PROFILES),
+                    help="fail-closed internal deployment evaluation profile")
     ap.add_argument("--expand", action="store_true", help="benchmark를 난독/프레이밍 변형으로 확장해 실행")
     ap.add_argument("--obfuscation", action="append", default=None,
                     help="expansion obfuscation. 반복 가능. 기본: jamo_split, zero_width")
@@ -1173,6 +1322,7 @@ def main() -> None:
         include_raw=args.include_raw,
         timeout=args.timeout,
         max_tokens=args.max_tokens,
+        seed=args.seed,
         obfuscations=args.obfuscation,
         framings=args.framing,
         framing_per_family=not args.no_framing,
@@ -1208,6 +1358,7 @@ def main() -> None:
         max_findings=args.max_findings,
         max_critical_high=args.max_critical_high,
         run_context=run_context,
+        deployment_profile=args.deployment_profile,
     )
     summary = manifest.get("summaries", {}).get("benchmark") or {}
     print(

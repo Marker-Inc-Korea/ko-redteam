@@ -21,7 +21,7 @@ from ko_llm_forensics import analyze_response  # noqa: E402
 from ko_diagnostics import diagnose  # noqa: E402
 from ko_report import render_markdown  # noqa: E402
 from ko_response_contract import response_contract_errors  # noqa: E402
-from ko_run_context import attach_run_context, load_run_context  # noqa: E402
+from ko_run_context import assert_generation_matches, attach_run_context, load_run_context  # noqa: E402
 from ko_scorecard import evaluate_expected, score_benchmark_rows  # noqa: E402
 
 DEFAULT_BENCHMARK = ROOT / "benchmarks" / "ko_llm_mini_v1.json"
@@ -44,12 +44,21 @@ def load_benchmark(path: str | Path = DEFAULT_BENCHMARK) -> dict[str, Any]:
     return data
 
 
-def chat(endpoint: str, model: str, prompt: str, *, timeout: int = 120, max_tokens: int = 512) -> str:
+def chat(
+    endpoint: str,
+    model: str,
+    prompt: str,
+    *,
+    timeout: int = 120,
+    max_tokens: int = 512,
+    seed: int = 0,
+) -> str:
     body = json.dumps({
         "model": model,
         "messages": [{"role": "user", "content": prompt}],
         "temperature": 0.0,
         "max_tokens": max_tokens,
+        "seed": seed,
     }).encode()
     req = urllib.request.Request(endpoint.rstrip("/") + "/chat/completions",
                                  data=body, headers={"Content-Type": "application/json"})
@@ -57,10 +66,18 @@ def chat(endpoint: str, model: str, prompt: str, *, timeout: int = 120, max_toke
     return data["choices"][0]["message"]["content"]
 
 
-def _call_endpoint(endpoint: str, model: str, prompt: str, *, timeout: int, max_tokens: int) -> dict[str, Any]:
+def _call_endpoint(
+    endpoint: str,
+    model: str,
+    prompt: str,
+    *,
+    timeout: int,
+    max_tokens: int,
+    seed: int,
+) -> dict[str, Any]:
     try:
         return {
-            "text": chat(endpoint, model, prompt, timeout=timeout, max_tokens=max_tokens),
+            "text": chat(endpoint, model, prompt, timeout=timeout, max_tokens=max_tokens, seed=seed),
             "error_type": None,
         }
     except Exception as e:  # noqa: BLE001
@@ -106,14 +123,28 @@ def run_benchmark(
     include_raw: bool = False,
     timeout: int = 120,
     max_tokens: int = 512,
+    seed: int = 0,
     call_fn: Callable[[dict[str, Any]], dict[str, Any]] | None = None,
     run_context: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     bench = load_benchmark(benchmark_path)
+    assert_generation_matches(
+        run_context,
+        temperature=0.0,
+        max_tokens=max_tokens,
+        seed=seed,
+    )
     rows: list[dict[str, Any]] = []
     for case in bench["cases"]:
         if call_fn is None:
-            call = _call_endpoint(endpoint, model, case["prompt"], timeout=timeout, max_tokens=max_tokens)
+            call = _call_endpoint(
+                endpoint,
+                model,
+                case["prompt"],
+                timeout=timeout,
+                max_tokens=max_tokens,
+                seed=seed,
+            )
         else:
             call = call_fn(case)
         assessment = analyze_response(
@@ -150,7 +181,7 @@ def run_benchmark(
             "taxonomy": bench.get("taxonomy", {}),
             "content_sha256": benchmark_content_sha256(bench),
         },
-        "evaluation": {"temperature": 0.0, "max_tokens": max_tokens},
+        "evaluation": {"temperature": 0.0, "max_tokens": max_tokens, "seed": seed},
         "model": model,
         "scorecard": scorecard,
         "findings": _benchmark_findings(rows),
@@ -168,6 +199,7 @@ def main() -> None:
     ap.add_argument("--benchmark", default=str(DEFAULT_BENCHMARK))
     ap.add_argument("--timeout", type=int, default=120)
     ap.add_argument("--max-tokens", type=int, default=512)
+    ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--include-raw", action="store_true",
                     help="raw prompt/response 를 로컬 report 에 포함한다. 기본은 sanitized only.")
     ap.add_argument("--run-context",
@@ -180,7 +212,7 @@ def main() -> None:
     run_context = load_run_context(args.run_context) if args.run_context else None
     report = run_benchmark(args.endpoint, args.model, benchmark_path=args.benchmark,
                            include_raw=args.include_raw, timeout=args.timeout,
-                           max_tokens=args.max_tokens, run_context=run_context)
+                           max_tokens=args.max_tokens, seed=args.seed, run_context=run_context)
     out = Path(args.output) if args.output else Path.cwd() / f"benchmark_{report['benchmark']['name']}_report.json"
     out.write_text(json.dumps(report, ensure_ascii=False, indent=1), "utf-8")
     sc = report["scorecard"]

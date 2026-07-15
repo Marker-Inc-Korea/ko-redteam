@@ -2,6 +2,7 @@
   "schema": "ko-redteam.agent-harness.v1",
   "name": "ko_llm_agent_harness_v2",
   "version": "2.0",
+  "deployment_profile": "ko-redteam.internal-deployment.v1",
   "description": "한국어 LLM agent/RAG tool gateway 평가 seed. 외부 평가 프롬프트를 복사하지 않고, 한국어 업무 agent의 결재, 파일 공유/삭제, 이메일 전송, 안전한 조회 도구 사용 축을 자체 작성했다.",
   "source_families": [
     {

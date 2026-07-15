@@ -13,6 +13,11 @@ try:
 except ModuleNotFoundError:  # package import path
     from .ko_response_contract import response_contract_errors
 
+try:
+    from ko_privacy_contract import privacy_contract_errors
+except ModuleNotFoundError:  # package import path
+    from .ko_privacy_contract import privacy_contract_errors
+
 EXPECTED_VALUES = {"refuse_or_redirect", "allow", "no_leak", "no_tool"}
 SUPPORTED_SCHEMAS = {
     "ko-redteam.benchmark.v1",
@@ -36,6 +41,7 @@ SECRET_LIKE_RE = re.compile(
     r"(?i)(?<![A-Za-z0-9])(sk-[A-Za-z0-9_-]{12,}|AKIA[0-9A-Z]{12,}|xox[baprs]-[A-Za-z0-9-]{16,}|"
     r"hf_[A-Za-z0-9]{16,}|glpat-[A-Za-z0-9_-]{16,})"
 )
+DEPLOYMENT_PROFILE = "ko-redteam.internal-deployment.v1"
 
 
 def _sha(text: str) -> str:
@@ -242,12 +248,22 @@ def audit_benchmark_data(data: dict[str, Any], *, path: str | None = None) -> di
     ids: Counter[str] = Counter()
     korean_signals: list[dict[str, Any]] = []
     response_contract_cases = 0
+    privacy_contract_cases = 0
+    system_policy_cases = 0
+    privacy_expected_counts: Counter[str] = Counter()
 
     schema = data.get("schema")
     if schema not in SUPPORTED_SCHEMAS:
         issues.append(_issue("error", "schema", f"unsupported schema: {data.get('schema')}"))
     if not isinstance(data.get("name"), str) or not data.get("name", "").strip():
         issues.append(_issue("error", "name", "benchmark name must be a non-empty string"))
+    deployment_profile = data.get("deployment_profile")
+    if deployment_profile is not None and deployment_profile != DEPLOYMENT_PROFILE:
+        issues.append(_issue(
+            "error",
+            "deployment_profile",
+            f"deployment_profile must be {DEPLOYMENT_PROFILE}",
+        ))
 
     cases = data.get("cases")
     if not isinstance(cases, list) or not cases:
@@ -272,6 +288,39 @@ def audit_benchmark_data(data: dict[str, Any], *, path: str | None = None) -> di
             response_contract_cases += 1
             for message in response_contract_errors(case.get("response_contract")):
                 issues.append(_issue("error", "response_contract", message, case_id=case_id))
+        if "privacy_contract" in case:
+            privacy_contract_cases += 1
+            for message in privacy_contract_errors(
+                case.get("privacy_contract"),
+                expected=str(expected) if expected is not None else None,
+            ):
+                issues.append(_issue("error", "privacy_contract", message, case_id=case_id))
+        if isinstance(case.get("system_prompt"), str) and case["system_prompt"].strip():
+            system_policy_cases += 1
+        elif "system_prompt" in case:
+            issues.append(_issue(
+                "error",
+                "system_prompt",
+                "system_prompt must be a non-empty string",
+                case_id=case_id,
+            ))
+        if schema == "ko-redteam.multiturn-benchmark.v1" and case.get("domain") == "privacy":
+            privacy_expected_counts[str(expected)] += 1
+            if deployment_profile == DEPLOYMENT_PROFILE:
+                if "privacy_contract" not in case:
+                    issues.append(_issue(
+                        "error",
+                        "privacy_contract_required",
+                        "deployment privacy cases require privacy_contract",
+                        case_id=case_id,
+                    ))
+                if not isinstance(case.get("system_prompt"), str) or not case["system_prompt"].strip():
+                    issues.append(_issue(
+                        "error",
+                        "system_policy_required",
+                        "deployment privacy cases require an explicit system_prompt policy",
+                        case_id=case_id,
+                    ))
         text_units = _case_texts(str(schema), case, case_id, issues)
         fingerprint_text = "\n---\n".join(text_units)
         for text in text_units:
@@ -309,6 +358,24 @@ def audit_benchmark_data(data: dict[str, Any], *, path: str | None = None) -> di
             issues.append(_issue("warning", "duplicate_prompt_hash",
                                  f"same prompt hash {digest} used by {', '.join(case_ids)}"))
 
+    if deployment_profile == DEPLOYMENT_PROFILE:
+        if schema == "ko-redteam.multiturn-benchmark.v1":
+            for expected_name, minimum in {"no_leak": 4, "allow": 4}.items():
+                if privacy_expected_counts[expected_name] < minimum:
+                    issues.append(_issue(
+                        "error",
+                        "privacy_control_balance",
+                        f"deployment multiturn benchmark requires at least {minimum} privacy/{expected_name} cases",
+                    ))
+        if schema == "ko-redteam.agent-harness.v1":
+            for expected_name, minimum in {"no_tool": 5, "allow": 5}.items():
+                if expected_counts[expected_name] < minimum:
+                    issues.append(_issue(
+                        "error",
+                        "agent_control_balance",
+                        f"deployment agent benchmark requires at least {minimum} {expected_name} cases",
+                    ))
+
     errors = sum(1 for i in issues if i["severity"] == "error")
     warnings = sum(1 for i in issues if i["severity"] == "warning")
     return {
@@ -320,6 +387,9 @@ def audit_benchmark_data(data: dict[str, Any], *, path: str | None = None) -> di
         "expected": dict(sorted(expected_counts.items())),
         "source_families": dict(sorted(source_family_counts.items())),
         "response_contract_cases": response_contract_cases,
+        "privacy_contract_cases": privacy_contract_cases,
+        "system_policy_cases": system_policy_cases,
+        "deployment_profile": deployment_profile,
         "korean_signals": _summarize_korean_signals(korean_signals),
         "issues": issues,
         "errors": errors,
@@ -342,6 +412,9 @@ def audit_benchmark_file(path: str | Path) -> dict[str, Any]:
             "expected": {},
             "source_families": {},
             "response_contract_cases": 0,
+            "privacy_contract_cases": 0,
+            "system_policy_cases": 0,
+            "deployment_profile": None,
             "korean_signals": _empty_korean_signals(),
             "issues": [_issue("error", "json", f"failed to read JSON: {type(e).__name__}")],
             "errors": 1,
@@ -358,6 +431,9 @@ def audit_benchmark_file(path: str | Path) -> dict[str, Any]:
             "expected": {},
             "source_families": {},
             "response_contract_cases": 0,
+            "privacy_contract_cases": 0,
+            "system_policy_cases": 0,
+            "deployment_profile": None,
             "korean_signals": _empty_korean_signals(),
             "issues": [_issue("error", "json_type", "benchmark JSON root must be an object")],
             "errors": 1,
@@ -407,6 +483,8 @@ def audit_benchmark_paths(paths: list[str | Path]) -> dict[str, Any]:
             "expected": dict(sorted(expected_counts.items())),
             "source_families": dict(sorted(source_counts.items())),
             "response_contract_cases": sum(int(item.get("response_contract_cases") or 0) for item in files),
+            "privacy_contract_cases": sum(int(item.get("privacy_contract_cases") or 0) for item in files),
+            "system_policy_cases": sum(int(item.get("system_policy_cases") or 0) for item in files),
             "korean_signals": {
                 "prompt_cases": prompt_cases,
                 "low_signal_cases": low_signal_cases,
@@ -432,6 +510,8 @@ def render_audit_markdown(audit: dict[str, Any]) -> str:
         f"- Status: **{summary['status']}**",
         f"- Errors: **{summary['errors']}** / Warnings: **{summary['warnings']}**",
         f"- Response contracts: **{summary.get('response_contract_cases', 0)}**",
+        f"- Privacy contracts: **{summary.get('privacy_contract_cases', 0)}**",
+        f"- Explicit system policies: **{summary.get('system_policy_cases', 0)}**",
     ]
     if summary["domains"]:
         rows = [["Domain", "Cases"], *[[k, v] for k, v in summary["domains"].items()]]

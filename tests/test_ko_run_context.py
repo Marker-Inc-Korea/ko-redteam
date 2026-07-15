@@ -47,6 +47,30 @@ def valid_context(*, run_id: str = "model-a-run-001", served_model: str = "serve
     }
 
 
+def valid_deployment_context(
+    *,
+    run_id: str = "model-a-deploy-001",
+    job_id: str = "7001",
+    serving_session_id: str = "session-0001",
+    repeat_index: int = 1,
+) -> dict:
+    context = valid_context(run_id=run_id)
+    context["schema"] = C.DEPLOYMENT_SCHEMA
+    context["execution"] = {
+        "scheduler": "slurm",
+        "job_id": job_id,
+        "serving_session_id": serving_session_id,
+        "repeat_index": repeat_index,
+    }
+    context["generation"] = {
+        "temperature": 0.0,
+        "max_tokens": 512,
+        "seed": 20260715,
+    }
+    context["evaluation"]["protocol_version"] = "internal-deployment-v6-2026-07-15"
+    return context
+
+
 def test_valid_context_is_attached_and_fingerprinted():
     context = valid_context()
     attached = C.attach_run_context(context, served_model="served-model")
@@ -85,3 +109,56 @@ def test_load_context_rejects_invalid_json_contract(tmp_path):
         assert "invalid run context" in str(exc)
     else:
         raise AssertionError("incomplete run context must fail")
+
+
+def test_deployment_context_requires_execution_generation_and_matches_requests():
+    context = valid_deployment_context()
+    assert C.validate_run_context(context) == []
+    C.assert_generation_matches(
+        context,
+        temperature=0.0,
+        max_tokens=512,
+        seed=20260715,
+    )
+
+    context["generation"]["seed"] = -1
+    assert any("seed" in error for error in C.validate_run_context(context))
+
+
+def test_independent_deployment_contexts_require_unique_slurm_jobs_and_sessions():
+    contexts = [
+        valid_deployment_context(
+            run_id=f"model-a-deploy-00{index}",
+            job_id=str(7000 + index),
+            serving_session_id=f"session-000{index}",
+            repeat_index=index,
+        )
+        for index in range(1, 4)
+    ]
+    assert C.validate_independent_run_contexts(
+        contexts,
+        min_repeats=3,
+        require_slurm=True,
+    ) == []
+
+    contexts[2]["execution"]["job_id"] = contexts[1]["execution"]["job_id"]
+    errors = C.validate_independent_run_contexts(contexts, require_slurm=True)
+    assert any("unique job_id" in error for error in errors)
+
+
+def test_independent_deployment_contexts_reject_runtime_or_protocol_drift():
+    contexts = [
+        valid_deployment_context(
+            run_id=f"model-a-deploy-00{index}",
+            job_id=str(7100 + index),
+            serving_session_id=f"runtime-session-00{index}",
+            repeat_index=index,
+        )
+        for index in range(1, 4)
+    ]
+    contexts[1]["runtime"]["precision"] = "float16"
+    contexts[2]["evaluation"]["protocol_version"] = "different-protocol"
+
+    errors = C.validate_independent_run_contexts(contexts, require_slurm=True)
+    assert any("runtime must match" in error for error in errors)
+    assert any("evaluation must match" in error for error in errors)

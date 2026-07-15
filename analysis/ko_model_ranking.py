@@ -542,6 +542,7 @@ def _report_identity(report: dict[str, Any]) -> dict[str, Any]:
         "benchmark_fingerprint": benchmark.get("content_sha256"),
         "temperature": evaluation.get("temperature"),
         "max_tokens": evaluation.get("max_tokens"),
+        "seed": evaluation.get("seed"),
         "tool_call_mode": evaluation.get("tool_call_mode"),
         "reported_model": report.get("model"),
         "run_context_sha256": provenance.get("context_sha256"),
@@ -809,7 +810,7 @@ def _validate_identity(left: dict[str, Any], right: dict[str, Any], *, context: 
     for key in ("report_schema", "benchmark_name", "benchmark_version"):
         if left.get(key) != right.get(key):
             raise ValueError(f"report identity mismatch {context}: {key}")
-    for key in ("benchmark_fingerprint", "temperature", "max_tokens", "tool_call_mode"):
+    for key in ("benchmark_fingerprint", "temperature", "max_tokens", "seed", "tool_call_mode"):
         values = (left.get(key), right.get(key))
         if any(value is not None for value in values) and values[0] != values[1]:
             raise ValueError(f"report identity mismatch {context}: {key}")

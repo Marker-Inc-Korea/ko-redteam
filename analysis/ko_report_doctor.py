@@ -84,6 +84,8 @@ KNOWN_SCHEMAS = PRIMARY_REPORT_SCHEMAS | {
     "ko-redteam.external-review-statement.v1",
     "ko-redteam.external-review-signature-audit.v1",
     "ko-redteam.run-context.v1",
+    "ko-redteam.run-context.v2",
+    "ko-redteam.deployment-readiness.v1",
 }
 
 SECRET_LIKE_RE = re.compile(
@@ -101,6 +103,7 @@ PII_RE = re.compile(
 )
 RAW_TEXT_KEYS = {"prompt", "prompt_raw", "raw", "messages"}
 RAW_RESPONSE_KEYS = {"response", "output", "text", "completion", "answer"}
+HEX_DIGEST_RE = re.compile(r"^[0-9a-fA-F]{16,128}$")
 
 
 def _issue(
@@ -136,16 +139,33 @@ def _walk(value: Any, *, base: str = ""):
             yield from _walk(child, base=loc)
 
 
-def _scan_text(text: str, *, path: str, location: str, issues: list[dict[str, Any]]) -> None:
+def _scan_text(
+    text: str,
+    *,
+    path: str,
+    location: str,
+    issues: list[dict[str, Any]],
+    skip_pii: bool = False,
+) -> None:
     if SECRET_LIKE_RE.search(text):
         issues.append(_issue("error", "secret_like_text", "vendor-token-shaped text is present",
                              path=path, location=location))
     if RAW_CANARY_RE.search(text):
         issues.append(_issue("error", "raw_canary_text", "raw CANARY_* marker is present",
                              path=path, location=location))
-    if PII_RE.search(text):
+    if not skip_pii and PII_RE.search(text):
         issues.append(_issue("error", "pii_like_text", "PII-shaped text is present",
                              path=path, location=location))
+
+
+def _is_digest_value(key: str | int, value: str) -> bool:
+    normalized = str(key).lower()
+    digest_key = (
+        normalized in {"sha256", "sha256_16"}
+        or normalized.endswith("_sha256")
+        or normalized.endswith("_sha256_16")
+    )
+    return digest_key and HEX_DIGEST_RE.fullmatch(value) is not None
 
 
 def _check_json_privacy(data: dict[str, Any], *, path: str, allow_raw: bool) -> list[dict[str, Any]]:
@@ -158,7 +178,13 @@ def _check_json_privacy(data: dict[str, Any], *, path: str, allow_raw: bool) -> 
             issues.append(_issue("error", "raw_response_field", f"string `{key}` field may contain raw output",
                                  path=path, location=location))
         if isinstance(value, str):
-            _scan_text(value, path=path, location=location, issues=issues)
+            _scan_text(
+                value,
+                path=path,
+                location=location,
+                issues=issues,
+                skip_pii=_is_digest_value(key, value),
+            )
     return issues
 
 

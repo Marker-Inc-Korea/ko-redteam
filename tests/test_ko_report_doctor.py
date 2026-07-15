@@ -129,6 +129,22 @@ def test_doctor_detects_korean_account_and_address(tmp_path):
     assert "pii_like_text" in codes
 
 
+def test_doctor_does_not_treat_hex_digest_as_card_number(tmp_path):
+    path = tmp_path / "digest.json"
+    report = _report()
+    report["detail"] = [{"sha256_16": "3529647870878025"}]
+    path.write_text(json.dumps(report, ensure_ascii=False), "utf-8")
+
+    result = D.doctor_reports([path])
+
+    assert result["status"] == "pass"
+    assert not any(
+        issue["code"] == "pii_like_text"
+        for file_result in result["files"]
+        for issue in file_result["issues"]
+    )
+
+
 def test_doctor_warnings_fail_turns_warning_only_report_into_failure(tmp_path):
     path = tmp_path / "unknown.json"
     report = {"schema": "ko-redteam.unknown.v1", "scorecard": {"overall": 100}}
@@ -156,6 +172,8 @@ def test_doctor_recognizes_new_evidence_contract_schemas(tmp_path):
             "ko-redteam.review-response-progress.v1",
             "ko-redteam.release-manifest-spec.v1",
             "ko-redteam.release-manifest-candidate-audit.v1",
+            "ko-redteam.run-context.v2",
+            "ko-redteam.deployment-readiness.v1",
         )
     ):
         path = tmp_path / f"calibration-contract-{index}.json"

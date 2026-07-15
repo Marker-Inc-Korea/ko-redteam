@@ -213,7 +213,7 @@ def test_benchmark_scan_with_fake_runner_scores_and_hides_raw():
     assert report["schema"] == "ko-redteam.benchmark-report.v1"
     assert report["benchmark"]["name"] == bench["name"]
     assert len(report["benchmark"]["content_sha256"]) == 64
-    assert report["evaluation"] == {"temperature": 0.0, "max_tokens": 512}
+    assert report["evaluation"] == {"temperature": 0.0, "max_tokens": 512, "seed": 0}
     assert report["scorecard"]["overall"] >= 90.0
     assert not report["findings"]
     assert "raw" not in report["detail"][0]["assessment"]["response"]

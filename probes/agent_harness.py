@@ -23,7 +23,7 @@ from ko_diagnostics import diagnose  # noqa: E402
 from ko_error_taxonomy import classify_error  # noqa: E402
 from ko_llm_forensics import OUTCOME_ERROR, korean_quality, sanitize_text  # noqa: E402
 from ko_report import render_markdown  # noqa: E402
-from ko_run_context import attach_run_context, load_run_context  # noqa: E402
+from ko_run_context import assert_generation_matches, attach_run_context, load_run_context  # noqa: E402
 from ko_scorecard import evaluate_expected, score_benchmark_rows  # noqa: E402
 
 DEFAULT_BENCHMARK = ROOT / "benchmarks" / "ko_llm_agent_harness_v2.json"
@@ -269,6 +269,7 @@ def _call_endpoint(
     *,
     timeout: int,
     max_tokens: int,
+    seed: int,
     tool_call_mode: str,
 ) -> dict[str, Any]:
     if tool_call_mode not in TOOL_CALL_MODES:
@@ -278,6 +279,7 @@ def _call_endpoint(
         "messages": messages,
         "temperature": 0.0,
         "max_tokens": max_tokens,
+        "seed": seed,
     }
     if tool_call_mode == "native_tools_v1":
         body.update({"tools": tools, "tool_choice": "auto"})
@@ -548,6 +550,7 @@ def run_agent_harness(
     include_raw: bool = False,
     timeout: int = 120,
     max_tokens: int = 512,
+    seed: int = 0,
     tool_call_mode: str = DEFAULT_TOOL_CALL_MODE,
     call_fn: CallFn | None = None,
     run_context: dict[str, Any] | None = None,
@@ -555,6 +558,12 @@ def run_agent_harness(
     if tool_call_mode not in TOOL_CALL_MODES:
         raise ValueError(f"unsupported tool call mode: {tool_call_mode}")
     bench = load_benchmark(benchmark_path)
+    assert_generation_matches(
+        run_context,
+        temperature=0.0,
+        max_tokens=max_tokens,
+        seed=seed,
+    )
     rows = []
     for case in bench["cases"]:
         messages = _messages(case, tool_call_mode=tool_call_mode)
@@ -567,6 +576,7 @@ def run_agent_harness(
                 tools,
                 timeout=timeout,
                 max_tokens=max_tokens,
+                seed=seed,
                 tool_call_mode=tool_call_mode,
             )
         else:
@@ -621,6 +631,7 @@ def run_agent_harness(
         "evaluation": {
             "temperature": 0.0,
             "max_tokens": max_tokens,
+            "seed": seed,
             "tool_call_mode": tool_call_mode,
         },
         "model": model,
@@ -647,6 +658,7 @@ def main() -> None:
     ap.add_argument("--benchmark", default=str(DEFAULT_BENCHMARK))
     ap.add_argument("--timeout", type=int, default=120)
     ap.add_argument("--max-tokens", type=int, default=512)
+    ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--tool-call-mode", choices=sorted(TOOL_CALL_MODES), default=DEFAULT_TOOL_CALL_MODE,
                     help="official 비교 기본값은 serving parser와 무관한 prompt_json_v1")
     ap.add_argument("--include-raw", action="store_true",
@@ -666,6 +678,7 @@ def main() -> None:
         include_raw=args.include_raw,
         timeout=args.timeout,
         max_tokens=args.max_tokens,
+        seed=args.seed,
         tool_call_mode=args.tool_call_mode,
         run_context=run_context,
     )

@@ -3,6 +3,18 @@
 한국어 LLM 서비스를 배포하기 전/후에 안전성, 개인정보, prompt security, agent/RAG 도구 사용,
 과잉거부, 한국어 응답 품질을 한 번에 점검하는 레드팀/포렌식 평가 도구입니다.
 
+> [!NOTE]
+> 현재 버전은 **0.2.0rc1 내부 운영 배포 후보**입니다. 평가기 배포 준비도와 3회 독립 Slurm 실행 증거는
+> 검증할 수 있지만, 특정 모델의 안전 인증이나 공식 leaderboard 공개를 의미하지 않습니다.
+
+| 바로가기 | 목적 |
+|---|---|
+| [Quick Start](#quick-start) | 로컬 설치와 기본 self-check |
+| [Deployment Guide](./DEPLOYMENT.md) | Slurm, run context v2, container, 3-repeat gate |
+| [What It Checks](#what-it-checks) | 평가 범위와 해석 |
+| [Command Groups](#command-groups) | CLI 전체 목록 |
+| [Official Evidence Pipeline](#official-evidence-pipeline) | 별도 공식 게시 요건 |
+
 **목적**: 모델이 한국어 운영 환경에서 무엇을 거부하고, 무엇을 허용하고, 어떤 정보를 새는지 재현 가능한
 리포트로 남깁니다.
 
@@ -63,7 +75,7 @@ OpenAI-compatible endpoint
   -> multi-turn escalation check
   -> agent/tool gateway check
   -> report doctor
-  -> CI gate
+  -> independent-repeat deployment gate
 ```
 
 ---
@@ -103,6 +115,10 @@ ko-redteam-suite \
 
 소스 checkout에서는 `python3 probes/...` 경로도 그대로 사용할 수 있습니다.
 
+운영 후보 검증은 일반 suite 한 번으로 끝나지 않습니다. open-weight 모델을 서로 다른 Slurm job에서 3회
+서빙하고 `core_v1`과 `single_v1`을 짝지어 실행한 뒤 `ko-redteam-validate-deployment`로 검증합니다.
+전체 명령과 실패 시 재실행 규칙은 [Deployment Guide](./DEPLOYMENT.md)를 따릅니다.
+
 ---
 
 ## Command Groups
@@ -110,6 +126,7 @@ ko-redteam-suite \
 | 단계 | CLI | 용도 |
 |---|---|---|
 | 통합 실행 | `ko-redteam-suite` | audit, coverage, endpoint smoke, 단일턴/멀티턴/agent 평가, doctor, gate |
+| 배포 준비도 | `ko-redteam-validate-deployment` | 독립 Slurm 반복, provenance, benchmark fingerprint, artifact hash 검증 |
 | 연결 확인 | `ko-redteam-check-endpoint` | OpenAI-compatible endpoint와 한국어 응답 신호 확인 |
 | 평가 실행 | `ko-redteam-benchmark`, `ko-redteam-multiturn`, `ko-redteam-agent-harness` | 단일턴, 멀티턴, tool gateway 평가 |
 | 오프라인 분석 | `ko-redteam-scan`, `ko-redteam-analyze-responses` | 저장된 응답과 공격 스캔 결과 분석 |
@@ -312,7 +329,7 @@ ko-redteam-semantic-embeddings compare --help
 ko-redteam-audit-splits \
   --practice-suite paperbench=benchmarks/ko_llm_paperbench_v1.json \
   --practice-suite mini_single=benchmarks/ko_llm_mini_v1.json \
-  --practice-suite multiturn=benchmarks/ko_llm_multiturn_v1.json \
+  --practice-suite multiturn=benchmarks/ko_llm_multiturn_v2.json \
   --practice-suite agent_harness=benchmarks/ko_llm_agent_harness_v2.json \
   --official-suite paperbench=private/official/paperbench.json \
   --official-suite mini_single=private/official/mini.json \
@@ -412,8 +429,8 @@ ko-redteam-benchmark \
 ko-redteam-multiturn \
   --endpoint http://127.0.0.1:8030/v1 \
   --model gemma-4-31B-it \
-  --benchmark benchmarks/ko_llm_multiturn_v1.json \
-  --markdown-output multiturn_ko_llm_multiturn_v1_report.md
+  --benchmark benchmarks/ko_llm_multiturn_v2.json \
+  --markdown-output multiturn_ko_llm_multiturn_v2_report.md
 ```
 
 Agent/RAG tool gateway 평가:
@@ -657,7 +674,8 @@ Agent report의 `expected=no_tool`은 schema 하위 호환을 위한 식별자�
 | seed | 역할 |
 |---|---|
 | `ko_llm_paperbench_v1.json` | 20개 독립 원형의 논문/가이드 기반 단일턴 expected-outcome 평가 |
-| `ko_llm_multiturn_v1.json` | 17개 독립 원형으로 점진적 유해 전환, prompt security, tool hijack, privacy 재노출, 정상 업무 utility 평가 |
+| `ko_llm_multiturn_v2.json` | 24개 독립 원형과 명시적 privacy policy/contract로 점진적 공격, 개인정보 목적 제한, 정상 업무 utility 평가 |
+| `ko_llm_multiturn_v1.json` | 17개 하위 호환 seed. 신규 배포 후보 검증에는 사용하지 않음 |
 | `ko_llm_agent_harness_v2.json` | 위험 차단 5개와 정상 도구 사용 5개를 균형 배치한 현재 Agent gateway 판단 평가 |
 | `ko_llm_agent_harness_v1.json` | 위험 차단 4개와 정상 조회 1개의 하위 호환 seed. 신규 비교·S3에는 사용하지 않음 |
 | `ko_llm_mini_v1.json` | 17개 독립 원형의 한국어 품질·과잉거부 포함 compact single-turn practice |
@@ -682,7 +700,7 @@ Agent report의 `expected=no_tool`은 schema 하위 호환을 위한 식별자�
 | 영역 | 파일 |
 |---|---|
 | 실행 CLI | `probes/scan.py`, `probes/benchmark_scan.py`, `probes/run_suite.py` |
-| 멀티턴 평가 | `probes/multiturn_benchmark.py`, `benchmarks/ko_llm_multiturn_v1.json` |
+| 멀티턴 평가 | `probes/multiturn_benchmark.py`, `benchmarks/ko_llm_multiturn_v2.json` |
 | Agent harness | `probes/agent_harness.py`, `benchmarks/ko_llm_agent_harness_v2.json` |
 | 공격 생성 | `probes/ko_obfuscation.py`, `probes/ko_jailbreak.py` |
 | 한국어 판정 | `detectors/ko_refusal.py` |
@@ -695,6 +713,7 @@ Agent report의 `expected=no_tool`은 schema 하위 호환을 위한 식별자�
 | 공식 증거 생성 | `analysis/ko_calibration.py`, `analysis/ko_calibration_evidence.py`, `analysis/ko_calibration_collection.py`, `analysis/ko_split_evidence.py`, `analysis/ko_power_evidence.py`, `analysis/ko_familywise_power.py`, `analysis/ko_power_design.py`, `analysis/ko_season_preregistration.py` |
 | 시즌 거버넌스 | `governance/README.md`, `governance/SEASON_OPERATIONS.md` |
 | 실행 provenance | `analysis/ko_run_context.py` |
+| 배포 준비도 | `analysis/ko_deployment_readiness.py`, `probes/validate_deployment.py` |
 | 평가셋 식별 | `analysis/ko_benchmark_identity.py` |
 | 품질 게이트 | `analysis/ko_benchmark_audit.py`, `analysis/ko_benchmark_coverage.py`, `analysis/ko_report_doctor.py` |
 
@@ -708,9 +727,11 @@ ko-redteam-self-check
 ko-redteam-check-public-hygiene --root .
 python3 -m build --sdist --wheel
 python3 -m pytest tests -q
-docker build -t ko-redteam:local .
-docker run --rm ko-redteam:local
-docker run --rm ko-redteam:local python -m pytest tests -q
+docker build --target runtime -t ko-redteam:local .
+docker run --rm --read-only --tmpfs /tmp:rw,noexec,nosuid,size=64m \
+  --cap-drop ALL --security-opt no-new-privileges ko-redteam:local
+docker build --target test -t ko-redteam:test .
+docker run --rm ko-redteam:test
 ```
 
 `self_check.py`는 live endpoint 없이 import, Python 버전, seed audit, paperbench coverage, offline evaluation,

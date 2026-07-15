@@ -9,6 +9,10 @@ __pycache__
 venv
 env
 *.egg-info
+build
+dist
+.coverage
+htmlcov
 
 # Generated local reports and suites can include sensitive prompt/response traces.
 probes/*_report.json

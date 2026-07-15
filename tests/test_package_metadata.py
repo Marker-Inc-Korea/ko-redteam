@@ -56,6 +56,7 @@ def test_console_script_targets_are_importable():
         "ko-redteam-build-release-manifest",
         "ko-redteam-compare-reports",
         "ko-redteam-check-regression",
+        "ko-redteam-validate-deployment",
     } <= set(scripts)
 
     for target in scripts.values():
@@ -71,12 +72,15 @@ def test_distribution_metadata_has_release_basics():
     assert "prune tests" in manifest
     assert "exclude probes/COMBO_FINDINGS.md" in manifest
     assert "include LEADERBOARD_PROTOCOL.md" in manifest
+    assert "include DEPLOYMENT.md" in manifest
     assert "graft governance" in manifest
     assert "recursive-exclude probes *_report.json *_report.md" in manifest
     assert "global-exclude .gitignore" in manifest
     assert data["build-system"]["requires"][0].startswith("setuptools>=77")
     assert data["project"]["license"] == "MIT"
     assert data["project"]["license-files"] == ["LICENSE"]
+    assert data["project"]["version"] == "0.2.0rc1"
+    assert "Development Status :: 4 - Beta" in data["project"]["classifiers"]
     assert "korean" in data["project"]["keywords"]
     assert "Natural Language :: Korean" in data["project"]["classifiers"]
     assert any(dep.startswith("build") for dep in data["project"]["optional-dependencies"]["dev"])
@@ -90,6 +94,7 @@ def test_package_data_paths_exist():
     assert (ROOT / "benchmarks" / "ko_llm_paperbench_v1.json").exists()
     assert (ROOT / "benchmarks" / "ko_llm_mini_v1.json").exists()
     assert (ROOT / "benchmarks" / "ko_llm_multiturn_v1.json").exists()
+    assert (ROOT / "benchmarks" / "ko_llm_multiturn_v2.json").exists()
     assert (ROOT / "benchmarks" / "ko_llm_agent_harness_v1.json").exists()
     assert (ROOT / "benchmarks" / "ko_llm_agent_harness_v2.json").exists()
     for filename in (
@@ -101,6 +106,7 @@ def test_package_data_paths_exist():
         assert (ROOT / "benchmarks" / filename).exists()
     assert (ROOT / "probes" / "ko_jailbreak_templates.json").exists()
     assert (ROOT / "LEADERBOARD_PROTOCOL.md").exists()
+    assert (ROOT / "DEPLOYMENT.md").exists()
     assert (ROOT / "governance" / "SEASON_OPERATIONS.md").exists()
     assert (ROOT / "governance" / "SEASON_2026Q3_PREREGISTRATION.json").exists()
     assert (ROOT / "governance" / "SEASON_2026Q3_S2_PREREGISTRATION.json").exists()
@@ -186,6 +192,7 @@ def test_analysis_package_imports_without_flat_pythonpath():
                 "from analysis.ko_practice_review import build_review_workspace,build_reviewer_commitment,validate_public_review_signatures;"
                 "from analysis.ko_review_handoff import verify_review_handoff_template;"
                 "from analysis.ko_release_manifest import build_candidate_manifest,finalize_release_manifest;"
+                "from analysis.ko_deployment_readiness import evaluate_deployment_repeats;"
                 "r=analyze_response('주민번호 900101-1234567');"
                 "assert r['risk_domain']=='pii_rrn';"
                 "assert callable(score_unlabeled_scan);"
@@ -210,6 +217,7 @@ def test_analysis_package_imports_without_flat_pythonpath():
                 "assert callable(verify_review_handoff_template);"
                 "assert callable(build_candidate_manifest);"
                 "assert callable(finalize_release_manifest);"
+                "assert callable(evaluate_deployment_repeats);"
                 "print('package-import-ok')"
             ),
         ],
@@ -235,6 +243,22 @@ def test_ci_runs_redteam_suite_multiturn_agent_hard_fail_check():
     assert 'report["summaries"]["measurement_integrity"]' in workflow
     assert "python -m build --sdist --wheel" in workflow
     assert "suite_error_ci/suite_manifest.json" in workflow
+
+
+def test_container_uses_minimal_non_root_runtime_and_separate_test_stage():
+    dockerfile = (ROOT / "Dockerfile").read_text("utf-8")
+
+    assert "FROM python:3.12-slim AS builder" in dockerfile
+    assert "FROM runtime-base AS test" in dockerfile
+    assert "FROM runtime-base AS runtime" in dockerfile
+    assert "USER 10001:10001" in dockerfile
+    assert 'python -m pip install --no-cache-dir ".[dev]"' not in dockerfile
+    workflow_path = ROOT.parent / ".github" / "workflows" / "tests.yml"
+    if workflow_path.exists():
+        workflow = workflow_path.read_text("utf-8")
+        assert "--read-only" in workflow
+        assert "--cap-drop ALL" in workflow
+        assert "--target test" in workflow
 
 
 def test_user_facing_docs_keep_external_scanner_references_neutral():
