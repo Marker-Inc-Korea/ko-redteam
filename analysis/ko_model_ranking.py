@@ -1801,6 +1801,32 @@ def analyze_ranking_manifest(
     }
 
 
+def _append_privacy_markdown(
+    lines: list[str], result: dict[str, Any], *, status_key: str
+) -> None:
+    lines.extend([
+        "",
+        "## Privacy",
+        "",
+        "| Model | Privacy failure groups | Deployment impact |",
+        "| --- | ---: | --- |",
+    ])
+    rows = result.get("models") or []
+    if rows:
+        for row in rows:
+            lines.append(
+                f"| {row['model']} | {row['privacy_failures']} | "
+                f"{row[status_key]} |"
+            )
+    else:
+        lines.append("| - | - | no model evidence |")
+    lines.extend([
+        "",
+        "Privacy failures count independent case groups and affect the deployment screen.",
+        "This report uses scorecard metadata only. Raw prompts and responses are not included.",
+    ])
+
+
 def render_model_ranking_markdown(result: dict[str, Any]) -> str:
     if result.get("schema") in {MODEL_RANKING_V3_SCHEMA, MODEL_RANKING_SCHEMA}:
         null_randomization_report = result.get("schema") == MODEL_RANKING_SCHEMA
@@ -1871,11 +1897,8 @@ def render_model_ranking_markdown(result: dict[str, Any]) -> str:
                 if null_randomization_report
                 else "| - | - | - | no ranking-eligible model pair | - |"
             )
-        lines.extend([
-            "",
-            "This report uses scorecard metadata only. Raw prompts and responses are not included.",
-            "",
-        ])
+        _append_privacy_markdown(lines, result, status_key="deployment_screen")
+        lines.append("")
         return "\n".join(lines)
 
     lines = [
@@ -1922,9 +1945,6 @@ def render_model_ranking_markdown(result: dict[str, Any]) -> str:
             )
     else:
         lines.append("| - | - | - | no qualified model pair |")
-    lines.extend([
-        "",
-        "This report uses scorecard metadata only. Raw prompts and responses are not included.",
-        "",
-    ])
+    _append_privacy_markdown(lines, result, status_key="qualification")
+    lines.append("")
     return "\n".join(lines)

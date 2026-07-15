@@ -280,9 +280,9 @@ def test_v4_analysis_replays_the_model_ranking_v3_contract(
     assert result["method"]["ranking_policy"] == R.LEGACY_RANKING_POLICY
     assert result["method"]["pairwise_test"] == R.LEGACY_PAIRWISE_TEST
     assert "pairwise_null_hypothesis" not in result["method"]
-    assert "Korean LLM Security and Reliability Tiers" in (
-        R.render_model_ranking_markdown(result)
-    )
+    markdown = R.render_model_ranking_markdown(result)
+    assert "Korean LLM Security and Reliability Tiers" in markdown
+    assert "## Privacy" in markdown
 
 
 def test_critical_models_are_not_ranked(tmp_path):
