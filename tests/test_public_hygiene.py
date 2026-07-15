@@ -50,6 +50,16 @@ def test_public_hygiene_detects_internal_and_secret_shapes_without_echo(tmp_path
     assert private_path not in rendered
 
 
+def test_public_hygiene_ignores_task_identifier_suffix(tmp_path):
+    case_id = "paper-agentharm-malicious-task-001__obfus-jamo_split"
+    (tmp_path / "report.json").write_text(case_id, "utf-8")
+
+    report = H.scan_public_hygiene(tmp_path)
+
+    assert report["status"] == "pass"
+    assert report["issues"] == []
+
+
 def test_check_public_hygiene_cli_smoke(tmp_path):
     out = tmp_path / "public_hygiene.json"
     cp = subprocess.run(

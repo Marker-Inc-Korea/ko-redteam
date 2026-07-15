@@ -45,7 +45,7 @@ CONTENT_RULES: tuple[tuple[str, re.Pattern[str]], ...] = (
     (
         "vendor_token_shape",
         re.compile(
-            r"(?i)(sk-[A-Za-z0-9_-]{12,}|AKIA[0-9A-Z]{12,}|xox[baprs]-[A-Za-z0-9-]{16,}|"
+            r"(?i)(?<![A-Za-z0-9])(sk-[A-Za-z0-9_-]{12,}|AKIA[0-9A-Z]{12,}|xox[baprs]-[A-Za-z0-9-]{16,}|"
             r"hf_[A-Za-z0-9]{16,}|glpat-[A-Za-z0-9_-]{16,})"
         ),
     ),

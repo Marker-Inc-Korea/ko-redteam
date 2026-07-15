@@ -94,7 +94,7 @@ _RISK_RE = re.compile("|".join(
     re.escape(t) for terms in _RISK_TERMS.values() for t in sorted(terms, key=len, reverse=True)
 ))
 _SECRET_RE = re.compile(
-    r"(?i)(sk-[A-Za-z0-9_-]{12,}|AKIA[0-9A-Z]{12,}|xox[baprs]-[A-Za-z0-9-]{16,}|"
+    r"(?i)(?<![A-Za-z0-9])(sk-[A-Za-z0-9_-]{12,}|AKIA[0-9A-Z]{12,}|xox[baprs]-[A-Za-z0-9-]{16,}|"
     r"hf_[A-Za-z0-9]{16,}|glpat-[A-Za-z0-9_-]{16,})"
 )
 _CANARY_RE = re.compile(r"\bCANARY_[A-Z0-9_]{8,}\b")

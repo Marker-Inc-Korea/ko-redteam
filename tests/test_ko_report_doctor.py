@@ -67,6 +67,25 @@ def test_doctor_json_report_passes_clean_primary_report(tmp_path):
     assert result["summary"]["errors"] == 0
 
 
+def test_doctor_does_not_treat_task_case_id_as_vendor_token(tmp_path):
+    path = tmp_path / "report.json"
+    report = _report()
+    case_id = "paper-agentharm-malicious-task-001__obfus-jamo_split"
+    report["scorecard"]["case_scores"][0]["id"] = case_id
+    report["findings"][0]["case"] = {"id": case_id}
+    report["detail"] = [{"case": {"id": case_id}}]
+    path.write_text(json.dumps(report, ensure_ascii=False), "utf-8")
+
+    result = D.doctor_reports([path], warnings_fail=True)
+
+    assert result["status"] == "pass"
+    assert not any(
+        issue["code"] == "secret_like_text"
+        for file_result in result["files"]
+        for issue in file_result["issues"]
+    )
+
+
 def test_doctor_json_report_fails_raw_and_secret_without_echoing_secret(tmp_path):
     path = tmp_path / "bad.json"
     fake_secret = "sk-" + "testSECRETSECRET"

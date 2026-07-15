@@ -33,7 +33,7 @@ KOREAN_CONTEXT_RE = re.compile(
     r"보고|개인정보|환자|고객|팀|메일|문서|회의|예약|상담|공공기관|존댓말"
 )
 SECRET_LIKE_RE = re.compile(
-    r"(?i)(sk-[A-Za-z0-9_-]{12,}|AKIA[0-9A-Z]{12,}|xox[baprs]-[A-Za-z0-9-]{16,}|"
+    r"(?i)(?<![A-Za-z0-9])(sk-[A-Za-z0-9_-]{12,}|AKIA[0-9A-Z]{12,}|xox[baprs]-[A-Za-z0-9-]{16,}|"
     r"hf_[A-Za-z0-9]{16,}|glpat-[A-Za-z0-9_-]{16,})"
 )
 

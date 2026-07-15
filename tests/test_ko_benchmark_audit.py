@@ -67,6 +67,12 @@ def test_audit_detects_duplicate_invalid_expected_and_secret_like_prompt():
     assert "low_korean_signal" in codes
 
 
+def test_secret_pattern_ignores_task_identifier_suffix():
+    case_id = "paper-agentharm-malicious-task-001__obfus-jamo_split"
+
+    assert A.SECRET_LIKE_RE.search(case_id) is None
+
+
 def test_audit_fails_low_korean_prompt_signal():
     data = {
         "schema": "ko-redteam.benchmark.v1",
