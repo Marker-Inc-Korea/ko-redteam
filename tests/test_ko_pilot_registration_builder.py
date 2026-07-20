@@ -123,6 +123,7 @@ def _project_copy(tmp_path: Path) -> tuple[Path, Path, Path]:
         B.REVIEW_MERGE_PATH,
         B.REVIEW_MERGE_ENTRYPOINT_PATH,
         B.REVIEW_WORKFLOW_PATH,
+        *B.HISTORICAL_BENCHMARK_PATHS,
         *(
             row["path"]
             for row in spec["design_sources"].values()
@@ -177,6 +178,7 @@ def test_registration_spec_source_paths_cover_every_build_input():
         B.REVIEW_MERGE_PATH,
         B.REVIEW_MERGE_ENTRYPOINT_PATH,
         B.REVIEW_WORKFLOW_PATH,
+        *B.HISTORICAL_BENCHMARK_PATHS,
         *(row["path"] for row in spec["design_sources"].values()),
         *(
             row["path"]
@@ -272,6 +274,43 @@ def test_registration_spec_source_tampering_fails_closed():
 
     with pytest.raises(ValueError, match="file digest mismatch"):
         B.validate_registration_spec(spec, project_root=ROOT)
+
+
+def test_builder_independently_rejects_historical_case_reintroduction():
+    draft = _load(DRAFT_PATH)
+    candidates = {
+        suite: (row["path"], _load(ROOT / row["path"]))
+        for suite, row in draft["benchmarks"].items()
+    }
+    historical = _load(ROOT / B.HISTORICAL_BENCHMARK_PATHS[0])
+    reused = deepcopy(historical["cases"][0])
+    reused["independence_group"] = reused["id"]
+    candidates["paperbench"][1]["cases"][0] = reused
+
+    with pytest.raises(ValueError, match="historical independence failed"):
+        B._validate_historical_independence(
+            draft,
+            candidates,
+            project_root=ROOT,
+        )
+
+
+def test_builder_rejects_forged_historical_independence_assertion():
+    draft = deepcopy(_load(DRAFT_PATH))
+    candidates = {
+        suite: (row["path"], _load(ROOT / row["path"]))
+        for suite, row in draft["benchmarks"].items()
+    }
+    draft["historical_independence_audit"]["historical_overlap_counts"][
+        "case_id"
+    ] = 1
+
+    with pytest.raises(ValueError, match="audit does not reproduce"):
+        B._validate_historical_independence(
+            draft,
+            candidates,
+            project_root=ROOT,
+        )
 
 
 def test_builder_cli_requires_clean_tracked_inputs_and_contained_outputs(tmp_path):

@@ -11,7 +11,7 @@
  },
  "draft_provenance": {
   "generator_path": "probes/build_successor_pilot_drafts.py",
-  "generator_sha256": "43e752a1bb125d51821fef0f512243d99bdf7066bb96da5664d095ef71c1a22c",
+  "generator_sha256": "8e1fc21aa4e154731a6236bba36b1adb8230ecd8539b5f0b899e492743c1fa5a",
   "reference_model_outputs_used": false,
   "human_review_required_before_registration": true
  },
@@ -35,27 +35,121 @@
  "benchmarks": {
   "paperbench": {
    "path": "benchmarks/ko_llm_paperbench_pilot_v1.json",
-   "sha256": "e6a87741e7919da302804b5fcf387018a4e8a53b053c85037279aebc7983276a",
-   "content_sha256": "421660d749ecea1d6c2c7f6ed514168f731095aefb0aeb210e574314d004074a",
+   "sha256": "c4d42468404e38caec2a2c4b20e0e79f6aa66621a63da340287e188e25cee3fb",
+   "content_sha256": "966a291bf292490dbf06fb38f54c6045ce89b006eccf27ef0f34229f7d4618be",
    "cases": 40
   },
   "mini_single": {
    "path": "benchmarks/ko_llm_mini_pilot_v1.json",
-   "sha256": "dba80c998e4b1759bac27c3597202366b6aace604d37b2c1352212ca589a8167",
-   "content_sha256": "2d9e3ce01475fff7911ebbf191678914320eb8be526adb35a2729e80145cb903",
+   "sha256": "2af731a83bba1fdb891541888ded145720b716f4c8091bbb6100ea270d1a5755",
+   "content_sha256": "3693aed9af9806c5a84a90c8f79ee66fb18bd5ba62f10c2efa367703abb50956",
    "cases": 40
   },
   "multiturn": {
    "path": "benchmarks/ko_llm_multiturn_pilot_v1.json",
-   "sha256": "85db743e535310964b1ca5bdba139186cf5ef291d1bed1527f661a98956fb596",
-   "content_sha256": "b20c7278f4da742003eeebdd89df52c047e4eade800e6abf7a0ecaa0a2be39c8",
+   "sha256": "9005b56519995d38ba3f7e3079bde8c8f7bef0302ad2f2d2f1180f175e166628",
+   "content_sha256": "5467c2eb7672e05eb73984160ca477c1a17ceec96fd69582957325ddbc304686",
    "cases": 20
   },
   "agent_harness": {
    "path": "benchmarks/ko_llm_agent_harness_pilot_v1.json",
-   "sha256": "d25bea03eb4eefdd76a17993339601e9f5f8dc8908979615582ae303746ae5e4",
-   "content_sha256": "a6e54ca0782d1612afcefb3ad55bd5e39e9ec900db4fd41b0bc8ddf0d5b013e1",
+   "sha256": "6a7c7e4d6edca3de0b4da0f0256594719036e3716a9c0a10acea1d414e09aff6",
+   "content_sha256": "a33501d1f298428a0881715de2ccc8cdda68720bf260fd06e78f1c696263e3d3",
    "cases": 40
+  }
+ },
+ "historical_independence_audit": {
+  "schema": "ko-redteam.historical-exact-independence-audit.v1",
+  "status": "pass",
+  "policy": "zero exact reuse against all public non-pilot benchmarks",
+  "normalization": {
+   "version": "ko-redteam.prompt-normalization.v1",
+   "unicode": "NFKC",
+   "case": "casefold",
+   "zero_width": "remove U+200B-U+200F,U+2060,U+FEFF",
+   "whitespace": "collapse and strip"
+  },
+  "historical_benchmarks": [
+   {
+    "path": "benchmarks/ko_llm_paperbench_v1.json",
+    "sha256": "1da3abc0bdd80a2fae472c60a33a81bb4d027b98837211be70a8126441b4e4b8",
+    "content_sha256": "35fb13997644af6d77b46e089948b53064a5bfc531564aceeb2f0dd2d8cd571f",
+    "schema": "ko-redteam.benchmark.v1",
+    "cases": 20
+   },
+   {
+    "path": "benchmarks/ko_llm_mini_v1.json",
+    "sha256": "f4038e3bda7769856ab22cbbdcf1bb026a088633d9c17b2d56bc5dc34b8b325b",
+    "content_sha256": "972550f415d5b71971dc0b2e65820d30ab45d6528f0556c7f4daf6b79ff1b984",
+    "schema": "ko-redteam.benchmark.v1",
+    "cases": 17
+   },
+   {
+    "path": "benchmarks/ko_llm_multiturn_v1.json",
+    "sha256": "d036d2331fa244687d95db813b5064dcf2db645005ee870ad0c1cc521bb111db",
+    "content_sha256": "d690b162758c141eaafbd445b6150c76d687c2502f3daa8a7bc43b48880ec448",
+    "schema": "ko-redteam.multiturn-benchmark.v1",
+    "cases": 17
+   },
+   {
+    "path": "benchmarks/ko_llm_multiturn_v2.json",
+    "sha256": "7f14d2800382be934721cdfbad79ad5086d01bbfb086b105ea5188447188594a",
+    "content_sha256": "119e0eaf89592fe6cabd6e6adb2b9334a80fe69fc1ae8c6ba2d4444527afc3f4",
+    "schema": "ko-redteam.multiturn-benchmark.v1",
+    "cases": 24
+   },
+   {
+    "path": "benchmarks/ko_llm_agent_harness_v1.json",
+    "sha256": "d0f04cdade7ca238824c34f998bd3d3e15e0670e030a9de5ab29123db7d4cc7c",
+    "content_sha256": "77aeeefe4eea6da91f87a4f92b70a86c3287462df03f8f5ea801b98850b6aeed",
+    "schema": "ko-redteam.agent-harness.v1",
+    "cases": 5
+   },
+   {
+    "path": "benchmarks/ko_llm_agent_harness_v2.json",
+    "sha256": "f814e70598c1f1dd44cb644f879a1ae5a5fd5a059803774b65579f172ce52dc8",
+    "content_sha256": "47a1532df408397d215036df4bb14df306129afaa80fa40d17d2fc51a8441307",
+    "schema": "ko-redteam.agent-harness.v1",
+    "cases": 10
+   }
+  ],
+  "historical_case_records": 93,
+  "candidate_benchmarks": {
+   "paperbench": {
+    "path": "benchmarks/ko_llm_paperbench_pilot_v1.json",
+    "content_sha256": "966a291bf292490dbf06fb38f54c6045ce89b006eccf27ef0f34229f7d4618be",
+    "cases": 40
+   },
+   "mini_single": {
+    "path": "benchmarks/ko_llm_mini_pilot_v1.json",
+    "content_sha256": "3693aed9af9806c5a84a90c8f79ee66fb18bd5ba62f10c2efa367703abb50956",
+    "cases": 40
+   },
+   "multiturn": {
+    "path": "benchmarks/ko_llm_multiturn_pilot_v1.json",
+    "content_sha256": "5467c2eb7672e05eb73984160ca477c1a17ceec96fd69582957325ddbc304686",
+    "cases": 20
+   },
+   "agent_harness": {
+    "path": "benchmarks/ko_llm_agent_harness_pilot_v1.json",
+    "content_sha256": "a33501d1f298428a0881715de2ccc8cdda68720bf260fd06e78f1c696263e3d3",
+    "cases": 40
+   }
+  },
+  "candidate_case_records": 140,
+  "candidate_duplicate_counts": {
+   "case_id": 0,
+   "independence_group": 0,
+   "normalized_text_sha256": 0,
+   "normalized_prompt_sha256": 0,
+   "evaluation_payload_sha256": 0
+  },
+  "historical_overlap_counts": {
+   "case_id": 0,
+   "independence_group": 0,
+   "normalized_text_sha256": 0,
+   "normalized_prompt_sha256": 0,
+   "evaluation_payload_sha256": 0
   }
  },
  "target_strata": {
@@ -68,76 +162,6 @@
   "agent_harness:agent_rag:no_tool": 20
  },
  "case_reviews": [
-  {
-   "suite": "paperbench",
-   "independence_group": "paper-harmbench-harmful-001",
-   "stratum": "paperbench:safety:refuse_or_redirect",
-   "decision": "pending_human_review",
-   "reviewer_ids": []
-  },
-  {
-   "suite": "paperbench",
-   "independence_group": "paper-jailbreak-roleplay-001",
-   "stratum": "paperbench:safety:refuse_or_redirect",
-   "decision": "pending_human_review",
-   "reviewer_ids": []
-  },
-  {
-   "suite": "paperbench",
-   "independence_group": "paper-cyberseceval-abuse-001",
-   "stratum": "paperbench:safety:refuse_or_redirect",
-   "decision": "pending_human_review",
-   "reviewer_ids": []
-  },
-  {
-   "suite": "paperbench",
-   "independence_group": "paper-rag-secret-exfil-001",
-   "stratum": "paperbench:privacy:no_leak",
-   "decision": "pending_human_review",
-   "reviewer_ids": []
-  },
-  {
-   "suite": "paperbench",
-   "independence_group": "paper-pipc-privacy-minimize-001",
-   "stratum": "paperbench:privacy:no_leak",
-   "decision": "pending_human_review",
-   "reviewer_ids": []
-  },
-  {
-   "suite": "paperbench",
-   "independence_group": "paper-privacy-support-ticket-002",
-   "stratum": "paperbench:privacy:no_leak",
-   "decision": "pending_human_review",
-   "reviewer_ids": []
-  },
-  {
-   "suite": "paperbench",
-   "independence_group": "paper-privacy-access-log-003",
-   "stratum": "paperbench:privacy:no_leak",
-   "decision": "pending_human_review",
-   "reviewer_ids": []
-  },
-  {
-   "suite": "paperbench",
-   "independence_group": "paper-privacy-recruiting-004",
-   "stratum": "paperbench:privacy:no_leak",
-   "decision": "pending_human_review",
-   "reviewer_ids": []
-  },
-  {
-   "suite": "paperbench",
-   "independence_group": "paper-safety-fraud-004",
-   "stratum": "paperbench:safety:refuse_or_redirect",
-   "decision": "pending_human_review",
-   "reviewer_ids": []
-  },
-  {
-   "suite": "paperbench",
-   "independence_group": "paper-safety-stalking-005",
-   "stratum": "paperbench:safety:refuse_or_redirect",
-   "decision": "pending_human_review",
-   "reviewer_ids": []
-  },
   {
    "suite": "paperbench",
    "independence_group": "paper-safety-credential-theft-006",
@@ -239,6 +263,41 @@
   {
    "suite": "paperbench",
    "independence_group": "paper-safety-control-evasion-020",
+   "stratum": "paperbench:safety:refuse_or_redirect",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "paperbench",
+   "independence_group": "paper-safety-rail-sabotage-021",
+   "stratum": "paperbench:safety:refuse_or_redirect",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "paperbench",
+   "independence_group": "paper-safety-supply-chain-022",
+   "stratum": "paperbench:safety:refuse_or_redirect",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "paperbench",
+   "independence_group": "paper-safety-abduction-023",
+   "stratum": "paperbench:safety:refuse_or_redirect",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "paperbench",
+   "independence_group": "paper-safety-explosive-024",
+   "stratum": "paperbench:safety:refuse_or_redirect",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "paperbench",
+   "independence_group": "paper-safety-market-manipulation-025",
    "stratum": "paperbench:safety:refuse_or_redirect",
    "decision": "pending_human_review",
    "reviewer_ids": []
@@ -349,72 +408,37 @@
    "reviewer_ids": []
   },
   {
-   "suite": "mini_single",
-   "independence_group": "overrefusal-medical-001",
-   "stratum": "mini_single:overrefusal:allow",
+   "suite": "paperbench",
+   "independence_group": "paper-privacy-welfare-020",
+   "stratum": "paperbench:privacy:no_leak",
    "decision": "pending_human_review",
    "reviewer_ids": []
   },
   {
-   "suite": "mini_single",
-   "independence_group": "overrefusal-admin-001",
-   "stratum": "mini_single:overrefusal:allow",
+   "suite": "paperbench",
+   "independence_group": "paper-privacy-transit-021",
+   "stratum": "paperbench:privacy:no_leak",
    "decision": "pending_human_review",
    "reviewer_ids": []
   },
   {
-   "suite": "mini_single",
-   "independence_group": "quality-korean-001",
-   "stratum": "mini_single:korean_quality:allow",
+   "suite": "paperbench",
+   "independence_group": "paper-privacy-voice-022",
+   "stratum": "paperbench:privacy:no_leak",
    "decision": "pending_human_review",
    "reviewer_ids": []
   },
   {
-   "suite": "mini_single",
-   "independence_group": "quality-korean-honorific-002",
-   "stratum": "mini_single:korean_quality:allow",
+   "suite": "paperbench",
+   "independence_group": "paper-privacy-whistleblower-023",
+   "stratum": "paperbench:privacy:no_leak",
    "decision": "pending_human_review",
    "reviewer_ids": []
   },
   {
-   "suite": "mini_single",
-   "independence_group": "quality-korean-notice-003",
-   "stratum": "mini_single:korean_quality:allow",
-   "decision": "pending_human_review",
-   "reviewer_ids": []
-  },
-  {
-   "suite": "mini_single",
-   "independence_group": "quality-korean-plain-004",
-   "stratum": "mini_single:korean_quality:allow",
-   "decision": "pending_human_review",
-   "reviewer_ids": []
-  },
-  {
-   "suite": "mini_single",
-   "independence_group": "quality-korean-date-005",
-   "stratum": "mini_single:korean_quality:allow",
-   "decision": "pending_human_review",
-   "reviewer_ids": []
-  },
-  {
-   "suite": "mini_single",
-   "independence_group": "overrefusal-safety-002",
-   "stratum": "mini_single:overrefusal:allow",
-   "decision": "pending_human_review",
-   "reviewer_ids": []
-  },
-  {
-   "suite": "mini_single",
-   "independence_group": "overrefusal-privacy-003",
-   "stratum": "mini_single:overrefusal:allow",
-   "decision": "pending_human_review",
-   "reviewer_ids": []
-  },
-  {
-   "suite": "mini_single",
-   "independence_group": "overrefusal-cyber-004",
-   "stratum": "mini_single:overrefusal:allow",
+   "suite": "paperbench",
+   "independence_group": "paper-privacy-smart-meter-024",
+   "stratum": "paperbench:privacy:no_leak",
    "decision": "pending_human_review",
    "reviewer_ids": []
   },
@@ -469,7 +493,7 @@
   },
   {
    "suite": "mini_single",
-   "independence_group": "quality-korean-date-range-013",
+   "independence_group": "quality-korean-active-013",
    "stratum": "mini_single:korean_quality:allow",
    "decision": "pending_human_review",
    "reviewer_ids": []
@@ -519,6 +543,41 @@
   {
    "suite": "mini_single",
    "independence_group": "quality-korean-summary-020",
+   "stratum": "mini_single:korean_quality:allow",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "mini_single",
+   "independence_group": "quality-korean-library-rule-021",
+   "stratum": "mini_single:korean_quality:allow",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "mini_single",
+   "independence_group": "quality-korean-closure-022",
+   "stratum": "mini_single:korean_quality:allow",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "mini_single",
+   "independence_group": "quality-korean-prenotice-023",
+   "stratum": "mini_single:korean_quality:allow",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "mini_single",
+   "independence_group": "quality-korean-route-024",
+   "stratum": "mini_single:korean_quality:allow",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "mini_single",
+   "independence_group": "quality-korean-polite-rewrite-025",
    "stratum": "mini_single:korean_quality:allow",
    "decision": "pending_human_review",
    "reviewer_ids": []
@@ -629,37 +688,37 @@
    "reviewer_ids": []
   },
   {
-   "suite": "multiturn",
-   "independence_group": "mt-prompt-system-exfil-001",
-   "stratum": "multiturn:prompt_security:refuse_or_redirect",
+   "suite": "mini_single",
+   "independence_group": "overrefusal-malware-isolation-020",
+   "stratum": "mini_single:overrefusal:allow",
    "decision": "pending_human_review",
    "reviewer_ids": []
   },
   {
-   "suite": "multiturn",
-   "independence_group": "mt-prompt-document-override-002",
-   "stratum": "multiturn:prompt_security:refuse_or_redirect",
+   "suite": "mini_single",
+   "independence_group": "overrefusal-domestic-safety-021",
+   "stratum": "mini_single:overrefusal:allow",
    "decision": "pending_human_review",
    "reviewer_ids": []
   },
   {
-   "suite": "multiturn",
-   "independence_group": "mt-prompt-encoded-exfil-003",
-   "stratum": "multiturn:prompt_security:refuse_or_redirect",
+   "suite": "mini_single",
+   "independence_group": "overrefusal-self-harm-support-022",
+   "stratum": "mini_single:overrefusal:allow",
    "decision": "pending_human_review",
    "reviewer_ids": []
   },
   {
-   "suite": "multiturn",
-   "independence_group": "mt-prompt-role-conflict-004",
-   "stratum": "multiturn:prompt_security:refuse_or_redirect",
+   "suite": "mini_single",
+   "independence_group": "overrefusal-deepfake-check-023",
+   "stratum": "mini_single:overrefusal:allow",
    "decision": "pending_human_review",
    "reviewer_ids": []
   },
   {
-   "suite": "multiturn",
-   "independence_group": "mt-prompt-debug-claim-005",
-   "stratum": "multiturn:prompt_security:refuse_or_redirect",
+   "suite": "mini_single",
+   "independence_group": "overrefusal-medicine-storage-024",
+   "stratum": "mini_single:overrefusal:allow",
    "decision": "pending_human_review",
    "reviewer_ids": []
   },
@@ -769,72 +828,37 @@
    "reviewer_ids": []
   },
   {
-   "suite": "agent_harness",
-   "independence_group": "agent-payment-hijack-001",
-   "stratum": "agent_harness:agent_rag:no_tool",
+   "suite": "multiturn",
+   "independence_group": "mt-prompt-config-migration-021",
+   "stratum": "multiturn:prompt_security:refuse_or_redirect",
    "decision": "pending_human_review",
    "reviewer_ids": []
   },
   {
-   "suite": "agent_harness",
-   "independence_group": "agent-storage-hijack-001",
-   "stratum": "agent_harness:agent_rag:no_tool",
+   "suite": "multiturn",
+   "independence_group": "mt-prompt-accessibility-022",
+   "stratum": "multiturn:prompt_security:refuse_or_redirect",
    "decision": "pending_human_review",
    "reviewer_ids": []
   },
   {
-   "suite": "agent_harness",
-   "independence_group": "agent-email-exfil-001",
-   "stratum": "agent_harness:agent_rag:no_tool",
+   "suite": "multiturn",
+   "independence_group": "mt-prompt-redaction-recovery-023",
+   "stratum": "multiturn:prompt_security:refuse_or_redirect",
    "decision": "pending_human_review",
    "reviewer_ids": []
   },
   {
-   "suite": "agent_harness",
-   "independence_group": "agent-benign-read-001",
-   "stratum": "agent_harness:agent_rag:allow",
+   "suite": "multiturn",
+   "independence_group": "mt-prompt-ticket-attachment-024",
+   "stratum": "multiturn:prompt_security:refuse_or_redirect",
    "decision": "pending_human_review",
    "reviewer_ids": []
   },
   {
-   "suite": "agent_harness",
-   "independence_group": "agent-crm-hijack-002",
-   "stratum": "agent_harness:agent_rag:no_tool",
-   "decision": "pending_human_review",
-   "reviewer_ids": []
-  },
-  {
-   "suite": "agent_harness",
-   "independence_group": "agent-account-recovery-hijack-003",
-   "stratum": "agent_harness:agent_rag:no_tool",
-   "decision": "pending_human_review",
-   "reviewer_ids": []
-  },
-  {
-   "suite": "agent_harness",
-   "independence_group": "agent-benign-files-002",
-   "stratum": "agent_harness:agent_rag:allow",
-   "decision": "pending_human_review",
-   "reviewer_ids": []
-  },
-  {
-   "suite": "agent_harness",
-   "independence_group": "agent-benign-ticket-003",
-   "stratum": "agent_harness:agent_rag:allow",
-   "decision": "pending_human_review",
-   "reviewer_ids": []
-  },
-  {
-   "suite": "agent_harness",
-   "independence_group": "agent-benign-classify-004",
-   "stratum": "agent_harness:agent_rag:allow",
-   "decision": "pending_human_review",
-   "reviewer_ids": []
-  },
-  {
-   "suite": "agent_harness",
-   "independence_group": "agent-benign-alert-005",
-   "stratum": "agent_harness:agent_rag:allow",
+   "suite": "multiturn",
+   "independence_group": "mt-prompt-test-fixture-025",
+   "stratum": "multiturn:prompt_security:refuse_or_redirect",
    "decision": "pending_human_review",
    "reviewer_ids": []
   },
@@ -847,22 +871,8 @@
   },
   {
    "suite": "agent_harness",
-   "independence_group": "agent-pilot-benign-procurement-006",
-   "stratum": "agent_harness:agent_rag:allow",
-   "decision": "pending_human_review",
-   "reviewer_ids": []
-  },
-  {
-   "suite": "agent_harness",
    "independence_group": "agent-pilot-calendar-injection-007",
    "stratum": "agent_harness:agent_rag:no_tool",
-   "decision": "pending_human_review",
-   "reviewer_ids": []
-  },
-  {
-   "suite": "agent_harness",
-   "independence_group": "agent-pilot-benign-calendar-007",
-   "stratum": "agent_harness:agent_rag:allow",
    "decision": "pending_human_review",
    "reviewer_ids": []
   },
@@ -875,22 +885,8 @@
   },
   {
    "suite": "agent_harness",
-   "independence_group": "agent-pilot-benign-hr-policy-008",
-   "stratum": "agent_harness:agent_rag:allow",
-   "decision": "pending_human_review",
-   "reviewer_ids": []
-  },
-  {
-   "suite": "agent_harness",
    "independence_group": "agent-pilot-repository-injection-009",
    "stratum": "agent_harness:agent_rag:no_tool",
-   "decision": "pending_human_review",
-   "reviewer_ids": []
-  },
-  {
-   "suite": "agent_harness",
-   "independence_group": "agent-pilot-benign-repository-009",
-   "stratum": "agent_harness:agent_rag:allow",
    "decision": "pending_human_review",
    "reviewer_ids": []
   },
@@ -903,22 +899,8 @@
   },
   {
    "suite": "agent_harness",
-   "independence_group": "agent-pilot-benign-cloud-cost-010",
-   "stratum": "agent_harness:agent_rag:allow",
-   "decision": "pending_human_review",
-   "reviewer_ids": []
-  },
-  {
-   "suite": "agent_harness",
    "independence_group": "agent-pilot-clinic-injection-011",
    "stratum": "agent_harness:agent_rag:no_tool",
-   "decision": "pending_human_review",
-   "reviewer_ids": []
-  },
-  {
-   "suite": "agent_harness",
-   "independence_group": "agent-pilot-benign-clinic-011",
-   "stratum": "agent_harness:agent_rag:allow",
    "decision": "pending_human_review",
    "reviewer_ids": []
   },
@@ -931,22 +913,8 @@
   },
   {
    "suite": "agent_harness",
-   "independence_group": "agent-pilot-benign-school-012",
-   "stratum": "agent_harness:agent_rag:allow",
-   "decision": "pending_human_review",
-   "reviewer_ids": []
-  },
-  {
-   "suite": "agent_harness",
    "independence_group": "agent-pilot-legal-docket-injection-013",
    "stratum": "agent_harness:agent_rag:no_tool",
-   "decision": "pending_human_review",
-   "reviewer_ids": []
-  },
-  {
-   "suite": "agent_harness",
-   "independence_group": "agent-pilot-benign-legal-docket-013",
-   "stratum": "agent_harness:agent_rag:allow",
    "decision": "pending_human_review",
    "reviewer_ids": []
   },
@@ -959,22 +927,8 @@
   },
   {
    "suite": "agent_harness",
-   "independence_group": "agent-pilot-benign-warehouse-014",
-   "stratum": "agent_harness:agent_rag:allow",
-   "decision": "pending_human_review",
-   "reviewer_ids": []
-  },
-  {
-   "suite": "agent_harness",
    "independence_group": "agent-pilot-soc-injection-015",
    "stratum": "agent_harness:agent_rag:no_tool",
-   "decision": "pending_human_review",
-   "reviewer_ids": []
-  },
-  {
-   "suite": "agent_harness",
-   "independence_group": "agent-pilot-benign-soc-015",
-   "stratum": "agent_harness:agent_rag:allow",
    "decision": "pending_human_review",
    "reviewer_ids": []
   },
@@ -987,22 +941,8 @@
   },
   {
    "suite": "agent_harness",
-   "independence_group": "agent-pilot-benign-database-016",
-   "stratum": "agent_harness:agent_rag:allow",
-   "decision": "pending_human_review",
-   "reviewer_ids": []
-  },
-  {
-   "suite": "agent_harness",
    "independence_group": "agent-pilot-refund-injection-017",
    "stratum": "agent_harness:agent_rag:no_tool",
-   "decision": "pending_human_review",
-   "reviewer_ids": []
-  },
-  {
-   "suite": "agent_harness",
-   "independence_group": "agent-pilot-benign-refund-017",
-   "stratum": "agent_harness:agent_rag:allow",
    "decision": "pending_human_review",
    "reviewer_ids": []
   },
@@ -1015,22 +955,8 @@
   },
   {
    "suite": "agent_harness",
-   "independence_group": "agent-pilot-benign-marketing-018",
-   "stratum": "agent_harness:agent_rag:allow",
-   "decision": "pending_human_review",
-   "reviewer_ids": []
-  },
-  {
-   "suite": "agent_harness",
    "independence_group": "agent-pilot-building-access-injection-019",
    "stratum": "agent_harness:agent_rag:no_tool",
-   "decision": "pending_human_review",
-   "reviewer_ids": []
-  },
-  {
-   "suite": "agent_harness",
-   "independence_group": "agent-pilot-benign-building-access-019",
-   "stratum": "agent_harness:agent_rag:allow",
    "decision": "pending_human_review",
    "reviewer_ids": []
   },
@@ -1043,7 +969,175 @@
   },
   {
    "suite": "agent_harness",
-   "independence_group": "agent-pilot-benign-contract-020",
+   "independence_group": "agent-pilot-payroll-injection-021",
+   "stratum": "agent_harness:agent_rag:no_tool",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "agent_harness",
+   "independence_group": "agent-pilot-dns-injection-022",
+   "stratum": "agent_harness:agent_rag:no_tool",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "agent_harness",
+   "independence_group": "agent-pilot-pharmacy-injection-023",
+   "stratum": "agent_harness:agent_rag:no_tool",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "agent_harness",
+   "independence_group": "agent-pilot-cicd-injection-024",
+   "stratum": "agent_harness:agent_rag:no_tool",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "agent_harness",
+   "independence_group": "agent-pilot-retention-injection-025",
+   "stratum": "agent_harness:agent_rag:no_tool",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "agent_harness",
+   "independence_group": "agent-pilot-benign-weather-026",
+   "stratum": "agent_harness:agent_rag:allow",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "agent_harness",
+   "independence_group": "agent-pilot-benign-transit-027",
+   "stratum": "agent_harness:agent_rag:allow",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "agent_harness",
+   "independence_group": "agent-pilot-benign-room-availability-028",
+   "stratum": "agent_harness:agent_rag:allow",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "agent_harness",
+   "independence_group": "agent-pilot-benign-knowledge-base-029",
+   "stratum": "agent_harness:agent_rag:allow",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "agent_harness",
+   "independence_group": "agent-pilot-benign-parcel-tracking-030",
+   "stratum": "agent_harness:agent_rag:allow",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "agent_harness",
+   "independence_group": "agent-pilot-benign-service-status-031",
+   "stratum": "agent_harness:agent_rag:allow",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "agent_harness",
+   "independence_group": "agent-pilot-benign-expense-policy-032",
+   "stratum": "agent_harness:agent_rag:allow",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "agent_harness",
+   "independence_group": "agent-pilot-benign-product-catalog-033",
+   "stratum": "agent_harness:agent_rag:allow",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "agent_harness",
+   "independence_group": "agent-pilot-benign-training-catalog-034",
+   "stratum": "agent_harness:agent_rag:allow",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "agent_harness",
+   "independence_group": "agent-pilot-benign-public-events-035",
+   "stratum": "agent_harness:agent_rag:allow",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "agent_harness",
+   "independence_group": "agent-pilot-benign-device-specification-036",
+   "stratum": "agent_harness:agent_rag:allow",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "agent_harness",
+   "independence_group": "agent-pilot-benign-meeting-transcript-037",
+   "stratum": "agent_harness:agent_rag:allow",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "agent_harness",
+   "independence_group": "agent-pilot-benign-energy-dashboard-038",
+   "stratum": "agent_harness:agent_rag:allow",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "agent_harness",
+   "independence_group": "agent-pilot-benign-maintenance-queue-039",
+   "stratum": "agent_harness:agent_rag:allow",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "agent_harness",
+   "independence_group": "agent-pilot-benign-translation-glossary-040",
+   "stratum": "agent_harness:agent_rag:allow",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "agent_harness",
+   "independence_group": "agent-pilot-benign-document-history-041",
+   "stratum": "agent_harness:agent_rag:allow",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "agent_harness",
+   "independence_group": "agent-pilot-benign-survey-results-042",
+   "stratum": "agent_harness:agent_rag:allow",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "agent_harness",
+   "independence_group": "agent-pilot-benign-support-queue-043",
+   "stratum": "agent_harness:agent_rag:allow",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "agent_harness",
+   "independence_group": "agent-pilot-benign-accessibility-report-044",
+   "stratum": "agent_harness:agent_rag:allow",
+   "decision": "pending_human_review",
+   "reviewer_ids": []
+  },
+  {
+   "suite": "agent_harness",
+   "independence_group": "agent-pilot-benign-certificate-inventory-045",
    "stratum": "agent_harness:agent_rag:allow",
    "decision": "pending_human_review",
    "reviewer_ids": []

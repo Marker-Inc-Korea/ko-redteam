@@ -11,8 +11,8 @@
 | 평가기 실행 | 준비 | 독립 Slurm serving 3회, endpoint error hard-fail, artifact digest, hardened container | 내부 RC 허용 |
 | 공개 image 승격 | 미완료 | nonroot·read-only 실행 통과, base digest 고정; CVE scan·SBOM 보존·서명 증거 없음 | registry production channel 금지 |
 | 공개 practice 데이터 | 준비 | schema·coverage·privacy audit 통과 | 개발·연구 진단만 허용 |
-| 후속 practice 사람 검토 | 미완료 | draft가 `pending_human_review`, reviewer 0명 | pilot 시작 금지 |
-| 파일럿 분산 정밀도 | 실패 | 7개 층 각각 5그룹, 사전 기준은 층별 20그룹 | 공식 split 설계 금지 |
+| 후속 practice 사람 검토 | 미완료 | 7개 층 x 20개 전량 신규 초안, exact 5종 중복 0·BGE-M3 0.85 이상 0쌍; reviewer 0명 | pilot 등록·anchor 실행 금지 |
+| 파일럿 분산 정밀도 | 실패 | 이전 실행은 층별 5그룹; 새 층별 20그룹 초안은 미검토·미실행이라 분산 증거 없음 | 공식 split 설계 금지 |
 | 다중비교 검정력 | 실패 | 현재 보수적 설계에서 최소 2모델 비교 필요량 796그룹, 기존 324그룹 | tier 주장 금지 |
 | hidden official split | 없음 | split audit·동결 artifact 없음 | 공식 평가 금지 |
 | 사람 라벨 calibration | 없음 | 300개·3명·expert 2명 기준을 만족하는 signed report 없음 | 자동 판정 공식 사용 금지 |
@@ -20,15 +20,16 @@
 | 독립 외부 검토 | 없음 | reviewer attestation·독립 기관 보고서 없음 | official 표현 금지 |
 | final release manifest | 없음 | `ko-redteam.leaderboard-release.v3` 없음 | 정적 publisher 실행 불가 |
 
-공개 benchmark audit의 `pass`는 JSON 계약과 문항 메타데이터가 유효하다는 뜻이다. 표본 대표성, 자동 판정의
-사람 일치도, hidden split 무오염성 또는 모델 간 통계적 분리를 증명하지 않는다. 현재 6모델 v6 결과도 공개
-practice 기반의 `internal_operational_candidate`이며 모델 안전 인증이 아니다.
+공개 benchmark audit의 `pass`는 JSON 계약과 문항 메타데이터가 유효하다는 뜻이다. 후속 초안의 exact audit과
+BGE-M3 진단도 이미 초안 개선에 사용된 설계 단계 screen이다. 표본 대표성, 의미적 독립성, 자동 판정의 사람
+일치도, hidden split 무오염성 또는 모델 간 통계적 분리를 증명하지 않는다. 현재 6모델 v6 결과도 공개 practice
+기반의 `internal_operational_candidate`이며 모델 안전 인증이 아니다.
 
 ## Evidence Required Before Publication
 
 1. Reference 출력에 blind인 실제 검토자 2명 이상이 successor practice 원형을 독립 검토하고 각자 서명한다.
 2. 검토가 동결된 clean commit에서 successor pilot을 사전등록한다.
-3. 7개 고정 stratum마다 최소 20개 독립 pilot group을 만들고 두 reference model을 새 Slurm serving으로 평가한다.
+3. 승인·동결된 7개 고정 stratum의 20개 독립 pilot group마다 두 reference model을 새 Slurm serving으로 평가한다.
 4. 관측 전 고정한 MDE·alpha·cohort에 대해 분산 상한, paired randomization 및 Holm family power를 다시 계산한다.
 5. 통과한 power-derived allocation과 immutable model cohort를 공식 prompt 작성 전에 사전등록한다.
 6. 공개 practice와 exact·semantic 중복이 0인 hidden official split을 만들고 두 독립 GPU embedding replay로 감사한다.

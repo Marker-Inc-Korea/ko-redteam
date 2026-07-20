@@ -4,7 +4,7 @@
 과잉거부, 한국어 응답 품질을 한 번에 점검하는 레드팀/포렌식 평가 도구입니다.
 
 > [!NOTE]
-> 현재 버전은 **0.2.0rc3 내부 운영 배포 후보**입니다. 평가기 배포 준비도와 3회 독립 Slurm 실행 증거는
+> 현재 버전은 **0.2.0rc4 내부 운영 배포 후보**입니다. 평가기 배포 준비도와 3회 독립 Slurm 실행 증거는
 > 검증할 수 있지만, 특정 모델의 안전 인증이나 공식 leaderboard 공개를 의미하지 않습니다.
 
 | 바로가기 | 목적 |
@@ -169,9 +169,15 @@ S1은 Agent transport 측정 오류로 무효화됐으며 영향과 수정 commi
 
 7개 target stratum을 각각 20개로 확장한 140개 독립 그룹 초안과
 [검토 packet](./governance/SUCCESSOR_PILOT_PRACTICE_REVIEW_DRAFT.md)을 공개합니다. 네 benchmark는 정적 schema,
-중복 ID, target allocation과 byte 재현성 검사를 통과했지만, 상태는 `machine_assisted_draft_pending_human_review`입니다.
+target allocation과 byte 재현성 검사를 통과했습니다. 과거 공개 non-pilot benchmark 6개·93개 record와 비교해
+case ID, independence group, 정규화 자연어, 전체 모델 입력과 평가 payload exact 중복이 모두 0이며, 등록 builder가
+이 값을 독립 재계산합니다. Agent의 `allow`와 `no_tool`은 같은 scenario를 별도 group으로 세지 않고 서로 다른
+업무·도구 원형 20개씩으로 구성했습니다. 다만 상태는 `machine_assisted_draft_pending_human_review`입니다.
+[BGE-M3 설계 단계 진단](./governance/SUCCESSOR_PILOT_SEMANTIC_DIAGNOSTIC_2026Q3.md)은 과거-후보와 후보 내부에서
+cosine 0.85 이상인 pair가 0개임을 두 Slurm GPU replay로 확인했지만, 초안 수정에 사용된 진단이므로 사람 검토를
+대체하지 않습니다.
 reference model 출력은 사용하지 않았으며 140개 행 모두 아직 `pending_human_review`입니다. 서로 다른 두 검토자가
-한국어 자연스러움, 기대행동, 중복과 실제 개인정보 포함 여부를 승인하고 최종 `practice-review.v2`와
+한국어 자연스러움, 기대행동, 의미상 근접 중복과 실제 개인정보 포함 여부를 승인하고 최종 `practice-review.v2`와
 `power-pilot-registration.v2`를 동결하기 전에는 anchor를 실행하거나 power·순위 근거로 사용하지 않습니다.
 [검수 workflow](./governance/PRACTICE_REVIEW_WORKFLOW.md)는 검토자별 blind packet, 빈 응답 template, 신원·소속
 attestation, reviewer가 직접 서명하는 Ed25519 commitment와 fail-closed 병합을 제공합니다. 서명은 제출물 무결성을

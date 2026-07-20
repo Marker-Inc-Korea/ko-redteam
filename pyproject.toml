@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ko-redteam"
-version = "0.2.0rc3"
+version = "0.2.0rc4"
 description = "Korean LLM redteam and forensics toolkit"
 readme = "README.md"
 requires-python = ">=3.10"

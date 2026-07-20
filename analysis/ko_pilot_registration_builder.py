@@ -1,11 +1,14 @@
 """Build a frozen power-pilot registration from committed review evidence."""
 from __future__ import annotations
 
+from collections import Counter
 from copy import deepcopy
 import hashlib
 import json
 from pathlib import Path
+import re
 from typing import Any
+import unicodedata
 
 try:
     from ko_benchmark_identity import benchmark_content_sha256
@@ -35,6 +38,26 @@ ANALYSIS_CODE_KEYS = {
     ),
 }
 EXPECTED_SOURCE_SCHEMAS = registration.REQUIRED_DESIGN_SOURCE_SCHEMAS
+HISTORICAL_INDEPENDENCE_SCHEMA = (
+    "ko-redteam.historical-exact-independence-audit.v1"
+)
+HISTORICAL_BENCHMARK_PATHS = (
+    "benchmarks/ko_llm_paperbench_v1.json",
+    "benchmarks/ko_llm_mini_v1.json",
+    "benchmarks/ko_llm_multiturn_v1.json",
+    "benchmarks/ko_llm_multiturn_v2.json",
+    "benchmarks/ko_llm_agent_harness_v1.json",
+    "benchmarks/ko_llm_agent_harness_v2.json",
+)
+PROMPT_NORMALIZATION = {
+    "version": "ko-redteam.prompt-normalization.v1",
+    "unicode": "NFKC",
+    "case": "casefold",
+    "zero_width": "remove U+200B-U+200F,U+2060,U+FEFF",
+    "whitespace": "collapse and strip",
+}
+ZERO_WIDTH_RE = re.compile(r"[\u200b-\u200f\u2060\ufeff]")
+WHITESPACE_RE = re.compile(r"\s+")
 
 
 def _file_sha256(path: Path) -> str:
@@ -106,6 +129,198 @@ def _verify_file_binding(
     return path, source
 
 
+def _canonical_sha256(value: Any) -> str:
+    canonical = json.dumps(
+        value,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return hashlib.sha256(canonical).hexdigest()
+
+
+def _normalize_prompt(value: str) -> str:
+    normalized = unicodedata.normalize("NFKC", value).casefold()
+    normalized = ZERO_WIDTH_RE.sub("", normalized)
+    return WHITESPACE_RE.sub(" ", normalized).strip()
+
+
+def _case_material(schema: str, case: dict[str, Any]) -> str:
+    if schema == "ko-redteam.benchmark.v1":
+        return str(case.get("prompt") or "")
+    if schema == "ko-redteam.multiturn-benchmark.v1":
+        turns = case.get("turns") if isinstance(case.get("turns"), list) else []
+        return "\n---\n".join(
+            str(turn.get("user") or "")
+            for turn in turns
+            if isinstance(turn, dict)
+        )
+    if schema == "ko-redteam.agent-harness.v1":
+        tools = case.get("tools") if isinstance(case.get("tools"), list) else []
+        return "\n---\n".join([
+            str(case.get("user_prompt") or ""),
+            str(case.get("untrusted_context") or ""),
+            json.dumps(tools, ensure_ascii=False, sort_keys=True),
+            json.dumps(
+                case.get("allowed_tools") or [],
+                ensure_ascii=False,
+                sort_keys=True,
+            ),
+            json.dumps(
+                case.get("denied_tools") or [],
+                ensure_ascii=False,
+                sort_keys=True,
+            ),
+            json.dumps(
+                case.get("required_tools") or [],
+                ensure_ascii=False,
+                sort_keys=True,
+            ),
+        ])
+    raise ValueError(f"unsupported benchmark schema: {schema}")
+
+
+def _case_text_material(schema: str, case: dict[str, Any]) -> str:
+    if schema == "ko-redteam.agent-harness.v1":
+        return "\n---\n".join([
+            str(case.get("user_prompt") or ""),
+            str(case.get("untrusted_context") or ""),
+        ])
+    return _case_material(schema, case)
+
+
+def _case_fingerprints(
+    schema: str,
+    case: dict[str, Any],
+) -> dict[str, str]:
+    case_id = str(case.get("id") or "").strip()
+    group = str(
+        case.get("independence_group")
+        or case.get("parent_id")
+        or case_id
+    ).strip()
+    material = _normalize_prompt(_case_material(schema, case))
+    text_material = _normalize_prompt(_case_text_material(schema, case))
+    if not case_id or not group or not material or not text_material:
+        raise ValueError("historical independence input contains an empty identity")
+    payload = {
+        key: value
+        for key, value in case.items()
+        if key not in {"id", "independence_group", "parent_id"}
+    }
+    return {
+        "case_id": case_id,
+        "independence_group": group,
+        "normalized_text_sha256": hashlib.sha256(
+            text_material.encode("utf-8")
+        ).hexdigest(),
+        "normalized_prompt_sha256": hashlib.sha256(
+            material.encode("utf-8")
+        ).hexdigest(),
+        "evaluation_payload_sha256": _canonical_sha256(payload),
+    }
+
+
+def _validate_historical_independence(
+    draft: dict[str, Any],
+    candidate_benchmarks: dict[str, tuple[str, dict[str, Any]]],
+    *,
+    project_root: Path,
+) -> dict[str, Any]:
+    keys = (
+        "case_id",
+        "independence_group",
+        "normalized_text_sha256",
+        "normalized_prompt_sha256",
+        "evaluation_payload_sha256",
+    )
+    historical_values: dict[str, list[str]] = {key: [] for key in keys}
+    historical_rows = []
+    historical_cases = 0
+    for relative in HISTORICAL_BENCHMARK_PATHS:
+        path, normalized = _project_file(
+            project_root,
+            relative,
+            f"historical benchmark {relative}",
+        )
+        benchmark = _load_object(path, f"historical benchmark {relative}")
+        schema = str(benchmark.get("schema") or "")
+        cases = benchmark.get("cases")
+        if not isinstance(cases, list):
+            raise ValueError(f"historical benchmark cases must be a list: {relative}")
+        historical_rows.append({
+            "path": normalized,
+            "sha256": _file_sha256(path),
+            "content_sha256": benchmark_content_sha256(benchmark),
+            "schema": schema,
+            "cases": len(cases),
+        })
+        historical_cases += len(cases)
+        for case in cases:
+            if not isinstance(case, dict):
+                raise ValueError(
+                    f"historical benchmark case must be an object: {relative}"
+                )
+            fingerprints = _case_fingerprints(schema, case)
+            for key in keys:
+                historical_values[key].append(fingerprints[key])
+
+    candidate_values: dict[str, list[str]] = {key: [] for key in keys}
+    candidate_rows = {}
+    candidate_cases = 0
+    for suite in ranking.OFFICIAL_SUITES:
+        relative, benchmark = candidate_benchmarks[suite]
+        schema = str(benchmark.get("schema") or "")
+        cases = benchmark.get("cases")
+        if not isinstance(cases, list):
+            raise ValueError(f"candidate benchmark cases must be a list: {suite}")
+        candidate_rows[suite] = {
+            "path": relative,
+            "content_sha256": benchmark_content_sha256(benchmark),
+            "cases": len(cases),
+        }
+        candidate_cases += len(cases)
+        for case in cases:
+            if not isinstance(case, dict):
+                raise ValueError(
+                    f"candidate benchmark case must be an object: {suite}"
+                )
+            fingerprints = _case_fingerprints(schema, case)
+            for key in keys:
+                candidate_values[key].append(fingerprints[key])
+
+    duplicate_counts = {
+        key: sum(1 for count in Counter(values).values() if count > 1)
+        for key, values in candidate_values.items()
+    }
+    overlap_counts = {
+        key: len(set(candidate_values[key]) & set(historical_values[key]))
+        for key in keys
+    }
+    if any(duplicate_counts.values()) or any(overlap_counts.values()):
+        raise ValueError(
+            "successor pilot historical independence failed: "
+            f"duplicates={duplicate_counts} overlaps={overlap_counts}"
+        )
+    rebuilt = {
+        "schema": HISTORICAL_INDEPENDENCE_SCHEMA,
+        "status": "pass",
+        "policy": "zero exact reuse against all public non-pilot benchmarks",
+        "normalization": PROMPT_NORMALIZATION,
+        "historical_benchmarks": historical_rows,
+        "historical_case_records": historical_cases,
+        "candidate_benchmarks": candidate_rows,
+        "candidate_case_records": candidate_cases,
+        "candidate_duplicate_counts": duplicate_counts,
+        "historical_overlap_counts": overlap_counts,
+    }
+    if draft.get("historical_independence_audit") != rebuilt:
+        raise ValueError(
+            "practice review draft historical independence audit does not reproduce"
+        )
+    return rebuilt
+
+
 def _reference_identity(value: dict[str, Any]) -> dict[str, Any]:
     return {
         key: value.get(key)
@@ -138,6 +353,7 @@ def registration_spec_source_paths(spec: dict[str, Any]) -> set[str]:
         REVIEW_MERGE_PATH,
         REVIEW_MERGE_ENTRYPOINT_PATH,
         REVIEW_WORKFLOW_PATH,
+        *HISTORICAL_BENCHMARK_PATHS,
     }
     for label, rows in (("design_sources", sources), ("benchmarks", benchmarks)):
         for name, raw in rows.items():
@@ -289,8 +505,9 @@ def validate_registration_spec(
         raise ValueError("spec benchmark bindings changed from review draft")
     if practice.get("target_strata") != draft.get("target_strata"):
         raise ValueError("spec target strata changed from review draft")
+    candidate_benchmarks: dict[str, tuple[str, dict[str, Any]]] = {}
     for suite, row in benchmark_artifacts.items():
-        benchmark_path, _ = _project_file(
+        benchmark_path, normalized_path = _project_file(
             root, row.get("path"), f"practice benchmark {suite}.path"
         )
         benchmark = _load_object(benchmark_path, f"practice benchmark {suite}")
@@ -300,6 +517,12 @@ def validate_registration_spec(
             or len(benchmark.get("cases") or []) != row.get("cases")
         ):
             raise ValueError(f"practice benchmark binding mismatch: {suite}")
+        candidate_benchmarks[suite] = (normalized_path, benchmark)
+    _validate_historical_independence(
+        draft,
+        candidate_benchmarks,
+        project_root=root,
+    )
 
     registration._execution(spec)
     statistics = deepcopy(

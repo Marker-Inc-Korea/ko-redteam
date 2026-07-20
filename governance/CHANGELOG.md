@@ -5,6 +5,11 @@
 
 ## Unreleased - Evidence-Eligible Ranking Protocol
 
+- successor 분산 파일럿 초안에서 과거 실행 문항을 층별 5개씩 재사용하던 35개를 제거하고, 140개 전체를
+  과거 미관측 원형으로 교체한다. 공개 non-pilot benchmark 6개·93개 record에 대해 case ID, independence
+  group, 정규화 자연어, 전체 모델 입력과 식별자를 제외한 평가 payload의 exact 중복을 생성기와 등록 builder가
+  각각 재계산해 하나라도 겹치면 중단한다. 동일 업무를 공유하면서 별도 group으로 계산하던 Agent allow/no-tool
+  20쌍도 서로 다른 업무·도구 원형으로 분리해 의사반복을 제거한다.
 - 공개 snapshot의 checksum을 신뢰하지 않고 copied release의 외부검토 서명·publication gate·ranking을 다시
   실행한 뒤 audit·metadata JSON·HTML을 canonical byte로 재생성하는 독립 verifier를 추가한다. Publisher는 이
   재생에 필요한 raw-free suite report와 execution evidence만 manifest 기준 경로로 포함하며 checksum 동시 변조,

@@ -20,7 +20,9 @@
 ## Required Order
 
 1. 공개 practice의 7개 target stratum마다 최소 20개 독립 group을 준비하고 machine-assisted draft 여부를
-   공개한다. reference 출력에 blind한 검토자 2명 이상이 각 사례를 승인해야 한다.
+   공개한다. 과거 공개 benchmark와 ID·group·정규화 자연어·전체 입력·평가 payload exact 중복이 0인지 독립
+   재계산하고, 같은 업무를 공유하는 변형을 별도 group으로 세지 않는다. reference 출력에 blind한 검토자 2명
+   이상이 의미상 근접 중복을 포함해 각 사례를 승인해야 한다.
 2. protocol commit, benchmark fingerprint, 정확한 upper/lower immutable revision, generation settings,
    execution evidence 계약, MDE, alpha, target power와 분산·다중비교 방법을 `power-pilot-registration.v2`로
    동결한다.
