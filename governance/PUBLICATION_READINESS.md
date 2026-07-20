@@ -9,22 +9,26 @@
 | 영역 | 상태 | 현재 증거 | 판정 |
 |---|---|---|---|
 | 평가기 실행 | 준비 | 독립 Slurm serving 3회, endpoint error hard-fail, artifact digest, hardened container | 내부 RC 허용 |
+| 과거 6모델 증거 호환성 | 실패 | multiturn report v1 18개, task metric availability 불일치 66건 | 순위·등급·tier 재사용 금지 |
 | 공개 image 승격 | 미완료 | nonroot·read-only 실행 통과, base digest 고정; CVE scan·SBOM 보존·서명 증거 없음 | registry production channel 금지 |
 | 공개 practice 데이터 | 준비 | schema·coverage·privacy audit 통과 | 개발·연구 진단만 허용 |
 | 후속 practice 사람 검토 | 미완료 | 7개 층 x 20개 전량 신규 초안, exact 5종 중복 0·BGE-M3 0.85 이상 0쌍, 등록·GPU Slurm preflight gate 구현; reviewer 0명 | pilot 등록·anchor 실행 금지 |
 | 파일럿 분산 정밀도 | 실패 | 이전 실행은 층별 5그룹; 새 층별 20그룹 초안은 미검토·미실행이라 분산 증거 없음 | 공식 split 설계 금지 |
 | 다중비교 검정력 | 실패 | 현재 보수적 설계에서 최소 2모델 비교 필요량 796그룹, 기존 324그룹 | tier 주장 금지 |
-| 순위 통계 게이트 | 준비 | manifest v6는 balanced Holm 유의성과 safety·utility 방향 일관성을 모두 요구 | 실제 hidden cohort 없이는 tier 주장 금지 |
+| 순위 통계 게이트 | 준비 | canonical builder와 manifest v7은 배열 순서 불변 계산, balanced Holm 유의성, safety·utility 방향 일관성을 요구 | 실제 hidden cohort 없이는 tier 주장 금지 |
 | hidden official split | 없음 | split audit·동결 artifact 없음 | 공식 평가 금지 |
 | 사람 라벨 calibration | 없음 | 300개·3명·expert 2명 기준을 만족하는 signed report 없음 | 자동 판정 공식 사용 금지 |
-| official model cohort | 없음 | v6 ranking manifest와 official report 없음 | 현재 모델 순위 게시 금지 |
+| official model cohort | 없음 | v7 ranking manifest와 official report 없음 | 현재 모델 순위 게시 금지 |
 | 독립 외부 검토 | 없음 | reviewer attestation·독립 기관 보고서 없음 | official 표현 금지 |
 | final release manifest | 없음 | `ko-redteam.leaderboard-release.v3` 없음 | 정적 publisher 실행 불가 |
 
 공개 benchmark audit의 `pass`는 JSON 계약과 문항 메타데이터가 유효하다는 뜻이다. 후속 초안의 exact audit과
 BGE-M3 진단도 이미 초안 개선에 사용된 설계 단계 screen이다. 표본 대표성, 의미적 독립성, 자동 판정의 사람
 일치도, hidden split 무오염성 또는 모델 간 통계적 분리를 증명하지 않는다. 현재 6모델 v6 결과도 공개 practice
-기반의 `internal_operational_candidate`이며 모델 안전 인증이 아니다.
+기반의 과거 진단이며, rc7 재감사에서 멀티턴 report 계약과 task metric 적용 범위가 현재 방식에 맞지 않아
+`not_ready`로 강등됐다. 자세한 근거는
+[`INTERNAL_SIX_MODEL_EVIDENCE_COMPATIBILITY_2026Q3.md`](./INTERNAL_SIX_MODEL_EVIDENCE_COMPATIBILITY_2026Q3.md)에
+기록한다.
 
 ## Evidence Required Before Publication
 
@@ -38,7 +42,7 @@ BGE-M3 진단도 이미 초안 개선에 사용된 설계 단계 screen이다. �
 5. 통과한 power-derived allocation과 immutable model cohort를 공식 prompt 작성 전에 사전등록한다.
 6. 공개 practice와 exact·semantic 중복이 0인 hidden official split을 만들고 두 독립 GPU embedding replay로 감사한다.
 7. 최소 300개 held-out 응답을 3명 이상이 blind labeling하고, expert 2명 이상이 불일치를 독립 adjudication한다.
-8. 동결 cohort를 모델별 최소 3개 독립 Slurm serving에서 실행하고 v5 ranking manifest로 결합한다.
+8. 동결 cohort를 모델별 최소 3개 독립 Slurm serving에서 실행하고 canonical builder로 v7 ranking manifest를 결합한다.
 9. 두 외부 검토자와 한 독립 기관이 calibration, split, 통계, 개인정보 보호와 이해상충을 검토·서명한다.
 10. 최종 validator가 `publishable`을 반환한 manifest만 `ko-redteam-publish-leaderboard`로 공개 snapshot을 만들고,
     별도 환경에서 `ko-redteam-verify-publication`을 통과시킨다.

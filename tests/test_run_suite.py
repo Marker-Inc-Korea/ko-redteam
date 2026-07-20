@@ -341,7 +341,7 @@ def test_run_suite_multiturn_and_agent_harness_join_doctor_gate(tmp_path):
     assert gate["summary"]["reports"] == 3
     assert (out_dir / "multiturn_report.md").exists()
     assert (out_dir / "agent_harness_report.md").exists()
-    assert multiturn_report["schema"] == "ko-redteam.multiturn-benchmark-report.v1"
+    assert multiturn_report["schema"] == "ko-redteam.multiturn-benchmark-report.v2"
     assert agent_report["schema"] == "ko-redteam.agent-harness-report.v1"
     assert "Multiturn Benchmark" in suite_md
     assert "Agent Harness" in suite_md

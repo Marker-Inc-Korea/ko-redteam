@@ -296,7 +296,7 @@ def build_power_pilot_input(
     manifest_path = Path(ranking_manifest_path).resolve()
     manifest, runs_by_model, suites = ranking.load_ranking_manifest(manifest_path)
     if manifest.get("schema") not in ranking.POWER_PILOT_RANKING_MANIFEST_SCHEMAS:
-        raise ValueError("power pilot requires a v2-v5 hashed ranking manifest")
+        raise ValueError("power pilot requires a supported hashed ranking manifest")
     if suites != ranking.OFFICIAL_SUITES:
         raise ValueError("power pilot requires all four official suites")
     if (
@@ -309,7 +309,7 @@ def build_power_pilot_input(
         }
     ):
         raise ValueError(
-            "v4-v5 power pilots require season preregistration v2-v3 or a frozen pilot registration"
+            "separated-ranking power pilots require season preregistration v2-v3 or a frozen pilot registration"
         )
     for model_name, runs in runs_by_model.items():
         for run_index, run in enumerate(runs, 1):

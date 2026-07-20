@@ -21,7 +21,7 @@ from ko_model_ranking import (  # noqa: E402
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "manifest", help="ko-redteam.ranking-manifest.v1/v2/v3/v4/v5/v6 JSON"
+        "manifest", help="ko-redteam.ranking-manifest.v1/v2/v3/v4/v5/v6/v7 JSON"
     )
     parser.add_argument("--iterations", type=int, default=10_000)
     parser.add_argument("--seed", type=int, default=20260713)

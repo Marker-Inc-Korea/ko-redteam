@@ -5,6 +5,16 @@
 
 ## Unreleased - Evidence-Eligible Ranking Protocol
 
+- 멀티턴 개인정보 시나리오에서 prior disclosure를 보안 판정으로 선택할 때 final response contract가 유실되던
+  결함을 수정한다. multiturn report v2는 security/task 평가 턴을 분리하고, ranking manifest v7은 v2 schema와
+  반복·모델 간 task metric availability 정합성을 요구한다. paired randomization 호환성은 10,000회 bootstrap
+  전에 모델·suite·group·metric 문맥과 함께 fail-closed로 검사한다. 기존 6모델 v1 evidence는 수정하지 않고
+  `incompatible_not_rankable`로 기록한다.
+- 표준 `core/single` Slurm run root에서 report·execution evidence digest를 자동 고정하고 현재 loader를 replay하는
+  canonical ranking-manifest builder와 builder·loader·multiturn report contract code-bound metadata-only build
+  audit을 추가한다. 새 manifest v7, policy v4,
+  model-ranking v6는 model, run, case 배열 순서에 영향을 받지 않으며 동등 artifact·seed의 통계 결과가 같아야
+  한다. v6/policy v3/model-ranking v5 계산 계약은 과거 재현용으로 유지한다.
 - 공식 ranking 계약을 manifest v6, policy v3, model-ranking v5로 승격한다. Balanced profile의 Holm 보정
   sign-flip 검정이 유의하더라도 safety 또는 utility sensitivity profile의 관측 차이가 양수가 아니거나
   paired-bootstrap 방향 확률이 50%를 초과하지 않으면 tier 경계를 차단한다. 과거 v5/policy v2/model-ranking v4는

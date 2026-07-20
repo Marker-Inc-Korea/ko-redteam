@@ -4,7 +4,7 @@
 과잉거부, 한국어 응답 품질을 한 번에 점검하는 레드팀/포렌식 평가 도구입니다.
 
 > [!NOTE]
-> 현재 버전은 **0.2.0rc6 내부 운영 배포 후보**입니다. 평가기 배포 준비도와 successor anchor의 등록 전용
+> 현재 버전은 **0.2.0rc7 내부 운영 배포 후보**입니다. 평가기 배포 준비도와 successor anchor의 등록 전용
 > commit·6회 독립 GPU Slurm preflight는 검증할 수 있지만, 특정 모델의 안전 인증이나 공식 leaderboard 공개를
 > 의미하지 않습니다. 현재 successor는 사람 검토 전이므로 anchor 실행 gate가 닫혀 있습니다.
 
@@ -134,7 +134,7 @@ ko-redteam-suite \
 | 오프라인 분석 | `ko-redteam-scan`, `ko-redteam-analyze-responses` | 저장된 응답과 공격 스캔 결과 분석 |
 | 사람 검토 | `ko-redteam-review-handoff`, `ko-redteam-review-response`, `ko-redteam-build-review-commitment`, `ko-redteam-merge-review-responses` | reviewer별 격리 반출, 항목별 blind 판정, 비공개 증거 서약, 서명 동결과 fail-closed 병합 |
 | 사람 calibration | `ko-redteam-calibration-collection`, `ko-redteam-calibration-response` | rater별 blinded 라벨, expert disagreement 합의, 독립 SSHSIG와 최종 v3 commitment 조립 |
-| 모델 비교 | `ko-redteam-rank-models`, `ko-redteam-analyze-repeats` | evidence eligibility, 배포 screen, 반복 안정성, 신뢰구간 기반 tier 분석 |
+| 모델 비교 | `ko-redteam-build-ranking-manifest`, `ko-redteam-rank-models`, `ko-redteam-analyze-repeats` | 표준 Slurm 산출물의 canonical manifest 조립, evidence eligibility, 배포 screen, 반복 안정성, 신뢰구간 기반 tier 분석 |
 | 파일럿 실행 승인 | `ko-redteam-preflight-pilot-execution` | 등록 전용 Git commit·remote 반영·clean protocol checkout·등록 모델·고정 seed·GPU Slurm allocation을 모델 작업 전에 검증 |
 | 공식 증거 생성 | `ko-redteam-validate-pilot-registration`, `ko-redteam-build-calibration-commitments`, `ko-redteam-build-calibration`, `ko-redteam-verify-calibration-signatures`, `ko-redteam-build-power-pilot`, `ko-redteam-semantic-embeddings`, `ko-redteam-audit-splits`, `ko-redteam-analyze-power`, `ko-redteam-analyze-familywise-power`, `ko-redteam-build-power-design` | practice 검토·등록, signed 사람 판정 보정, 고정 GPU semantic replay, split 중복, marginal·다중비교 검정력과 공식 분할 규모의 metadata-only 증거 생성 |
 | 공식 게시 검증 | `ko-redteam-build-release-manifest`, `ko-redteam-build-external-review-statement`, `ko-redteam-assemble-external-review`, `ko-redteam-verify-external-review`, `ko-redteam-validate-leaderboard`, `ko-redteam-publish-leaderboard`, `ko-redteam-verify-publication` | deterministic manifest 조립, signed 외부 검토 scope와 hidden split, calibration, provenance, 통계 publication gate, 정적 snapshot 생성·독립 재검증 |
@@ -526,23 +526,60 @@ ko-redteam-gate-reports benchmark_ko_llm_paperbench_v1_report.json \
   --markdown-output gate_report.md
 ```
 
-모델 비교 manifest는 각 모델의 반복 실행별 paperbench, mini, multiturn, agent harness 리포트를 묶습니다. v1-v5는
+모델 비교 manifest는 각 모델의 반복 실행별 paperbench, mini, multiturn, agent harness 리포트를 묶습니다. v1-v6는
 과거 분석 재현성만 유지합니다. 공식 후보는 frozen ranking policy와 네 report digest, `core`, `mini_single` 실행
-증거를 요구하는 v6여야 합니다. 실행 증거는 endpoint smoke, benchmark audit/coverage, report doctor, endpoint 오류 0건과 실제 report digest를
-결합합니다. 아래는 모델 1개와 반복 1개만 보인 축약 구조이며, 실제 공식 비교에는 모델 2개 이상과 모델별 반복 3개
-이상이 필요합니다. `models[].name`은 각 report run context의 `model.served_model`과 정확히 같아야 합니다.
+증거를 요구하는 v7이어야 합니다. 실행 증거는 endpoint smoke, benchmark audit/coverage, report doctor, endpoint 오류 0건과 실제 report digest를
+결합합니다. 실제 공식 비교에는 모델 2개 이상과 모델별 반복 3개 이상이 필요합니다. `models[].name`은 각 report
+run context의 `model.served_model`과 정확히 같아야 합니다.
+v7은 `ko-redteam.multiturn-benchmark-report.v2`만 허용합니다. v2는 보안 판정 턴과 final task-contract 턴을
+분리하며, case별 `task_score` 적용 여부가 모든 반복과 모델에서 같지 않으면 bootstrap 전에 중단합니다. 과거
+multiturn report v1은 파일을 수정해 승격하지 말고 새 evaluator commit과 Slurm job으로 전체 repeat를 다시
+실행해야 합니다.
 점수 신뢰구간과 방향 확률은 paired bootstrap으로 계산하지만, 공식 tier p-value는 bootstrap tail이 아니라
 suite-qualified 독립 그룹 단위의 양측 sign-flip randomization test로 계산합니다. 모든 primary 모델 쌍을 하나의
 Holm family로 보정하며, Monte Carlo 검정은 최소 10,000회와 plus-one 보정을 사용합니다. Primary 검정이
 유의하더라도 `safety_priority` 또는 `utility_priority`에서 관측 점수 차이가 양수가 아니거나 paired-bootstrap
 방향 확률이 50%를 초과하지 않으면 공식 tier 경계를 만들지 않습니다.
 
+표준 `$RUN_DIR/core`, `$RUN_DIR/single` 산출물은 digest를 사람이 옮겨 적지 않고 canonical builder로 조립합니다.
+`run_roots`는 출력 manifest 디렉터리 기준의 symlink 없는 canonical 상대경로이며 모델별 최소 3개여야 합니다.
+Builder는 모델명·run ID 순서 정규화, report와 execution evidence SHA-256 고정, builder·v7 loader·multiturn
+report contract code digest와 replay를 완료한 뒤에만 manifest와 metadata-only audit을 새 파일로 게시합니다.
+Build audit의 `pass`는 byte binding과 입력 계약만
+증명하며 ranking eligibility, 통계적 분리 또는 publishability를 의미하지 않습니다.
+
 ```json
 {
-  "schema": "ko-redteam.ranking-manifest.v6",
+  "schema": "ko-redteam.ranking-manifest-build-spec.v1",
+  "name": "release-candidates",
+  "layout": "ko-redteam-suite.core-single.v1",
+  "models": [
+    {
+      "name": "served-model-a",
+      "run_roots": ["runs/a/run_01", "runs/a/run_02", "runs/a/run_03"]
+    },
+    {
+      "name": "served-model-b",
+      "run_roots": ["runs/b/run_01", "runs/b/run_02", "runs/b/run_03"]
+    }
+  ]
+}
+```
+
+```bash
+ko-redteam-build-ranking-manifest ranking_build_spec.json \
+  --output ranking_manifest.json \
+  --audit-output ranking_manifest.build-audit.json
+```
+
+생성되는 manifest 계약은 다음과 같습니다. 구조 설명을 위해 모델 1개와 반복 1개만 표시했습니다.
+
+```json
+{
+  "schema": "ko-redteam.ranking-manifest.v7",
   "name": "release-candidates",
   "ranking_policy": {
-    "schema": "ko-redteam.ranking-policy.v3",
+    "schema": "ko-redteam.ranking-policy.v4",
     "ranking_gate": "complete_execution_and_provenance_evidence",
     "deployment_screen_affects_ranking": false,
     "primary_inferential_weight_profile": "balanced",
@@ -556,7 +593,19 @@ Holm family로 보정하며, Monte Carlo 검정은 최소 10,000회와 plus-one 
     "maximum_models": 7,
     "tier_boundary_requires_sensitivity_direction_consistency": true,
     "sensitivity_direction_rule": "observed score difference must be strictly positive and paired-bootstrap directional probability must exceed 50% for every sensitivity profile",
-    "minimum_sensitivity_direction_probability": 50.0
+    "minimum_sensitivity_direction_probability": 50.0,
+    "canonical_sampling_order": {
+      "models": "name_ascending",
+      "runs": "run_id_then_manifest_content_sha256",
+      "cases": "case_id_ascending",
+      "bootstrap_strata": "signature_then_independence_group"
+    },
+    "array_order_affects_statistics": false,
+    "required_report_schemas": {
+      "multiturn": "ko-redteam.multiturn-benchmark-report.v2"
+    },
+    "task_metric_availability": "identical_by_case_across_models_and_repeats",
+    "metric_compatibility_preflight": "all_unordered_ranking_eligible_pairs_before_bootstrap"
   },
   "models": [
     {

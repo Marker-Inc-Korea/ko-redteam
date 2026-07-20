@@ -497,6 +497,17 @@ def _audit_ranking(audit: _Audit, ranking: dict[str, Any], ranking_manifest: dic
         bool(SHA256_RE.fullmatch(str(method.get("analysis_code_sha256") or ""))),
         "ranking report must commit to the exact analysis implementation",
     )
+    audit.check(
+        "ranking.analysis_dependencies",
+        "artifact_integrity",
+        method.get("analysis_dependency_sha256")
+        == {
+            "multiturn_report_contract": _sha256_file(
+                Path(__file__).with_name("ko_multiturn_report.py")
+            )
+        },
+        "ranking report must commit to the corrected multiturn report contract",
+    )
     suite_case_counts = (
         method.get("suite_case_counts")
         if isinstance(method.get("suite_case_counts"), dict)
@@ -683,6 +694,15 @@ def _audit_ranking(audit: _Audit, ranking: dict[str, Any], ranking_manifest: dic
         )
         is True,
         "official tier boundaries must block pre-registered safety or utility direction reversals",
+    )
+    audit.check(
+        "ranking.canonical_sampling_order",
+        "statistics",
+        method.get("canonical_sampling_order")
+        == RANKING_POLICY["canonical_sampling_order"]
+        and method.get("array_order_affects_statistics") is False
+        and RANKING_POLICY.get("array_order_affects_statistics") is False,
+        "official statistics must be invariant to model, run, and case array ordering",
     )
     audit.check(
         "ranking.pairwise_test",

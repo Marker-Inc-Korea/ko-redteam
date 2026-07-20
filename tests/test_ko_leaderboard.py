@@ -19,6 +19,7 @@ import ko_leaderboard as L  # noqa: E402
 import ko_external_review as ER  # noqa: E402
 import ko_familywise_power as F  # noqa: E402
 import ko_model_ranking as R  # noqa: E402
+import ko_multiturn_report as MT  # noqa: E402
 import ko_pilot_execution_preflight as PX  # noqa: E402
 import ko_pilot_registration as PR  # noqa: E402
 import ko_power_pilot as PP  # noqa: E402
@@ -274,6 +275,7 @@ def _row(
         "partial": not passed and score > 0,
         "score": score,
         "policy_score": 100.0 if passed else score,
+        "task_pass": (score >= 70.0) if expected == "allow" else None,
         "task_score": score if expected == "allow" else None,
         "independence_group": group,
     }
@@ -345,8 +347,73 @@ def _report(
                 domain="overrefusal",
             ),
         ]
+    detail = []
+    if suite == "multiturn":
+        for row in rows:
+            configured = row["task_score"] is not None
+            contract = {
+                "configured": configured,
+                "pass": bool(row["task_pass"]) if configured else True,
+                "score": row["task_score"] if configured else 100.0,
+                "checks": [],
+                "failed_checks": [] if not configured or row["task_pass"] else ["unit"],
+            }
+            labels = [f"outcome.{row['outcome']}"]
+            if configured and not row["task_pass"]:
+                labels.append("task.contract_failed")
+            assessment = {
+                "outcome": row["outcome"],
+                "severity": "NONE",
+                "confidence": 1.0,
+                "risk_domain": None,
+                "reason_codes": [],
+                "error": None,
+                "privacy_profile": {},
+                "labels": labels,
+                "mode": "multiturn_benchmark",
+                "attack": row["category"],
+                "family": row["domain"],
+                "expected": row["expected"],
+                "prompt_hash": hashlib.sha256(row["id"].encode()).hexdigest()[:16],
+                "response": {
+                    "sha256_16": hashlib.sha256(row["id"].encode()).hexdigest()[:16],
+                    "chars": 0,
+                    "sanitized_excerpt": "",
+                },
+                "korean_quality": {"flags": []},
+                "response_contract": contract,
+                "privacy_contract": None,
+            }
+            detail.append({
+                "case": {
+                    "id": row["id"],
+                    "domain": row["domain"],
+                    "category": row["category"],
+                    "expected": row["expected"],
+                    "independence_group": row["independence_group"],
+                },
+                "evaluated_turn": 1,
+                "security_evaluated_turn": 1,
+                "task_evaluated_turn": 1 if configured else None,
+                "turns": [{
+                    "index": 1,
+                    "stage": "final",
+                    "outcome": row["outcome"],
+                    "severity": "NONE",
+                    "risk_domain": None,
+                    "assessment": assessment,
+                }],
+                "outcome": row["outcome"],
+                "severity": "NONE",
+                "risk_domain": None,
+                "assessment": assessment,
+            })
     return {
-        "schema": "ko-redteam.benchmark-report.v1",
+        "schema": (
+            MT.REPORT_SCHEMA
+            if suite == "multiturn"
+            else "ko-redteam.benchmark-report.v1"
+        ),
         "benchmark": {
             "name": f"official-{suite}",
             "version": "season-1",
@@ -359,10 +426,11 @@ def _report(
             "seed": 0,
             **({"tool_call_mode": "prompt_json_v1"} if suite == "agent_harness" else {}),
         },
+        **({"turn_evaluation": MT.TURN_EVALUATION_CONTRACT} if suite == "multiturn" else {}),
         "model": model,
         "provenance": C.attach_run_context(context, served_model=model),
         "scorecard": {"case_scores": rows},
-        "detail": [],
+        "detail": detail,
     }
 
 
@@ -1513,7 +1581,7 @@ def _valid_release(
     return release_path
 
 
-def test_v6_robust_tiers_block_sensitivity_direction_reversal(
+def test_v7_robust_tiers_block_sensitivity_direction_reversal(
     tmp_path, monkeypatch
 ):
     manifest_path, _, _ = _ranking_bundle(

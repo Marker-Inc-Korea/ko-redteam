@@ -6,9 +6,21 @@ from pathlib import Path
 import re
 from typing import Any
 
+try:
+    from ko_multiturn_report import (
+        REPORT_SCHEMA as MULTITURN_REPORT_SCHEMA,
+        multiturn_report_v2_errors,
+    )
+except ModuleNotFoundError:  # package import path
+    from .ko_multiturn_report import (
+        REPORT_SCHEMA as MULTITURN_REPORT_SCHEMA,
+        multiturn_report_v2_errors,
+    )
+
 PRIMARY_REPORT_SCHEMAS = {
     "ko-redteam.llm-forensics.v1",
     "ko-redteam.benchmark-report.v1",
+    MULTITURN_REPORT_SCHEMA,
     "ko-redteam.multiturn-benchmark-report.v1",
     "ko-redteam.agent-harness-report.v1",
     "ko-redteam.offline-benchmark-report.v1",
@@ -24,11 +36,15 @@ KNOWN_SCHEMAS = PRIMARY_REPORT_SCHEMAS | {
     "ko-redteam.benchmark-audit.v1",
     "ko-redteam.report-doctor.v1",
     "ko-redteam.research-inference-notice.v1",
+    "ko-redteam.model-ranking.v6",
     "ko-redteam.model-ranking.v5",
     "ko-redteam.model-ranking.v4",
     "ko-redteam.model-ranking.v3",
     "ko-redteam.model-ranking.v2",
     "ko-redteam.model-ranking.v1",
+    "ko-redteam.ranking-manifest-build-audit.v1",
+    "ko-redteam.ranking-manifest-build-spec.v1",
+    "ko-redteam.ranking-manifest.v7",
     "ko-redteam.ranking-manifest.v6",
     "ko-redteam.ranking-manifest.v5",
     "ko-redteam.ranking-manifest.v4",
@@ -255,6 +271,16 @@ def doctor_json_report(path: str | Path, *, allow_raw: bool = False) -> dict[str
     issues.extend(_check_json_privacy(data, path=str(p), allow_raw=allow_raw))
     if schema in PRIMARY_REPORT_SCHEMAS:
         issues.extend(_check_primary_report(data, path=str(p)))
+    if schema == MULTITURN_REPORT_SCHEMA:
+        issues.extend(
+            _issue(
+                "error",
+                "multiturn_contract",
+                error,
+                path=str(p),
+            )
+            for error in multiturn_report_v2_errors(data)
+        )
     return _file_result(str(p), "json", schema, issues)
 
 

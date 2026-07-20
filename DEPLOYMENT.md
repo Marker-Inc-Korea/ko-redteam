@@ -1,6 +1,6 @@
 # ko-redteam Deployment Guide
 
-이 문서는 `0.2.0rc6` 내부 운영 배포 후보의 실행 계약을 정의합니다. 이 단계는 평가기 자체의
+이 문서는 `0.2.0rc7` 내부 운영 배포 후보의 실행 계약을 정의합니다. 이 단계는 평가기 자체의
 재현성, 산출물 무결성, endpoint 오류 처리를 검증합니다. 특정 모델의 안전 인증이나 공식 순위 공개를
 의미하지 않습니다.
 
@@ -27,12 +27,12 @@ successor power pilot은 일반 배포 검증보다 강한 등록·Git publicati
 UID/GID `10001`입니다. Dockerfile의 `python:3.12-slim` base는 manifest digest로 고정합니다.
 
 ```bash
-docker build --target runtime -t ko-redteam:0.2.0rc6 .
+docker build --target runtime -t ko-redteam:0.2.0rc7 .
 docker run --rm --read-only \
   --tmpfs /tmp:rw,noexec,nosuid,size=64m \
   --cap-drop ALL \
   --security-opt no-new-privileges \
-  ko-redteam:0.2.0rc6
+  ko-redteam:0.2.0rc7
 ```
 
 이미지는 model server를 포함하지 않습니다. 실제 평가는 report 출력용 writable volume과 Slurm job 안에서
@@ -120,6 +120,7 @@ validator는 다음 조건을 fail-closed로 확인합니다.
 - 동일한 immutable model/runtime/prompting/generation 계약
 - 각 repeat의 `core_v1`과 `single_v1` 실행 짝
 - paperbench expanded, multiturn v2, Agent v2, mini v1의 evaluator-local fingerprint
+- 보안 판정 턴과 final task-contract 턴을 분리한 multiturn report v2
 - manifest, execution evidence, report SHA-256 연결
 - coverage, endpoint smoke, measurement integrity, strict report doctor 통과
 - 모든 report의 endpoint error 0건과 provenance 일치
@@ -128,8 +129,25 @@ validator는 다음 조건을 fail-closed로 확인합니다.
 모델 안전 인증이나 공식 publishability 판단에는 사용하지 않습니다. 외부 검토는 현재 scope에서 제외되어
 있으므로 공식 leaderboard 또는 제3자 검증 완료를 주장할 수 없습니다.
 
+두 모델 이상을 비교할 때는 report 경로와 digest를 수동으로 작성하지 않습니다. 모든 모델의 표준
+`core/single` run root를 `ko-redteam.ranking-manifest-build-spec.v1`에 모델별 최소 3개 등록하고 다음 명령으로
+canonical v7 manifest를 생성합니다.
+
+```bash
+ko-redteam-build-ranking-manifest ranking_build_spec.json \
+  --output ranking_manifest.json \
+  --audit-output ranking_manifest.build-audit.json
+```
+
+Builder는 canonical 상대경로와 symlink 금지, 모델명·run ID 전역 유일성, report/evidence digest와 전체 loader
+계약을 검증합니다. v7은 multiturn report v2와 case별 task metric 적용 범위의 반복·모델 간 일치를 요구합니다.
+기존 출력 파일은 덮어쓰지 않으며 audit에는 원문 prompt·response를 넣지 않습니다. Build
+`pass`는 ranking eligibility나 모델 간 분리, 공식 게시 가능성을 판정하지 않습니다.
+
 ## Failure Handling
 
 실패한 repeat의 vLLM process를 재사용하지 않습니다. 원인을 수정한 뒤 새 Slurm job, 새 serving session,
 새 run ID로 해당 repeat 전체의 core/single suite를 다시 실행합니다. report 파일이나 manifest를 수동으로
 수정하면 execution evidence hash 검증이 실패합니다.
+특히 multiturn report v1은 v2로 변환하거나 task score를 사후 대입하지 않습니다. 새 evaluator commit으로
+전체 repeat를 재실행해야 합니다.

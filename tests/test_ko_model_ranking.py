@@ -69,6 +69,50 @@ def test_paired_sign_flip_monte_carlo_is_seeded_and_plus_one_corrected():
     )
 
 
+def test_paired_metric_preflight_stops_before_bootstrap(tmp_path, monkeypatch):
+    source_manifest = _manifest(tmp_path, [
+        _add_model(tmp_path, "model-a", scores=[90.0, 90.0, 90.0]),
+        _add_model(tmp_path, "model-b", scores=[80.0, 80.0, 80.0]),
+    ])
+    _, runs_by_model, suites = R.load_ranking_manifest(source_manifest)
+    for run in runs_by_model["model-b"]:
+        run["multiturn"]["multiturn-allow"]["task_score"] = None
+
+    monkeypatch.setattr(
+        R,
+        "load_ranking_manifest",
+        lambda _: (
+            {
+                "schema": R.RANKING_MANIFEST_SCHEMA,
+                "ranking_policy": R.RANKING_POLICY,
+            },
+            runs_by_model,
+            suites,
+        ),
+    )
+    monkeypatch.setattr(
+        R,
+        "_ranking_eligibility",
+        lambda *args, **kwargs: ("eligible", []),
+    )
+    monkeypatch.setattr(
+        R,
+        "_sample_groups",
+        lambda *args, **kwargs: pytest.fail("bootstrap ran before metric preflight"),
+    )
+
+    with pytest.raises(ValueError) as captured:
+        R.analyze_ranking_manifest(source_manifest, iterations=100)
+
+    message = str(captured.value)
+    assert "paired randomization preflight failed" in message
+    assert "left_model='model-a'" in message
+    assert "right_model='model-b'" in message
+    assert "suite='multiturn'" in message
+    assert "independence_group='multiturn-allow'" in message
+    assert "metric='task_score'" in message
+
+
 def test_current_policy_separates_ranking_evidence_from_deployment_screen():
     summary = {
         "endpoint_errors": 0,
@@ -102,7 +146,7 @@ def test_current_policy_separates_ranking_evidence_from_deployment_screen():
     assert deployment_reasons == ["critical_safety_failure", "privacy_failure"]
 
 
-def test_v6_manifest_requires_frozen_policy_and_model_cap(tmp_path):
+def test_v7_manifest_requires_frozen_policy_and_model_cap(tmp_path):
     path = tmp_path / "ranking_manifest.json"
     path.write_text(
         json.dumps({
@@ -123,6 +167,32 @@ def test_v6_manifest_requires_frozen_policy_and_model_cap(tmp_path):
         "utf-8",
     )
     with pytest.raises(ValueError, match="maximum model count"):
+        R.load_ranking_manifest(path)
+
+
+def test_v6_manifest_preserves_policy_v3_contract(tmp_path):
+    path = tmp_path / "ranking_manifest.json"
+    models = [{"name": "model-a", "runs": []}, {"name": "model-b", "runs": []}]
+    path.write_text(
+        json.dumps({
+            "schema": R.RANKING_MANIFEST_V6_SCHEMA,
+            "ranking_policy": R.RANKING_POLICY,
+            "models": models,
+        }),
+        "utf-8",
+    )
+    with pytest.raises(ValueError, match="freeze its canonical ranking policy"):
+        R.load_ranking_manifest(path)
+
+    path.write_text(
+        json.dumps({
+            "schema": R.RANKING_MANIFEST_V6_SCHEMA,
+            "ranking_policy": R.RANKING_POLICY_V3,
+            "models": models,
+        }),
+        "utf-8",
+    )
+    with pytest.raises(ValueError, match="non-empty runs"):
         R.load_ranking_manifest(path)
 
 
@@ -305,6 +375,41 @@ def _manifest(tmp_path: Path, models: list[dict]) -> Path:
     return path
 
 
+def test_v7_task_metric_availability_must_align_within_and_across_models(
+    tmp_path,
+):
+    source_manifest = _manifest(tmp_path, [
+        _add_model(tmp_path, "model-a", scores=[90.0, 90.0, 90.0]),
+        _add_model(tmp_path, "model-b", scores=[80.0, 80.0, 80.0]),
+    ])
+    _, runs_by_model, suites = R.load_ranking_manifest(source_manifest)
+    runs_by_model["model-a"][1]["multiturn"]["multiturn-allow"][
+        "task_score"
+    ] = None
+
+    with pytest.raises(ValueError, match="availability mismatch within"):
+        R._validate_case_alignment(
+            runs_by_model,
+            suites,
+            require_disjoint_suite_groups=False,
+            require_aligned_task_availability=True,
+        )
+
+    runs_by_model["model-a"][1]["multiturn"]["multiturn-allow"][
+        "task_score"
+    ] = 90.0
+    for run in runs_by_model["model-b"]:
+        run["multiturn"]["multiturn-allow"]["task_score"] = None
+
+    with pytest.raises(ValueError, match="availability mismatch across models"):
+        R._validate_case_alignment(
+            runs_by_model,
+            suites,
+            require_disjoint_suite_groups=False,
+            require_aligned_task_availability=True,
+        )
+
+
 def test_v4_analysis_replays_the_model_ranking_v3_contract(
     tmp_path, monkeypatch
 ):
@@ -333,6 +438,34 @@ def test_v4_analysis_replays_the_model_ranking_v3_contract(
     markdown = R.render_model_ranking_markdown(result)
     assert "Korean LLM Security and Reliability Tiers" in markdown
     assert "## Privacy" in markdown
+
+
+def test_v6_analysis_replays_the_model_ranking_v5_contract(
+    tmp_path, monkeypatch
+):
+    source_manifest = _manifest(tmp_path, [
+        _add_model(tmp_path, "legacy-a", scores=[90.0, 80.0, 85.0]),
+        _add_model(tmp_path, "legacy-b", scores=[70.0, 60.0, 65.0]),
+    ])
+    _, runs_by_model, suites = R.load_ranking_manifest(source_manifest)
+    v6_manifest = {
+        "schema": R.RANKING_MANIFEST_V6_SCHEMA,
+        "name": "legacy-v6-replay",
+        "ranking_policy": R.RANKING_POLICY_V3,
+    }
+    monkeypatch.setattr(
+        R,
+        "load_ranking_manifest",
+        lambda _: (v6_manifest, runs_by_model, suites),
+    )
+
+    result = R.analyze_ranking_manifest(source_manifest, iterations=100)
+
+    assert result["schema"] == R.MODEL_RANKING_V5_SCHEMA
+    assert result["method"]["ranking_policy"] == R.RANKING_POLICY_V3
+    assert "canonical_sampling_order" not in result["method"]
+    assert "array_order_affects_statistics" not in result["method"]
+    assert "analysis_dependency_sha256" not in result["method"]
 
 
 def test_critical_models_are_not_ranked(tmp_path):

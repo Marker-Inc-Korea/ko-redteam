@@ -9,6 +9,10 @@ from typing import Any, Iterable
 
 try:
     from ko_benchmark_identity import benchmark_content_sha256
+    from ko_multiturn_report import (
+        REPORT_SCHEMA as MULTITURN_REPORT_SCHEMA,
+        multiturn_report_v2_errors,
+    )
     from ko_run_context import (
         canonical_sha256,
         validate_independent_run_contexts,
@@ -16,6 +20,10 @@ try:
     )
 except ModuleNotFoundError:  # package import path
     from .ko_benchmark_identity import benchmark_content_sha256
+    from .ko_multiturn_report import (
+        REPORT_SCHEMA as MULTITURN_REPORT_SCHEMA,
+        multiturn_report_v2_errors,
+    )
     from .ko_run_context import (
         canonical_sha256,
         validate_independent_run_contexts,
@@ -40,7 +48,7 @@ PROFILE_SPECS = {
             ),
             "multiturn": (
                 "multiturn_report.json",
-                "ko-redteam.multiturn-benchmark-report.v1",
+                MULTITURN_REPORT_SCHEMA,
                 "ko_llm_multiturn_v2",
             ),
             "agent_harness": (
@@ -564,6 +572,16 @@ def _validate_profile(
                     category,
                     "report_contract_mismatch",
                     f"{report_name} {label} failed",
+                    repeat_index=repeat_index,
+                    profile=profile,
+                )
+        if report_name == "multiturn" and report.get("schema") == schema:
+            for error in multiturn_report_v2_errors(report):
+                _issue(
+                    issues,
+                    "measurement",
+                    "multiturn_contract_mismatch",
+                    error,
                     repeat_index=repeat_index,
                     profile=profile,
                 )

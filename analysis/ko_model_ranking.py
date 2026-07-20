@@ -21,6 +21,17 @@ try:
 except ModuleNotFoundError:  # package import path
     from .ko_llm_forensics import ENDPOINT_SMOKE_NON_BLOCKING_QUALITY_FLAGS
 
+try:
+    from ko_multiturn_report import (
+        REPORT_SCHEMA as CURRENT_MULTITURN_REPORT_SCHEMA,
+        multiturn_report_v2_errors,
+    )
+except ModuleNotFoundError:  # package import path
+    from .ko_multiturn_report import (
+        REPORT_SCHEMA as CURRENT_MULTITURN_REPORT_SCHEMA,
+        multiturn_report_v2_errors,
+    )
+
 
 LEGACY_SUITES = ("paperbench", "mini_single", "multiturn")
 OFFICIAL_SUITES = (*LEGACY_SUITES, "agent_harness")
@@ -30,7 +41,8 @@ RANKING_MANIFEST_V2_SCHEMA = "ko-redteam.ranking-manifest.v2"
 RANKING_MANIFEST_V3_SCHEMA = "ko-redteam.ranking-manifest.v3"
 RANKING_MANIFEST_V4_SCHEMA = "ko-redteam.ranking-manifest.v4"
 RANKING_MANIFEST_V5_SCHEMA = "ko-redteam.ranking-manifest.v5"
-RANKING_MANIFEST_SCHEMA = "ko-redteam.ranking-manifest.v6"
+RANKING_MANIFEST_V6_SCHEMA = "ko-redteam.ranking-manifest.v6"
+RANKING_MANIFEST_SCHEMA = "ko-redteam.ranking-manifest.v7"
 SUITE_EXECUTION_EVIDENCE_SCHEMA = "ko-redteam.suite-execution-evidence.v1"
 SUPPORTED_RANKING_MANIFEST_SCHEMAS = {
     RANKING_MANIFEST_V1_SCHEMA,
@@ -38,6 +50,7 @@ SUPPORTED_RANKING_MANIFEST_SCHEMAS = {
     RANKING_MANIFEST_V3_SCHEMA,
     RANKING_MANIFEST_V4_SCHEMA,
     RANKING_MANIFEST_V5_SCHEMA,
+    RANKING_MANIFEST_V6_SCHEMA,
     RANKING_MANIFEST_SCHEMA,
 }
 HASHED_RANKING_MANIFEST_SCHEMAS = {
@@ -45,6 +58,7 @@ HASHED_RANKING_MANIFEST_SCHEMAS = {
     RANKING_MANIFEST_V3_SCHEMA,
     RANKING_MANIFEST_V4_SCHEMA,
     RANKING_MANIFEST_V5_SCHEMA,
+    RANKING_MANIFEST_V6_SCHEMA,
     RANKING_MANIFEST_SCHEMA,
 }
 POWER_PILOT_RANKING_MANIFEST_SCHEMAS = HASHED_RANKING_MANIFEST_SCHEMAS
@@ -52,24 +66,29 @@ EXECUTION_EVIDENCE_RANKING_MANIFEST_SCHEMAS = {
     RANKING_MANIFEST_V3_SCHEMA,
     RANKING_MANIFEST_V4_SCHEMA,
     RANKING_MANIFEST_V5_SCHEMA,
+    RANKING_MANIFEST_V6_SCHEMA,
     RANKING_MANIFEST_SCHEMA,
 }
 SEPARATED_RANKING_MANIFEST_SCHEMAS = {
     RANKING_MANIFEST_V4_SCHEMA,
     RANKING_MANIFEST_V5_SCHEMA,
+    RANKING_MANIFEST_V6_SCHEMA,
     RANKING_MANIFEST_SCHEMA,
 }
 NULL_RANDOMIZATION_RANKING_MANIFEST_SCHEMAS = {
     RANKING_MANIFEST_V5_SCHEMA,
+    RANKING_MANIFEST_V6_SCHEMA,
     RANKING_MANIFEST_SCHEMA,
 }
 MODEL_RANKING_V2_SCHEMA = "ko-redteam.model-ranking.v2"
 MODEL_RANKING_V3_SCHEMA = "ko-redteam.model-ranking.v3"
 MODEL_RANKING_V4_SCHEMA = "ko-redteam.model-ranking.v4"
-MODEL_RANKING_SCHEMA = "ko-redteam.model-ranking.v5"
+MODEL_RANKING_V5_SCHEMA = "ko-redteam.model-ranking.v5"
+MODEL_RANKING_SCHEMA = "ko-redteam.model-ranking.v6"
 LEGACY_RANKING_POLICY_SCHEMA = "ko-redteam.ranking-policy.v1"
 RANKING_POLICY_V2_SCHEMA = "ko-redteam.ranking-policy.v2"
-RANKING_POLICY_SCHEMA = "ko-redteam.ranking-policy.v3"
+RANKING_POLICY_V3_SCHEMA = "ko-redteam.ranking-policy.v3"
+RANKING_POLICY_SCHEMA = "ko-redteam.ranking-policy.v4"
 LEGACY_PAIRWISE_TEST = "two-sided paired bootstrap with plus-one correction"
 PAIRWISE_TEST = (
     "two-sided paired independence-group sign-flip randomization; "
@@ -101,9 +120,9 @@ RANKING_POLICY_V2 = {
     "complete_order_claimed": False,
     "maximum_models": 7,
 }
-RANKING_POLICY = {
+RANKING_POLICY_V3 = {
     **RANKING_POLICY_V2,
-    "schema": RANKING_POLICY_SCHEMA,
+    "schema": RANKING_POLICY_V3_SCHEMA,
     "tier_claim": (
         "multiplicity-controlled robust contiguous tiers; boundaries also "
         "require no direction reversal under pre-registered sensitivity weights"
@@ -114,6 +133,24 @@ RANKING_POLICY = {
         "directional probability must exceed 50% for every sensitivity profile"
     ),
     "minimum_sensitivity_direction_probability": 50.0,
+}
+RANKING_POLICY = {
+    **RANKING_POLICY_V3,
+    "schema": RANKING_POLICY_SCHEMA,
+    "canonical_sampling_order": {
+        "models": "name_ascending",
+        "runs": "run_id_then_manifest_content_sha256",
+        "cases": "case_id_ascending",
+        "bootstrap_strata": "signature_then_independence_group",
+    },
+    "array_order_affects_statistics": False,
+    "required_report_schemas": {
+        "multiturn": CURRENT_MULTITURN_REPORT_SCHEMA,
+    },
+    "task_metric_availability": "identical_by_case_across_models_and_repeats",
+    "metric_compatibility_preflight": (
+        "all_unordered_ranking_eligible_pairs_before_bootstrap"
+    ),
 }
 EXECUTION_EVIDENCE_CONTRACT = {
     "ranking_manifest_schema": RANKING_MANIFEST_SCHEMA,
@@ -208,6 +245,21 @@ class _LoadedRankingManifest(dict[str, Any]):
     def __init__(self, value: dict[str, Any], *, source_sha256: str) -> None:
         super().__init__(value)
         self.source_sha256 = source_sha256
+
+
+def _canonical_manifest_run_sort_key(run: Any) -> tuple[str, str]:
+    if not isinstance(run, dict):
+        return ("", "")
+    payload = json.dumps(
+        run,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return (
+        str(run.get("run_id") or ""),
+        hashlib.sha256(payload).hexdigest(),
+    )
 
 
 def _file_sha256(path: Path) -> str:
@@ -600,6 +652,12 @@ def _load_report(path: Path, payload: bytes) -> dict[str, Any]:
         raise ValueError(f"report must contain valid UTF-8 JSON: {path}") from exc
     if not isinstance(report, dict) or not isinstance(report.get("scorecard"), dict):
         raise ValueError(f"report must contain scorecard: {path}")
+    if report.get("schema") == CURRENT_MULTITURN_REPORT_SCHEMA:
+        errors = multiturn_report_v2_errors(report)
+        if errors:
+            raise ValueError(
+                f"invalid corrected multiturn report: {path}: {errors[0]}"
+            )
     return report
 
 
@@ -772,6 +830,8 @@ def load_ranking_manifest(
         expected_policy = (
             RANKING_POLICY
             if manifest_schema == RANKING_MANIFEST_SCHEMA
+            else RANKING_POLICY_V3
+            if manifest_schema == RANKING_MANIFEST_V6_SCHEMA
             else RANKING_POLICY_V2
             if manifest_schema == RANKING_MANIFEST_V5_SCHEMA
             else LEGACY_RANKING_POLICY
@@ -796,14 +856,30 @@ def load_ranking_manifest(
         if any(agent_presence) and not all(agent_presence):
             raise ValueError("legacy ranking manifest cannot mix runs with and without agent_harness")
         suites = OFFICIAL_SUITES if agent_presence and all(agent_presence) else LEGACY_SUITES
+    ordered_entries = (
+        sorted(
+            entries,
+            key=lambda entry: (
+                str(entry.get("name") or "")
+                if isinstance(entry, dict)
+                else ""
+            ),
+        )
+        if manifest_schema == RANKING_MANIFEST_SCHEMA
+        else entries
+    )
     loaded: dict[str, list[dict[str, Any]]] = {}
-    for entry in entries:
+    for entry in ordered_entries:
+        if not isinstance(entry, dict):
+            raise ValueError("ranking manifest model entries must be objects")
         name = str(entry.get("name") or "").strip()
         runs = entry.get("runs")
         if not name or name in loaded:
             raise ValueError("ranking manifest model names must be unique and non-empty")
         if not isinstance(runs, list) or not runs:
             raise ValueError(f"ranking manifest model requires non-empty runs: {name}")
+        if manifest_schema == RANKING_MANIFEST_SCHEMA:
+            runs = sorted(runs, key=_canonical_manifest_run_sort_key)
         if manifest.get("schema") in HASHED_RANKING_MANIFEST_SCHEMAS:
             for run in runs:
                 if not isinstance(run, dict) or not isinstance(run.get("run_id"), str):
@@ -813,6 +889,16 @@ def load_ranking_manifest(
                     if not isinstance(artifact, dict) or not artifact.get("path") or not artifact.get("sha256"):
                         raise ValueError(f"hashed ranking runs require artifact digest: {name}/{suite}")
         resolved_runs = [_resolve_run(run, manifest_path.parent, suites) for run in runs]
+        if manifest_schema == RANKING_MANIFEST_SCHEMA:
+            for index, resolved in enumerate(resolved_runs, 1):
+                report_schema = resolved["_identities"]["multiturn"].get(
+                    "report_schema"
+                )
+                if report_schema != CURRENT_MULTITURN_REPORT_SCHEMA:
+                    raise ValueError(
+                        "v7 ranking requires corrected multiturn report schema "
+                        f"{CURRENT_MULTITURN_REPORT_SCHEMA}: {name}/run-{index}"
+                    )
         if manifest.get("schema") in EXECUTION_EVIDENCE_RANKING_MANIFEST_SCHEMAS:
             for run, resolved in zip(runs, resolved_runs):
                 resolved["_execution_evidence"] = _load_execution_evidence(
@@ -839,6 +925,9 @@ def load_ranking_manifest(
         require_disjoint_suite_groups=(
             manifest.get("schema") in HASHED_RANKING_MANIFEST_SCHEMAS
         ),
+        require_aligned_task_availability=(
+            manifest.get("schema") == RANKING_MANIFEST_SCHEMA
+        ),
     )
     return manifest, loaded, suites
 
@@ -848,9 +937,11 @@ def _validate_case_alignment(
     suites: tuple[str, ...],
     *,
     require_disjoint_suite_groups: bool,
+    require_aligned_task_availability: bool = False,
 ) -> None:
     baseline: dict[str, dict[str, tuple[Any, ...]]] | None = None
     identity_baseline: dict[str, dict[str, Any]] | None = None
+    task_availability_baseline: dict[str, dict[str, bool]] | None = None
     for model, runs in models.items():
         model_baseline = {
             suite: {
@@ -865,6 +956,13 @@ def _validate_case_alignment(
             for suite in suites
         }
         model_identity = runs[0]["_identities"]
+        model_task_availability = {
+            suite: {
+                case_id: row.get("task_score") is not None
+                for case_id, row in runs[0][suite].items()
+            }
+            for suite in suites
+        }
         if require_disjoint_suite_groups:
             group_suites: dict[str, str] = {}
             group_expected: dict[tuple[str, str], str] = {}
@@ -905,6 +1003,18 @@ def _validate_case_alignment(
                 }
                 if signature != model_baseline[suite]:
                     raise ValueError(f"case metadata mismatch within {model} run {index}/{suite}")
+                if require_aligned_task_availability:
+                    for case_id, expected_available in model_task_availability[
+                        suite
+                    ].items():
+                        actual_available = (
+                            run[suite][case_id].get("task_score") is not None
+                        )
+                        if actual_available != expected_available:
+                            raise ValueError(
+                                "v7 ranking task metric availability mismatch within "
+                                f"{model}/run-{index}/{suite}/{case_id}"
+                            )
                 _validate_identity(
                     model_identity[suite],
                     run["_identities"][suite],
@@ -919,6 +1029,7 @@ def _validate_case_alignment(
         if baseline is None:
             baseline = model_baseline
             identity_baseline = model_identity
+            task_availability_baseline = model_task_availability
             continue
         for suite in suites:
             if model_baseline[suite] != baseline[suite]:
@@ -928,6 +1039,19 @@ def _validate_case_alignment(
                 model_identity[suite],
                 context=f"across models: {model}/{suite}",
             )
+            if require_aligned_task_availability:
+                assert task_availability_baseline is not None
+                for case_id, expected_available in task_availability_baseline[
+                    suite
+                ].items():
+                    if (
+                        model_task_availability[suite][case_id]
+                        != expected_available
+                    ):
+                        raise ValueError(
+                            "v7 ranking task metric availability mismatch across models: "
+                            f"{model}/{suite}/{case_id}"
+                        )
         baseline_provenance = next(iter(models.values()))[0].get("_provenance")
         model_provenance = runs[0].get("_provenance")
         if baseline_provenance is not None and model_provenance is not None:
@@ -973,12 +1097,18 @@ def _validate_model_provenance(left: dict[str, Any], right: dict[str, Any], *, c
 
 
 def _aggregate_runs(
-    runs: list[dict[str, Any]], suites: tuple[str, ...]
+    runs: list[dict[str, Any]],
+    suites: tuple[str, ...],
+    *,
+    canonical_order: bool = False,
 ) -> dict[str, dict[str, dict[str, Any]]]:
     aggregated: dict[str, dict[str, dict[str, Any]]] = {}
     for suite in suites:
         aggregated[suite] = {}
-        for case_id in runs[0][suite]:
+        case_ids = runs[0][suite]
+        if canonical_order:
+            case_ids = sorted(case_ids)
+        for case_id in case_ids:
             rows = [run[suite][case_id] for run in runs]
             task_scores = [float(row["task_score"]) for row in rows if row.get("task_score") is not None]
             aggregated[suite][case_id] = {
@@ -1265,11 +1395,17 @@ def _sample_groups(
     baseline: dict[str, dict[str, dict[str, Any]]],
     rng: random.Random,
     suites: tuple[str, ...],
+    *,
+    canonical_order: bool = False,
 ) -> dict[str, list[tuple[str, str]]]:
     samples = {}
     for suite in suites:
         groups: dict[str, list[str]] = {}
-        for case_id, row in baseline[suite].items():
+        case_ids = baseline[suite]
+        if canonical_order:
+            case_ids = sorted(case_ids)
+        for case_id in case_ids:
+            row = baseline[suite][case_id]
             groups.setdefault(str(row["independence_group"]), []).append(case_id)
         strata: dict[tuple[bool, bool, bool], list[str]] = {}
         for group_id, case_ids in groups.items():
@@ -1281,7 +1417,14 @@ def _sample_groups(
             )
             strata.setdefault(signature, []).append(group_id)
         suite_samples = []
-        for stratum_index, group_ids in enumerate(strata.values()):
+        stratum_groups = (
+            [strata[signature] for signature in sorted(strata)]
+            if canonical_order
+            else list(strata.values())
+        )
+        for stratum_index, group_ids in enumerate(stratum_groups):
+            if canonical_order:
+                group_ids = sorted(group_ids)
             for draw_index in range(len(group_ids)):
                 group_id = rng.choice(group_ids)
                 sampled_group = f"bootstrap-{stratum_index}-{draw_index}"
@@ -1346,7 +1489,11 @@ def _paired_group_contributions(
             right_value = _group_metric(right_rows, value_key, predicate=predicate)
             if (left_value is None) != (right_value is None):
                 raise ValueError(
-                    "paired randomization requires aligned group metric availability"
+                    "paired randomization requires aligned group metric availability: "
+                    f"suite={group_key[0]!r}, "
+                    f"independence_group={group_key[1]!r}, metric={name!r}, "
+                    f"left_available={left_value is not None}, "
+                    f"right_available={right_value is not None}"
                 )
             metrics[name] = (
                 None
@@ -1514,11 +1661,23 @@ def analyze_ranking_manifest(
         raise ValueError("min_pairwise_confidence must be between 50 and 100")
     manifest, runs_by_model, suites = load_ranking_manifest(path)
     manifest_path = Path(path).resolve()
+    manifest_schema = manifest.get("schema")
+    canonical_order_policy = manifest_schema == RANKING_MANIFEST_SCHEMA
+    model_names = (
+        sorted(runs_by_model)
+        if canonical_order_policy
+        else list(runs_by_model)
+    )
     weight_profiles = (
         WEIGHT_PROFILES if suites == OFFICIAL_SUITES else LEGACY_WEIGHT_PROFILES
     )
     aggregated = {
-        model: _aggregate_runs(runs, suites) for model, runs in runs_by_model.items()
+        model: _aggregate_runs(
+            runs_by_model[model],
+            suites,
+            canonical_order=canonical_order_policy,
+        )
+        for model in model_names
     }
     components = {
         model: _components(
@@ -1542,12 +1701,14 @@ def analyze_ranking_manifest(
         )
         for model in runs_by_model
     }
-    manifest_schema = manifest.get("schema")
     separated_policy = manifest_schema in SEPARATED_RANKING_MANIFEST_SCHEMAS
     null_randomization_policy = (
         manifest_schema in NULL_RANDOMIZATION_RANKING_MANIFEST_SCHEMAS
     )
-    robust_tier_policy = manifest_schema == RANKING_MANIFEST_SCHEMA
+    robust_tier_policy = manifest_schema in {
+        RANKING_MANIFEST_V6_SCHEMA,
+        RANKING_MANIFEST_SCHEMA,
+    }
     eligibilities = {
         model: _ranking_eligibility(
             repeat_summaries[model],
@@ -1564,16 +1725,82 @@ def analyze_ranking_manifest(
         for model in runs_by_model
     }
 
+    diagnostic_order = (
+        sorted(
+            model_names,
+            key=lambda model: (-components[model]["diagnostic_score"], model),
+        )
+        if canonical_order_policy
+        else sorted(
+            model_names,
+            key=lambda model: components[model]["diagnostic_score"],
+            reverse=True,
+        )
+    )
+    ranked_models = [
+        model
+        for model in diagnostic_order
+        if (
+            eligibilities[model][0] == "eligible"
+            if separated_policy
+            else qualifications[model][0] == "qualified"
+        )
+    ]
+    inferential_profiles = (
+        (PRIMARY_WEIGHT_PROFILE,) if separated_policy else tuple(weight_profiles)
+    )
+    paired_contribution_cache: dict[
+        tuple[str, str], dict[str, dict[tuple[str, str], float]]
+    ] = {}
+    if null_randomization_policy:
+        for higher_index, higher in enumerate(ranked_models):
+            for lower in ranked_models[higher_index + 1:]:
+                try:
+                    paired_contribution_cache[(higher, lower)] = (
+                        _paired_group_contributions(
+                            aggregated[higher],
+                            aggregated[lower],
+                            suites,
+                            weight_profiles,
+                        )
+                    )
+                except ValueError as exc:
+                    raise ValueError(
+                        "paired randomization preflight failed for "
+                        f"left_model={higher!r}, right_model={lower!r}: {exc}"
+                    ) from exc
+
     rng = random.Random(seed)
-    distributions = {model: [] for model in runs_by_model}
+    distributions = {model: [] for model in model_names}
     pairwise_wins = Counter()
-    baseline = next(iter(aggregated.values()))
+    baseline = aggregated[model_names[0]]
+    run_positions = {
+        model: {id(run): index for index, run in enumerate(runs_by_model[model])}
+        for model in model_names
+    }
+    sampled_aggregate_cache: dict[str, dict[tuple[int, ...], Any]] = {
+        model: {} for model in model_names
+    }
     for _ in range(iterations):
-        samples = _sample_groups(baseline, rng, suites)
+        samples = _sample_groups(
+            baseline,
+            rng,
+            suites,
+            canonical_order=canonical_order_policy,
+        )
         scores_by_profile = {profile: {} for profile in weight_profiles}
-        for model in aggregated:
+        for model in model_names:
             sampled_runs = [rng.choice(runs_by_model[model]) for _ in runs_by_model[model]]
-            sampled_aggregate = _aggregate_runs(sampled_runs, suites)
+            cache_key = tuple(
+                run_positions[model][id(run)] for run in sampled_runs
+            )
+            if cache_key not in sampled_aggregate_cache[model]:
+                sampled_aggregate_cache[model][cache_key] = _aggregate_runs(
+                    sampled_runs,
+                    suites,
+                    canonical_order=canonical_order_policy,
+                )
+            sampled_aggregate = sampled_aggregate_cache[model][cache_key]
             sampled = {
                 suite: [
                     {
@@ -1595,7 +1822,6 @@ def analyze_ranking_manifest(
                         pairwise_wins[(profile, left, right)] += int(scores[left] > scores[right])
                         pairwise_wins[(profile, left, right)] += 0.5 * int(scores[left] == scores[right])
 
-    diagnostic_order = sorted(runs_by_model, key=lambda model: components[model]["diagnostic_score"], reverse=True)
     model_rows = []
     for model in diagnostic_order:
         values = distributions[model]
@@ -1639,29 +1865,12 @@ def analyze_ranking_manifest(
             })
         model_rows.append(row)
 
-    ranked_models = [
-        model
-        for model in diagnostic_order
-        if (
-            eligibilities[model][0] == "eligible"
-            if separated_policy
-            else qualifications[model][0] == "qualified"
-        )
-    ]
-    inferential_profiles = (
-        (PRIMARY_WEIGHT_PROFILE,) if separated_policy else tuple(weight_profiles)
-    )
     raw_p_values: dict[tuple[str, str, str], float] = {}
     pairwise_tests: dict[tuple[str, str, str], dict[str, Any]] = {}
     for higher_index, higher in enumerate(ranked_models):
         for lower in ranked_models[higher_index + 1:]:
             if null_randomization_policy:
-                contributions = _paired_group_contributions(
-                    aggregated[higher],
-                    aggregated[lower],
-                    suites,
-                    weight_profiles,
-                )
+                contributions = paired_contribution_cache[(higher, lower)]
                 for profile in inferential_profiles:
                     test = _paired_sign_flip_test(
                         list(contributions[profile].values()),
@@ -1881,6 +2090,8 @@ def analyze_ranking_manifest(
     return {
         "schema": (
             MODEL_RANKING_SCHEMA
+            if canonical_order_policy
+            else MODEL_RANKING_V5_SCHEMA
             if robust_tier_policy
             else MODEL_RANKING_V4_SCHEMA
             if null_randomization_policy
@@ -1893,12 +2104,21 @@ def analyze_ranking_manifest(
         "ranking_manifest_sha256": manifest_source_sha256,
         "method": {
             "analysis_code_sha256": _file_sha256(Path(__file__)),
+            **({
+                "analysis_dependency_sha256": {
+                    "multiturn_report_contract": _file_sha256(
+                        Path(__file__).with_name("ko_multiturn_report.py")
+                    ),
+                },
+            } if canonical_order_policy else {}),
             "gate_precedes_ranking": not separated_policy,
             **({
                 "evidence_gate_precedes_ranking": True,
                 "deployment_screen_affects_ranking": False,
                 "ranking_policy": (
                     RANKING_POLICY
+                    if canonical_order_policy
+                    else RANKING_POLICY_V3
                     if robust_tier_policy
                     else RANKING_POLICY_V2
                     if null_randomization_policy
@@ -1924,6 +2144,12 @@ def analyze_ranking_manifest(
                     },
                     "tier_boundary_requires_sensitivity_direction_consistency": True,
                 } if robust_tier_policy else {}),
+                **({
+                    "canonical_sampling_order": RANKING_POLICY[
+                        "canonical_sampling_order"
+                    ],
+                    "array_order_affects_statistics": False,
+                } if canonical_order_policy else {}),
             } if separated_policy else {}),
             "primary_weight_profile": PRIMARY_WEIGHT_PROFILE,
             "weight_profiles": weight_profiles,
@@ -2052,10 +2278,12 @@ def render_model_ranking_markdown(result: dict[str, Any]) -> str:
     if result.get("schema") in {
         MODEL_RANKING_V3_SCHEMA,
         MODEL_RANKING_V4_SCHEMA,
+        MODEL_RANKING_V5_SCHEMA,
         MODEL_RANKING_SCHEMA,
     }:
         null_randomization_report = result.get("schema") in {
             MODEL_RANKING_V4_SCHEMA,
+            MODEL_RANKING_V5_SCHEMA,
             MODEL_RANKING_SCHEMA,
         }
         lines = [
@@ -2072,10 +2300,18 @@ def render_model_ranking_markdown(result: dict[str, Any]) -> str:
             "| Model | Ranking evidence | Deployment screen | Critical groups | Privacy groups | Error groups | Repeats | Decision flip | Primary score | 95% CI |",
             "| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |",
         ]
-        if result.get("schema") == MODEL_RANKING_SCHEMA:
+        if result.get("schema") in {
+            MODEL_RANKING_V5_SCHEMA,
+            MODEL_RANKING_SCHEMA,
+        }:
             lines.insert(
                 7,
                 "- A tier boundary is blocked when either pre-registered sensitivity profile reverses direction.",
+            )
+        if result.get("schema") == MODEL_RANKING_SCHEMA:
+            lines.insert(
+                8,
+                "- Canonical model, run, case, and bootstrap-stratum ordering makes array order non-inferential.",
             )
         for row in result.get("models") or []:
             ci = row.get("diagnostic_ci95") or [None, None]

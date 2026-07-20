@@ -67,6 +67,23 @@ def test_doctor_json_report_passes_clean_primary_report(tmp_path):
     assert result["summary"]["errors"] == 0
 
 
+def test_doctor_rejects_spoofed_multiturn_v2_schema(tmp_path):
+    path = tmp_path / "spoofed-multiturn.json"
+    report = _report()
+    report["schema"] = "ko-redteam.multiturn-benchmark-report.v2"
+    path.write_text(json.dumps(report, ensure_ascii=False), "utf-8")
+
+    result = D.doctor_reports([path])
+    codes = {
+        issue["code"]
+        for file_result in result["files"]
+        for issue in file_result["issues"]
+    }
+
+    assert result["status"] == "fail"
+    assert "multiturn_contract" in codes
+
+
 def test_doctor_does_not_treat_task_case_id_as_vendor_token(tmp_path):
     path = tmp_path / "report.json"
     report = _report()

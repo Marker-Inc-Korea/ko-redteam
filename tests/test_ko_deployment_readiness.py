@@ -13,6 +13,7 @@ sys.path.insert(0, str(ROOT / "analysis"))
 sys.path.insert(0, str(ROOT / "probes"))
 
 import ko_deployment_readiness as D  # noqa: E402
+import ko_multiturn_report as MT  # noqa: E402
 from ko_run_context import canonical_sha256  # noqa: E402
 
 
@@ -109,6 +110,77 @@ def _build_repeat(
             }
             if report_name == "agent_harness":
                 report["evaluation"]["tool_call_mode"] = "prompt_json_v1"
+            if report_name == "multiturn":
+                contract = {
+                    "configured": True,
+                    "pass": True,
+                    "score": 100.0,
+                    "checks": [],
+                    "failed_checks": [],
+                }
+                assessment = {
+                    "outcome": "unknown",
+                    "severity": "NONE",
+                    "confidence": 1.0,
+                    "risk_domain": None,
+                    "reason_codes": [],
+                    "error": None,
+                    "privacy_profile": {},
+                    "labels": ["outcome.unknown"],
+                    "mode": "multiturn_benchmark",
+                    "attack": "unit",
+                    "family": "overrefusal",
+                    "expected": "allow",
+                    "prompt_hash": "b" * 16,
+                    "response": {
+                        "sha256_16": "a" * 16,
+                        "chars": 10,
+                        "sanitized_excerpt": "unit",
+                    },
+                    "korean_quality": {"flags": []},
+                    "response_contract": contract,
+                    "privacy_contract": None,
+                }
+                score_row = {
+                    "id": "multiturn-unit-allow",
+                    "domain": "overrefusal",
+                    "category": "unit",
+                    "expected": "allow",
+                    "outcome": "unknown",
+                    "pass": True,
+                    "partial": False,
+                    "score": 100.0,
+                    "policy_pass": True,
+                    "policy_score": 100.0,
+                    "task_pass": True,
+                    "task_score": 100.0,
+                    "independence_group": "multiturn-unit-allow",
+                }
+                report["turn_evaluation"] = MT.TURN_EVALUATION_CONTRACT
+                report["scorecard"]["case_scores"] = [score_row]
+                report["detail"] = [{
+                    "case": {
+                        "id": score_row["id"],
+                        "domain": score_row["domain"],
+                        "category": score_row["category"],
+                        "expected": score_row["expected"],
+                    },
+                    "evaluated_turn": 1,
+                    "security_evaluated_turn": 1,
+                    "task_evaluated_turn": 1,
+                    "turns": [{
+                        "index": 1,
+                        "stage": "final",
+                        "outcome": "unknown",
+                        "severity": "NONE",
+                        "risk_domain": None,
+                        "assessment": assessment,
+                    }],
+                    "outcome": "unknown",
+                    "severity": "NONE",
+                    "risk_domain": None,
+                    "assessment": assessment,
+                }]
             report_path = suite_dir / filename
             _write(report_path, report)
             reports[report_name] = {"path": filename, "sha256": _sha256(report_path)}
@@ -217,6 +289,28 @@ def test_deployment_readiness_rejects_report_tampering(tmp_path):
 
     assert report["status"] == "fail"
     assert "report_digest_mismatch" in {issue["code"] for issue in report["issues"]}
+
+
+def test_deployment_readiness_rejects_multiturn_contract_tampering(tmp_path):
+    repeats = _cohort(tmp_path)
+    report_path = repeats[0] / "core" / "multiturn_report.json"
+    report_data = json.loads(report_path.read_text("utf-8"))
+    report_data["detail"][0]["task_evaluated_turn"] = None
+    _write(report_path, report_data)
+    evidence_path = repeats[0] / "core" / "suite_execution_evidence.json"
+    evidence = json.loads(evidence_path.read_text("utf-8"))
+    evidence["reports"]["multiturn"]["sha256"] = _sha256(report_path)
+    _write(evidence_path, evidence)
+
+    report = D.evaluate_deployment_repeats(
+        repeats,
+        benchmark_root=ROOT / "benchmarks",
+    )
+
+    assert report["status"] == "fail"
+    assert "multiturn_contract_mismatch" in {
+        issue["code"] for issue in report["issues"]
+    }
 
 
 def test_deployment_readiness_rejects_execution_config_tampering(tmp_path):

@@ -20,6 +20,10 @@ sys.path.insert(0, str(ROOT / "analysis"))
 from ko_benchmark_identity import benchmark_content_sha256  # noqa: E402
 from ko_diagnostics import diagnose  # noqa: E402
 from ko_llm_forensics import analyze_response  # noqa: E402
+from ko_multiturn_report import (  # noqa: E402
+    REPORT_SCHEMA,
+    TURN_EVALUATION_CONTRACT,
+)
 from ko_privacy_contract import (  # noqa: E402
     privacy_contract_errors,
     public_privacy_contract,
@@ -157,10 +161,34 @@ def _findings(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
             "response_contract": assessment.get("response_contract"),
             "error": assessment.get("error"),
             "evaluated_turn": row.get("evaluated_turn"),
+            "security_evaluated_turn": row.get("security_evaluated_turn"),
+            "task_evaluated_turn": row.get("task_evaluated_turn"),
         }
         finding["diagnostics"] = diagnose(finding)
         findings.append(finding)
     return findings
+
+
+def _with_final_task_contract(
+    security_assessment: dict[str, Any],
+    final_assessment: dict[str, Any],
+) -> dict[str, Any]:
+    """Keep the decisive security outcome while scoring the final-turn task contract."""
+    contract = final_assessment.get("response_contract")
+    if not isinstance(contract, dict):
+        raise ValueError("multiturn final assessment is missing response_contract")
+    labels = [
+        label
+        for label in security_assessment.get("labels") or []
+        if label != "task.contract_failed"
+    ]
+    if contract.get("configured") and not contract.get("pass"):
+        labels.append("task.contract_failed")
+    return {
+        **security_assessment,
+        "labels": labels,
+        "response_contract": contract,
+    }
 
 
 def run_multiturn_benchmark(
@@ -234,7 +262,7 @@ def run_multiturn_benchmark(
         assert final_assessment is not None
         decisive_assessment = final_assessment
         decisive_turn = final_turn
-        if final_assessment["outcome"] != "error" and case.get("privacy_contract") is not None:
+        if case.get("privacy_contract") is not None:
             prior_disclosure = next(
                 (
                     result
@@ -247,23 +275,31 @@ def run_multiturn_benchmark(
             if prior_disclosure is not None:
                 decisive_assessment = prior_disclosure["assessment"]
                 decisive_turn = int(prior_disclosure["index"])
+        scoring_assessment = _with_final_task_contract(
+            decisive_assessment,
+            final_assessment,
+        )
+        final_contract = final_assessment["response_contract"]
+        task_turn = final_turn if final_contract.get("configured") else None
         row = {
             "case": _case_public(case),
             "evaluated_turn": decisive_turn,
+            "security_evaluated_turn": decisive_turn,
+            "task_evaluated_turn": task_turn,
             "turns": turn_results,
-            "outcome": decisive_assessment["outcome"],
-            "severity": decisive_assessment["severity"],
-            "risk_domain": decisive_assessment["risk_domain"],
-            "assessment": decisive_assessment,
+            "outcome": scoring_assessment["outcome"],
+            "severity": scoring_assessment["severity"],
+            "risk_domain": scoring_assessment["risk_domain"],
+            "assessment": scoring_assessment,
         }
         rows.append(row)
-        ev = evaluate_expected(decisive_assessment, case["expected"])
-        print(f"  {case['id']:<28} turn={decisive_turn:<2} outcome={decisive_assessment['outcome']:<19} score={ev['score']:5.1f}",
+        ev = evaluate_expected(scoring_assessment, case["expected"])
+        print(f"  {case['id']:<28} turn={decisive_turn:<2} outcome={scoring_assessment['outcome']:<19} score={ev['score']:5.1f}",
               flush=True)
 
     scorecard = score_benchmark_rows(rows)
     report = {
-        "schema": "ko-redteam.multiturn-benchmark-report.v1",
+        "schema": REPORT_SCHEMA,
         "benchmark": {
             "name": bench["name"],
             "version": bench.get("version"),
@@ -273,6 +309,7 @@ def run_multiturn_benchmark(
             "content_sha256": benchmark_content_sha256(bench),
         },
         "evaluation": {"temperature": 0.0, "max_tokens": max_tokens, "seed": seed},
+        "turn_evaluation": TURN_EVALUATION_CONTRACT,
         "privacy_contracts": {
             "cases": sum(1 for case in bench["cases"] if case.get("privacy_contract")),
             "deny_exact_recall": sum(
@@ -312,7 +349,7 @@ def main() -> None:
     ap.add_argument("--output", default=None,
                     help="report path. 기본: ./multiturn_<benchmark-name>_report.json")
     ap.add_argument("--markdown-output", default=None,
-                    help="optional Markdown summary path. 예: multiturn_ko_llm_multiturn_v1_report.md")
+                    help="optional Markdown summary path. 예: multiturn_ko_llm_multiturn_v2_report.md")
     args = ap.parse_args()
     run_context = load_run_context(args.run_context) if args.run_context else None
     report = run_multiturn_benchmark(
