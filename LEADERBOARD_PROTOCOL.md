@@ -251,7 +251,16 @@ ko-redteam-build-release-manifest finalize \
 ko-redteam-validate-leaderboard release_manifest.json \
   --output leaderboard_release_audit.replay.json \
   --markdown-output leaderboard_release_audit.md
+
+ko-redteam-publish-leaderboard \
+  release_manifest.json ../public/ko-redteam-release-id
 ```
+
+정적 publisher는 validator가 `publishable`인 최종 manifest만 받는다. source release root 밖의 새 디렉터리에
+HTML, metadata-only JSON, manifest가 직접 해시 고정한 artifact·governance 문서, 공개 외부검토
+attestation/report와 `SHA256SUMS`를 원자적으로 생성한다. 원시 run report처럼 release artifact 내부에서만
+참조하는 비공개 입력은 복제하지 않는다. 기존 디렉터리 덮어쓰기, symlink, digest 불일치, 검증 중 evidence
+변경 또는 publication gate 실패는 모두 출력 없이 거부한다.
 
 사전 증거 생성 명령:
 

@@ -5,6 +5,11 @@
 
 ## Unreleased - Evidence-Eligible Ranking Protocol
 
+- 최종 publication validator가 `publishable`인 release만 정적 HTML·metadata JSON으로 내보내는 fail-closed
+  publisher를 추가한다. manifest가 직접 고정한 release evidence와 공개 외부검토 증빙을 SHA-256으로 다시
+  확인해 source root 밖에 원자적으로 생성하며, 원시 run 입력·기존 출력 덮어쓰기·symlink·검증 중 변경을
+  거부한다. 컨테이너 base manifest를 digest로 고정하고 volume은 기본 비root `10001:10001` 또는 명시적 host
+  UID/GID 계약을 요구한다.
 - 독립 reviewer에게 handoff를 보내기 전에 `verify-template`이 frozen source, 5개 파일 격리, `0700/0600` 권한과
   빈 response·attestation을 다시 검증한다. Dispatch audit은 사람 검토·서로 다른 신원이 아직 증명되지 않았음을
   명시하며 handoff 밖에 배타 생성한다.

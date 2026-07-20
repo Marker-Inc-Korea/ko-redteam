@@ -54,6 +54,7 @@ def test_console_script_targets_are_importable():
         "ko-redteam-build-season-preregistration",
         "ko-redteam-validate-season-preregistration",
         "ko-redteam-build-release-manifest",
+        "ko-redteam-publish-leaderboard",
         "ko-redteam-compare-reports",
         "ko-redteam-check-regression",
         "ko-redteam-validate-deployment",
@@ -79,7 +80,7 @@ def test_distribution_metadata_has_release_basics():
     assert data["build-system"]["requires"][0].startswith("setuptools>=77")
     assert data["project"]["license"] == "MIT"
     assert data["project"]["license-files"] == ["LICENSE"]
-    assert data["project"]["version"] == "0.2.0rc1"
+    assert data["project"]["version"] == "0.2.0rc2"
     assert "Development Status :: 4 - Beta" in data["project"]["classifiers"]
     assert "korean" in data["project"]["keywords"]
     assert "Natural Language :: Korean" in data["project"]["classifiers"]
@@ -108,6 +109,7 @@ def test_package_data_paths_exist():
     assert (ROOT / "LEADERBOARD_PROTOCOL.md").exists()
     assert (ROOT / "DEPLOYMENT.md").exists()
     assert (ROOT / "governance" / "SEASON_OPERATIONS.md").exists()
+    assert (ROOT / "governance" / "PUBLICATION_READINESS.md").exists()
     assert (ROOT / "governance" / "SEASON_2026Q3_PREREGISTRATION.json").exists()
     assert (ROOT / "governance" / "SEASON_2026Q3_S2_PREREGISTRATION.json").exists()
     assert (ROOT / "governance" / "SEASON_2026Q3_S3_PREREGISTRATION.json").exists()
@@ -180,6 +182,7 @@ def test_analysis_package_imports_without_flat_pythonpath():
                 "from analysis.ko_benchmark_identity import benchmark_content_sha256;"
                 "from analysis.ko_model_ranking import analyze_ranking_manifest;"
                 "from analysis.ko_leaderboard import audit_leaderboard_release;"
+                "from analysis.ko_leaderboard_site import build_publication_snapshot;"
                 "from analysis.ko_calibration import build_calibration_report;"
                 "from analysis.ko_calibration_evidence import validate_public_calibration_signatures;"
                 "from analysis.ko_split_evidence import build_split_audit;"
@@ -197,6 +200,7 @@ def test_analysis_package_imports_without_flat_pythonpath():
                 "assert r['risk_domain']=='pii_rrn';"
                 "assert callable(score_unlabeled_scan);"
                 "assert callable(render_markdown);"
+                "assert callable(build_publication_snapshot);"
                 "assert evaluate_response_contract('정상 응답', None)['pass'];"
                 "assert parse_thresholds(['privacy=90']) == {'privacy': 90.0};"
                 "assert len(benchmark_content_sha256({'schema':'unit','cases':[]})) == 64;"
@@ -248,7 +252,12 @@ def test_ci_runs_redteam_suite_multiturn_agent_hard_fail_check():
 def test_container_uses_minimal_non_root_runtime_and_separate_test_stage():
     dockerfile = (ROOT / "Dockerfile").read_text("utf-8")
 
-    assert "FROM python:3.12-slim AS builder" in dockerfile
+    pinned_base = (
+        "python:3.12-slim@sha256:"
+        "c3d81d25b3154142b0b42eb1e61300024426268edeb5b5a26dd7ddf64d9daf28"
+    )
+    assert f"FROM {pinned_base} AS builder" in dockerfile
+    assert f"FROM {pinned_base} AS runtime-base" in dockerfile
     assert "FROM runtime-base AS test" in dockerfile
     assert "FROM runtime-base AS runtime" in dockerfile
     assert "USER 10001:10001" in dockerfile

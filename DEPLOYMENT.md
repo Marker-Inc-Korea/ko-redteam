@@ -1,6 +1,6 @@
 # ko-redteam Deployment Guide
 
-이 문서는 `0.2.0rc1` 내부 운영 배포 후보의 실행 계약을 정의합니다. 이 단계는 평가기 자체의
+이 문서는 `0.2.0rc2` 내부 운영 배포 후보의 실행 계약을 정의합니다. 이 단계는 평가기 자체의
 재현성, 산출물 무결성, endpoint 오류 처리를 검증합니다. 특정 모델의 안전 인증이나 공식 순위 공개를
 의미하지 않습니다.
 
@@ -19,19 +19,28 @@ endpoint를 사용하고, 다음 repeat는 다른 Slurm job ID와 serving sessio
 ## Container
 
 프로덕션 이미지는 wheel만 포함하며 source, tests, pytest, build tool을 포함하지 않습니다. 기본 사용자는
-UID/GID `10001`입니다.
+UID/GID `10001`입니다. Dockerfile의 `python:3.12-slim` base는 manifest digest로 고정합니다.
 
 ```bash
-docker build --target runtime -t ko-redteam:0.2.0rc1 .
+docker build --target runtime -t ko-redteam:0.2.0rc2 .
 docker run --rm --read-only \
   --tmpfs /tmp:rw,noexec,nosuid,size=64m \
   --cap-drop ALL \
   --security-opt no-new-privileges \
-  ko-redteam:0.2.0rc1
+  ko-redteam:0.2.0rc2
 ```
 
 이미지는 model server를 포함하지 않습니다. 실제 평가는 report 출력용 writable volume과 Slurm job 안에서
 기동한 endpoint를 연결해 실행합니다.
+
+기본 UID/GID `10001:10001`이 mount한 입력 evidence를 읽고 출력 디렉터리에 쓸 수 있어야 합니다. Kubernetes는
+`runAsUser: 10001`, `runAsGroup: 10001`과 volume에 맞는 `fsGroup`을 함께 설정합니다. 소유자 전용 연구
+evidence를 로컬에서 read-only 검증할 때는 파일 권한을 넓히지 말고 `docker run --user "$(id -u):$(id -g)"`로
+현재 비root UID를 명시합니다.
+
+registry의 production channel로 승격하기 전에는 조직 표준 scanner로 OS package CVE를 검사하고, 생성된 SBOM과
+image digest를 보존하며 image signature를 검증해야 합니다. 이 저장소의 self-check는 해당 공급망 검사를
+대체하지 않습니다.
 
 ## Run Context v2
 

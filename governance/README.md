@@ -14,6 +14,7 @@
 | [`CHANGELOG.md`](./CHANGELOG.md) | 프로토콜 및 시즌 변경 이력 |
 | [`SEASON_OPERATIONS.md`](./SEASON_OPERATIONS.md) | 시즌 준비부터 게시까지의 실행 순서 |
 | [`EVIDENCE_INPUTS.md`](./EVIDENCE_INPUTS.md) | 비공개 evidence JSON 입력 계약 |
+| [`PUBLICATION_READINESS.md`](./PUBLICATION_READINESS.md) | 내부 RC와 공식 리더보드 사이의 현재 증거 gap 및 publication 순서 |
 | [`PRACTICE_VALIDATION_2026Q3.md`](./PRACTICE_VALIDATION_2026Q3.md) | 7모델 공개 practice 판별력과 통계적 한계 |
 | [`PRACTICE_VALIDATION_2026Q3_INFERENCE_NOTICE.md`](./PRACTICE_VALIDATION_2026Q3_INFERENCE_NOTICE.md) | 과거 bootstrap-tail pair 분리·tier 추론 철회 |
 | [`PRACTICE_REVIEW_WORKFLOW.md`](./PRACTICE_REVIEW_WORKFLOW.md) | successor pilot blind packet·독립 응답·서명 commitment·병합 절차 |
