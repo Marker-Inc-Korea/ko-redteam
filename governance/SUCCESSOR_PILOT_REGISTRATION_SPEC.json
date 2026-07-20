@@ -151,8 +151,10 @@
    "agent_harness"
   ],
   "minimum_repeats": 3,
+  "exact_repeats_per_anchor": 3,
   "temperature": 0.0,
   "max_tokens": 512,
+  "seed": 0,
   "agent_tool_call_mode": "prompt_json_v1",
   "execution_evidence": {
    "ranking_manifest_schema": "ko-redteam.ranking-manifest.v5",
@@ -176,6 +178,21 @@
    "score_gate_enabled": false,
    "endpoint_errors_allowed": 0,
    "raw_output_allowed": false
+  },
+  "pilot_execution_preflight": {
+   "schema": "ko-redteam.pilot-execution-preflight-contract.v1",
+   "artifact_schema": "ko-redteam.pilot-execution-preflight.v1",
+   "required": true,
+   "slurm_gpu_required": true,
+   "independent_job_per_repeat": true,
+   "independent_serving_session_per_repeat": true,
+   "registration_publication_commit_required": true,
+   "remote_tracking_ref_required": true,
+   "manifest_reference_key": "pilot_execution_preflight",
+   "validator_path": "analysis/ko_pilot_execution_preflight.py",
+   "validator_sha256": "e3b390554ec27af6312a83de28fcaa977d2fc53229f004e42b233ba3634fa382",
+   "entrypoint_path": "probes/preflight_pilot_execution.py",
+   "entrypoint_sha256": "5f74748897bd84dad4bf6a1c7a8f6a1aff6831c06c5871e617f0e61e07335212"
   },
   "immutable_model_revision_required": true,
   "clean_evaluator_commit_required": true

@@ -4,13 +4,15 @@
 과잉거부, 한국어 응답 품질을 한 번에 점검하는 레드팀/포렌식 평가 도구입니다.
 
 > [!NOTE]
-> 현재 버전은 **0.2.0rc4 내부 운영 배포 후보**입니다. 평가기 배포 준비도와 3회 독립 Slurm 실행 증거는
-> 검증할 수 있지만, 특정 모델의 안전 인증이나 공식 leaderboard 공개를 의미하지 않습니다.
+> 현재 버전은 **0.2.0rc5 내부 운영 배포 후보**입니다. 평가기 배포 준비도와 successor anchor의 등록 전용
+> commit·6회 독립 GPU Slurm preflight는 검증할 수 있지만, 특정 모델의 안전 인증이나 공식 leaderboard 공개를
+> 의미하지 않습니다. 현재 successor는 사람 검토 전이므로 anchor 실행 gate가 닫혀 있습니다.
 
 | 바로가기 | 목적 |
 |---|---|
 | [Quick Start](#quick-start) | 로컬 설치와 기본 self-check |
 | [Deployment Guide](./DEPLOYMENT.md) | Slurm, run context v2, container, 3-repeat gate |
+| [Successor Pilot Execution](./governance/SUCCESSOR_PILOT_EXECUTION_WORKFLOW.md) | 등록 이후 2 anchor × 3 GPU Slurm 실행 gate |
 | [What It Checks](#what-it-checks) | 평가 범위와 해석 |
 | [Command Groups](#command-groups) | CLI 전체 목록 |
 | [Official Evidence Pipeline](#official-evidence-pipeline) | 별도 공식 게시 요건 |
@@ -133,6 +135,7 @@ ko-redteam-suite \
 | 사람 검토 | `ko-redteam-review-handoff`, `ko-redteam-review-response`, `ko-redteam-build-review-commitment`, `ko-redteam-merge-review-responses` | reviewer별 격리 반출, 항목별 blind 판정, 비공개 증거 서약, 서명 동결과 fail-closed 병합 |
 | 사람 calibration | `ko-redteam-calibration-collection`, `ko-redteam-calibration-response` | rater별 blinded 라벨, expert disagreement 합의, 독립 SSHSIG와 최종 v3 commitment 조립 |
 | 모델 비교 | `ko-redteam-rank-models`, `ko-redteam-analyze-repeats` | evidence eligibility, 배포 screen, 반복 안정성, 신뢰구간 기반 tier 분석 |
+| 파일럿 실행 승인 | `ko-redteam-preflight-pilot-execution` | 등록 전용 Git commit·remote 반영·clean protocol checkout·등록 모델·고정 seed·GPU Slurm allocation을 모델 작업 전에 검증 |
 | 공식 증거 생성 | `ko-redteam-validate-pilot-registration`, `ko-redteam-build-calibration-commitments`, `ko-redteam-build-calibration`, `ko-redteam-verify-calibration-signatures`, `ko-redteam-build-power-pilot`, `ko-redteam-semantic-embeddings`, `ko-redteam-audit-splits`, `ko-redteam-analyze-power`, `ko-redteam-analyze-familywise-power`, `ko-redteam-build-power-design` | practice 검토·등록, signed 사람 판정 보정, 고정 GPU semantic replay, split 중복, marginal·다중비교 검정력과 공식 분할 규모의 metadata-only 증거 생성 |
 | 공식 게시 검증 | `ko-redteam-build-release-manifest`, `ko-redteam-build-external-review-statement`, `ko-redteam-assemble-external-review`, `ko-redteam-verify-external-review`, `ko-redteam-validate-leaderboard`, `ko-redteam-publish-leaderboard`, `ko-redteam-verify-publication` | deterministic manifest 조립, signed 외부 검토 scope와 hidden split, calibration, provenance, 통계 publication gate, 정적 snapshot 생성·독립 재검증 |
 | 평가셋 관리 | `ko-redteam-import-benchmark`, `ko-redteam-merge-benchmarks`, `ko-redteam-expand-benchmark` | 외부 파일 변환, 병합, 한국어 변형 생성 |
@@ -242,12 +245,18 @@ git commit -m "Freeze successor power pilot registration"
 git push
 ```
 
+이후 anchor는 [Successor Pilot Execution Workflow](./governance/SUCCESSOR_PILOT_EXECUTION_WORKFLOW.md)에 따라
+upper/lower 각각 정확히 3개, 총 6개의 별도 GPU Slurm job으로만 실행합니다. 각 job의 첫 모델 관련 작업 전에
+`ko-redteam-preflight-pilot-execution`이 protocol checkout, registration publication commit, runtime 구현 해시와
+Slurm GPU allocation을 승인해야 합니다. 한 job에서 repeat를 반복하거나 preflight 전에 모델을 다운로드·load하는
+실행은 power evidence로 사용할 수 없습니다.
+
 ```bash
 PILOT_REGISTRATION=governance/SUCCESSOR_PILOT_REGISTRATION.json
 PRACTICE_REVIEW=governance/SUCCESSOR_PILOT_PRACTICE_REVIEW.json
 POWER_FROZEN_AT=2026-07-16T16:00:00+09:00
 
-# 1. Validate pre-execution practice review and pilot registration
+# 1. Validate practice review and registration after all six per-job preflights
 ko-redteam-validate-pilot-registration "$PILOT_REGISTRATION" \
   --review "$PRACTICE_REVIEW"
 

@@ -5,6 +5,11 @@
 
 ## Unreleased - Evidence-Eligible Ranking Protocol
 
+- successor anchor 실행 전에 protocol commit과 clean checkout, registration/audit만 추가한 direct-child
+  publication commit의 remote 반영, 등록된 모델·suite·temperature·max tokens·seed, 실제 preflight 구현 해시와
+  GPU Slurm allocation을 재검증하는 metadata-only gate를 추가한다. 두 anchor는 각각 정확히 3개의 서로 다른
+  Slurm job과 serving session을 사용해야 하며 ranking manifest는 6개 preflight SHA-256을 결합한다. Power 및
+  season evidence는 registration publication commit, preflight hash, 고정 seed와 독립 job/session 수를 보존한다.
 - successor 분산 파일럿 초안에서 과거 실행 문항을 층별 5개씩 재사용하던 35개를 제거하고, 140개 전체를
   과거 미관측 원형으로 교체한다. 공개 non-pilot benchmark 6개·93개 record에 대해 case ID, independence
   group, 정규화 자연어, 전체 모델 입력과 식별자를 제외한 평가 payload의 exact 중복을 생성기와 등록 builder가

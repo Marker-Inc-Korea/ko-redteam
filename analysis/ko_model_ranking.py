@@ -535,6 +535,11 @@ def _report_identity(report: dict[str, Any]) -> dict[str, Any]:
     runtime = provenance.get("runtime") or {}
     prompting = provenance.get("prompting") or {}
     provenance_evaluation = provenance.get("evaluation") or {}
+    run_context = (
+        {key: value for key, value in provenance.items() if key != "context_sha256"}
+        if provenance
+        else None
+    )
     return {
         "report_schema": report.get("schema"),
         "benchmark_name": benchmark.get("name"),
@@ -567,6 +572,7 @@ def _report_identity(report: dict[str, Any]) -> dict[str, Any]:
         "evaluator_git_commit": provenance_evaluation.get("evaluator_git_commit"),
         "source_dirty": provenance_evaluation.get("source_dirty"),
         "protocol_version": provenance_evaluation.get("protocol_version"),
+        "run_context": run_context,
     }
 
 

@@ -347,6 +347,11 @@ def registration_spec_source_paths(spec: dict[str, Any]) -> set[str]:
         statistics.get("analysis_code_paths"),
         "spec.statistics.analysis_code_paths",
     )
+    execution = registration._object(spec.get("execution"), "spec.execution")
+    preflight = registration._object(
+        execution.get("pilot_execution_preflight"),
+        "spec.execution.pilot_execution_preflight",
+    )
     paths = {
         BUILDER_PATH,
         BUILDER_ENTRYPOINT_PATH,
@@ -367,6 +372,13 @@ def registration_spec_source_paths(spec: dict[str, Any]) -> set[str]:
         paths.add(
             registration._relative_path(
                 raw_path, f"spec.statistics.analysis_code_paths.{name}"
+            )
+        )
+    for key in ("validator_path", "entrypoint_path"):
+        paths.add(
+            registration._relative_path(
+                preflight.get(key),
+                f"spec.execution.pilot_execution_preflight.{key}",
             )
         )
     return paths
@@ -525,6 +537,25 @@ def validate_registration_spec(
     )
 
     registration._execution(spec)
+    preflight = registration._object(
+        registration._object(spec.get("execution"), "spec.execution").get(
+            "pilot_execution_preflight"
+        ),
+        "spec.execution.pilot_execution_preflight",
+    )
+    for label, path_key, digest_key in (
+        ("validator", "validator_path", "validator_sha256"),
+        ("entrypoint", "entrypoint_path", "entrypoint_sha256"),
+    ):
+        code_path, _ = _project_file(
+            root,
+            preflight.get(path_key),
+            f"pilot execution preflight {label}",
+        )
+        if _file_sha256(code_path) != preflight.get(digest_key):
+            raise ValueError(
+                f"pilot execution preflight {label} SHA-256 mismatch"
+            )
     statistics = deepcopy(
         registration._object(spec.get("statistics"), "spec.statistics")
     )

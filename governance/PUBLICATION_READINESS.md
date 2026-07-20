@@ -11,7 +11,7 @@
 | 평가기 실행 | 준비 | 독립 Slurm serving 3회, endpoint error hard-fail, artifact digest, hardened container | 내부 RC 허용 |
 | 공개 image 승격 | 미완료 | nonroot·read-only 실행 통과, base digest 고정; CVE scan·SBOM 보존·서명 증거 없음 | registry production channel 금지 |
 | 공개 practice 데이터 | 준비 | schema·coverage·privacy audit 통과 | 개발·연구 진단만 허용 |
-| 후속 practice 사람 검토 | 미완료 | 7개 층 x 20개 전량 신규 초안, exact 5종 중복 0·BGE-M3 0.85 이상 0쌍; reviewer 0명 | pilot 등록·anchor 실행 금지 |
+| 후속 practice 사람 검토 | 미완료 | 7개 층 x 20개 전량 신규 초안, exact 5종 중복 0·BGE-M3 0.85 이상 0쌍, 등록·GPU Slurm preflight gate 구현; reviewer 0명 | pilot 등록·anchor 실행 금지 |
 | 파일럿 분산 정밀도 | 실패 | 이전 실행은 층별 5그룹; 새 층별 20그룹 초안은 미검토·미실행이라 분산 증거 없음 | 공식 split 설계 금지 |
 | 다중비교 검정력 | 실패 | 현재 보수적 설계에서 최소 2모델 비교 필요량 796그룹, 기존 324그룹 | tier 주장 금지 |
 | hidden official split | 없음 | split audit·동결 artifact 없음 | 공식 평가 금지 |
@@ -28,8 +28,11 @@ BGE-M3 진단도 이미 초안 개선에 사용된 설계 단계 screen이다. �
 ## Evidence Required Before Publication
 
 1. Reference 출력에 blind인 실제 검토자 2명 이상이 successor practice 원형을 독립 검토하고 각자 서명한다.
-2. 검토가 동결된 clean commit에서 successor pilot을 사전등록한다.
-3. 승인·동결된 7개 고정 stratum의 20개 독립 pilot group마다 두 reference model을 새 Slurm serving으로 평가한다.
+2. 검토가 동결된 clean protocol commit에서 successor pilot을 사전등록하고, registration과 audit만 추가한
+   direct-child commit을 remote에 게시한다.
+3. 승인·동결된 7개 고정 stratum의 20개 독립 pilot group마다 두 reference model을 anchor별 정확히 3개,
+   총 6개의 새 GPU Slurm job으로 평가한다. 각 job은 모델 작업 전에 등록 publication·checkout·구현·GPU
+   preflight를 통과하고 manifest에 고유 preflight hash를 결합한다.
 4. 관측 전 고정한 MDE·alpha·cohort에 대해 분산 상한, paired randomization 및 Holm family power를 다시 계산한다.
 5. 통과한 power-derived allocation과 immutable model cohort를 공식 prompt 작성 전에 사전등록한다.
 6. 공개 practice와 exact·semantic 중복이 0인 hidden official split을 만들고 두 독립 GPU embedding replay로 감사한다.

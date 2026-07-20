@@ -4,13 +4,14 @@ from __future__ import annotations
 from datetime import datetime
 import hashlib
 import json
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from statistics import mean
 from typing import Any
 
 try:
     from ko_familywise_power import OFFICIAL_MIN_PILOT_GROUPS_PER_STRATUM
     import ko_model_ranking as ranking
+    import ko_pilot_execution_preflight as execution_preflight
     import ko_pilot_registration as pilot_registration
     from ko_power_evidence import (
         INPUT_SCHEMA,
@@ -18,10 +19,11 @@ try:
         PILOT_SOURCE_SCHEMA,
         PILOT_SOURCE_V2_SCHEMA,
     )
-    from ko_run_context import canonical_sha256
+    from ko_run_context import canonical_sha256, validate_independent_run_contexts
 except ModuleNotFoundError:  # package import path
     from .ko_familywise_power import OFFICIAL_MIN_PILOT_GROUPS_PER_STRATUM
     from . import ko_model_ranking as ranking
+    from . import ko_pilot_execution_preflight as execution_preflight
     from . import ko_pilot_registration as pilot_registration
     from .ko_power_evidence import (
         INPUT_SCHEMA,
@@ -29,7 +31,7 @@ except ModuleNotFoundError:  # package import path
         PILOT_SOURCE_SCHEMA,
         PILOT_SOURCE_V2_SCHEMA,
     )
-    from .ko_run_context import canonical_sha256
+    from .ko_run_context import canonical_sha256, validate_independent_run_contexts
 
 
 LEGACY_PREREGISTRATION_SCHEMA = "ko-redteam.season-preregistration.v1"
@@ -64,6 +66,58 @@ def _object(value: Any, context: str) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise ValueError(f"{context} must be an object")
     return value
+
+
+def _load_hashed_json_reference(
+    reference: Any,
+    base_dir: Path,
+    *,
+    context: str,
+) -> tuple[dict[str, Any], str]:
+    row = _object(reference, context)
+    if set(row) != {"path", "sha256"}:
+        raise ValueError(f"{context} must contain only path and sha256")
+    relative = row.get("path")
+    expected_sha256 = row.get("sha256")
+    relative_path = PurePosixPath(relative) if isinstance(relative, str) else None
+    if (
+        relative_path is None
+        or not relative
+        or relative_path.is_absolute()
+        or ".." in relative_path.parts
+        or "\\" in relative
+    ):
+        raise ValueError(f"{context}.path must be a relative path")
+    if (
+        not isinstance(expected_sha256, str)
+        or len(expected_sha256) != 64
+        or any(character not in "0123456789abcdef" for character in expected_sha256)
+    ):
+        raise ValueError(f"{context}.sha256 must be SHA-256")
+    base = base_dir.resolve()
+    candidate = base.joinpath(*relative_path.parts)
+    cursor = base
+    for part in relative_path.parts:
+        cursor /= part
+        if cursor.is_symlink():
+            raise ValueError(f"{context}.path must not traverse symbolic links")
+    path = candidate.resolve()
+    if base not in path.parents or not path.is_file():
+        raise ValueError(f"{context}.path escapes the ranking manifest directory")
+    try:
+        raw = path.read_bytes()
+    except OSError as exc:
+        raise ValueError(f"{context} could not be read") from exc
+    actual_sha256 = hashlib.sha256(raw).hexdigest()
+    if actual_sha256 != expected_sha256:
+        raise ValueError(f"{context} SHA-256 mismatch")
+    try:
+        value = json.loads(raw.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ValueError(f"{context} must be valid UTF-8 JSON") from exc
+    if not isinstance(value, dict):
+        raise ValueError(f"{context} root must be an object")
+    return value, actual_sha256
 
 
 def _timestamp(value: Any, context: str) -> datetime:
@@ -282,6 +336,56 @@ def build_power_pilot_input(
         for name in (upper_name, lower_name)
     ):
         raise ValueError("both anchors must meet the pre-registered repeat count")
+    if is_pilot_registration:
+        exact_repeats = execution.get("exact_repeats_per_anchor")
+        if (
+            not isinstance(exact_repeats, int)
+            or isinstance(exact_repeats, bool)
+            or exact_repeats != minimum_repeats
+        ):
+            raise ValueError("pilot registration must freeze an exact repeat count")
+        if set(runs_by_model) != {upper_name, lower_name}:
+            raise ValueError("successor power pilot manifest must contain only two anchors")
+        if any(
+            len(runs_by_model[name]) != exact_repeats
+            for name in (upper_name, lower_name)
+        ):
+            raise ValueError("both anchors must use exactly the frozen repeat count")
+        all_job_ids: list[str] = []
+        all_session_ids: list[str] = []
+        for model_name in (upper_name, lower_name):
+            contexts = [
+                (run.get("_provenance") or {}).get("run_context")
+                for run in runs_by_model[model_name]
+            ]
+            if not all(isinstance(context, dict) for context in contexts):
+                raise ValueError(
+                    f"successor pilot requires complete run contexts: {model_name}"
+                )
+            context_errors = validate_independent_run_contexts(
+                contexts,
+                min_repeats=exact_repeats,
+                require_slurm=True,
+            )
+            if context_errors:
+                raise ValueError(
+                    f"successor pilot repeat independence failed: {model_name}: "
+                    f"{context_errors[0]}"
+                )
+            all_job_ids.extend(
+                str(context["execution"]["job_id"])
+                for context in contexts
+            )
+            all_session_ids.extend(
+                str(context["execution"]["serving_session_id"])
+                for context in contexts
+            )
+        if len(set(all_job_ids)) != len(all_job_ids):
+            raise ValueError("successor pilot requires globally unique Slurm job IDs")
+        if len(set(all_session_ids)) != len(all_session_ids):
+            raise ValueError(
+                "successor pilot requires globally unique serving session IDs"
+            )
 
     protocol = _object(
         preregistration.get("pilot" if is_pilot_registration else "season"),
@@ -381,6 +485,7 @@ def build_power_pilot_input(
         raise ValueError("power pilot procedure does not match preregistration")
     temperature = execution.get("temperature")
     max_tokens = execution.get("max_tokens")
+    generation_seed = execution.get("seed")
     agent_tool_call_mode = execution.get("agent_tool_call_mode")
     if (
         isinstance(temperature, bool)
@@ -388,6 +493,14 @@ def build_power_pilot_input(
         or isinstance(max_tokens, bool)
         or not isinstance(max_tokens, int)
         or max_tokens < 1
+        or (
+            is_pilot_registration
+            and (
+                not isinstance(generation_seed, int)
+                or isinstance(generation_seed, bool)
+                or generation_seed < 0
+            )
+        )
         or agent_tool_call_mode != "prompt_json_v1"
     ):
         raise ValueError("pre-registered generation settings are invalid")
@@ -395,9 +508,16 @@ def build_power_pilot_input(
     source_identities: dict[str, dict[str, Any]] = {}
     run_started_times: list[datetime] = []
     evidence_completed_times: list[datetime] = []
-    for role, reference in (
-        ("upper", upper_reference),
-        ("lower", lower_reference),
+    preflight_sha256s: list[str] = []
+    preflight_publication_commits: set[str] = set()
+    manifest_entries = {
+        str(entry.get("name") or ""): entry
+        for entry in (manifest.get("models") or [])
+        if isinstance(entry, dict)
+    }
+    for role, registered_role, reference in (
+        ("upper", "upper_anchor", upper_reference),
+        ("lower", "lower_anchor", lower_reference),
     ):
         name = str(reference.get("name") or "")
         identity = runs_by_model[name][0].get("_provenance") or {}
@@ -415,8 +535,53 @@ def build_power_pilot_input(
                     f"{role} anchor provenance does not match preregistration"
                 )
             if is_pilot_registration:
+                assert pilot_audit is not None
                 assert registration_time is not None
                 assert power_frozen_time is not None
+                raw_entry = _object(
+                    manifest_entries.get(name),
+                    f"ranking manifest anchor {name}",
+                )
+                raw_runs = raw_entry.get("runs")
+                if not isinstance(raw_runs, list) or len(raw_runs) != len(
+                    runs_by_model[name]
+                ):
+                    raise ValueError("ranking manifest anchor run list changed")
+                raw_run = _object(
+                    raw_runs[run_index - 1],
+                    f"ranking manifest {name} run {run_index}",
+                )
+                contract = _object(
+                    execution.get("pilot_execution_preflight"),
+                    "pilot execution preflight contract",
+                )
+                reference_key = contract.get("manifest_reference_key")
+                if reference_key != execution_preflight.MANIFEST_REFERENCE_KEY:
+                    raise ValueError("pilot preflight manifest reference key changed")
+                preflight_value, preflight_sha256 = _load_hashed_json_reference(
+                    raw_run.get(reference_key),
+                    manifest_path.parent,
+                    context=f"{name} run {run_index} pilot execution preflight",
+                )
+                execution_preflight.validate_preflight_report(
+                    preflight_value,
+                    pilot_audit,
+                    expected_role=registered_role,
+                    expected_context=_object(
+                        provenance.get("run_context"),
+                        f"{role} anchor run {run_index} context",
+                    ),
+                )
+                preflight_sha256s.append(preflight_sha256)
+                preflight_publication_commits.add(
+                    str(
+                        _object(
+                            preflight_value.get("registration_publication"),
+                            "preflight registration publication",
+                        ).get("commit")
+                        or ""
+                    )
+                )
                 started_at = _timestamp(
                     provenance.get("started_at"),
                     f"{role} anchor run {run_index} started_at",
@@ -462,6 +627,10 @@ def build_power_pilot_input(
                     or report_identity.get("temperature") != temperature
                     or report_identity.get("max_tokens") != max_tokens
                     or (
+                        is_pilot_registration
+                        and report_identity.get("seed") != generation_seed
+                    )
+                    or (
                         suite == "agent_harness"
                         and report_identity.get("tool_call_mode") != agent_tool_call_mode
                     )
@@ -470,6 +639,14 @@ def build_power_pilot_input(
                         f"{role} pilot benchmark or generation settings changed: {suite}"
                     )
         source_identities[role] = identity
+
+    if is_pilot_registration:
+        if len(set(preflight_sha256s)) != len(preflight_sha256s):
+            raise ValueError("successor pilot preflight artifacts must be unique per repeat")
+        if len(preflight_publication_commits) != 1 or "" in preflight_publication_commits:
+            raise ValueError(
+                "successor pilot repeats must use one registration publication commit"
+            )
 
     if is_pilot_registration:
         assert pilot_audit is not None
@@ -612,6 +789,16 @@ def build_power_pilot_input(
                 "registration_canonical_sha256"
             ],
             "practice_review_sha256": pilot_audit["review_canonical_sha256"],
+            "registration_publication_commit": next(
+                iter(preflight_publication_commits)
+            ),
+            "pilot_execution_preflight_sha256s": preflight_sha256s,
+            "exact_repeats_per_anchor": execution[
+                "exact_repeats_per_anchor"
+            ],
+            "generation_seed": generation_seed,
+            "independent_slurm_job_count": len(set(all_job_ids)),
+            "independent_serving_session_count": len(set(all_session_ids)),
             "pilot_id": pilot_audit["pilot_id"],
             "pilot_registered_at": pilot_audit["registered_at"],
             "first_run_started_at": min(run_started_times).isoformat(),

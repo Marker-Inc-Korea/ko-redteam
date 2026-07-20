@@ -256,12 +256,31 @@ def _registration(review: dict) -> dict:
         "execution": {
             "suites": list(R.OFFICIAL_SUITES),
             "minimum_repeats": 3,
+            "exact_repeats_per_anchor": 3,
             "temperature": 0.0,
             "max_tokens": 512,
+            "seed": 0,
             "agent_tool_call_mode": "prompt_json_v1",
             "execution_evidence": {
                 **R.EXECUTION_EVIDENCE_CONTRACT,
                 "ranking_manifest_schema": R.RANKING_MANIFEST_SCHEMA,
+            },
+            "pilot_execution_preflight": {
+                "schema": P.PILOT_EXECUTION_PREFLIGHT_CONTRACT_SCHEMA,
+                "artifact_schema": P.PILOT_EXECUTION_PREFLIGHT_SCHEMA,
+                "required": True,
+                "slurm_gpu_required": True,
+                "independent_job_per_repeat": True,
+                "independent_serving_session_per_repeat": True,
+                "registration_publication_commit_required": True,
+                "remote_tracking_ref_required": True,
+                "manifest_reference_key": (
+                    P.PILOT_EXECUTION_PREFLIGHT_REFERENCE_KEY
+                ),
+                "validator_path": P.PILOT_EXECUTION_PREFLIGHT_VALIDATOR_PATH,
+                "validator_sha256": "9" * 64,
+                "entrypoint_path": P.PILOT_EXECUTION_PREFLIGHT_ENTRYPOINT_PATH,
+                "entrypoint_sha256": "a" * 64,
             },
             "immutable_model_revision_required": True,
             "clean_evaluator_commit_required": True,
@@ -441,6 +460,30 @@ def test_frozen_pilot_registration_binds_review_and_pre_execution_design():
                 pairwise_test=R.LEGACY_PAIRWISE_TEST
             ),
             "pairwise test",
+        ),
+        (
+            lambda registration, review: registration["execution"].update(
+                exact_repeats_per_anchor=4
+            ),
+            "exactly three repeats",
+        ),
+        (
+            lambda registration, review: registration["execution"].update(
+                seed=-1
+            ),
+            "execution.seed",
+        ),
+        (
+            lambda registration, review: registration["execution"][
+                "pilot_execution_preflight"
+            ].update(required=False),
+            "not fail-closed",
+        ),
+        (
+            lambda registration, review: registration["execution"][
+                "pilot_execution_preflight"
+            ].update(validator_sha256="invalid"),
+            "validator_sha256",
         ),
         (
             lambda registration, review: registration.update(extra="unsupported"),

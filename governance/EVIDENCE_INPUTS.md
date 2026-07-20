@@ -208,7 +208,9 @@ suite/domain/expected 7개 stratum을 모두 포함하고 stratum마다 최소 2
 group 수는 `power-derived-split-design.v1`의 계획값 및 split audit의 여섯 영역 합계와 같아야 한다.
 현재 입력의 `pilot_source`는 `ko-redteam.power-pilot-source.v2`여야 하며 pilot registration, practice review,
 benchmark fingerprint, anchor revision과 evaluator commit의 digest, `first_run_started_at`,
-`last_run_started_at`, `last_execution_completed_at`을 함께 포함한다. `preregistered_at`은 과거 필드명을
+`last_run_started_at`, `last_execution_completed_at`을 함께 포함한다. 또한 registration publication commit,
+anchor별 정확한 3회·총 6개의 고유 preflight SHA-256, generation seed, 독립 Slurm job과 serving session 수를
+포함해야 한다. `preregistered_at`은 과거 필드명을
 유지하지만 의미는 모든 실행 evidence가 완료된 뒤의 power 분석 동결 시각이다. 검증 순서는
 `pilot_registered_at <= first_run_started_at <= last_run_started_at <= last_execution_completed_at <= preregistered_at`이다.
 

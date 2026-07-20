@@ -58,6 +58,17 @@ PILOT_REGISTRATION_BUILD_EVIDENCE_SCHEMA = (
 PRACTICE_REVIEW_V1_SCHEMA = "ko-redteam.practice-review.v1"
 PRACTICE_REVIEW_SCHEMA = FINAL_REVIEW_SCHEMA
 PILOT_REGISTRATION_AUDIT_SCHEMA = "ko-redteam.power-pilot-registration-audit.v1"
+PILOT_EXECUTION_PREFLIGHT_CONTRACT_SCHEMA = (
+    "ko-redteam.pilot-execution-preflight-contract.v1"
+)
+PILOT_EXECUTION_PREFLIGHT_SCHEMA = "ko-redteam.pilot-execution-preflight.v1"
+PILOT_EXECUTION_PREFLIGHT_REFERENCE_KEY = "pilot_execution_preflight"
+PILOT_EXECUTION_PREFLIGHT_VALIDATOR_PATH = (
+    "analysis/ko_pilot_execution_preflight.py"
+)
+PILOT_EXECUTION_PREFLIGHT_ENTRYPOINT_PATH = (
+    "probes/preflight_pilot_execution.py"
+)
 FROZEN_STATUS = "frozen_pre_execution"
 REVIEW_PASSED_STATUS = "passed"
 CONSTRUCTION_METHOD = "target-allocation linearized balanced diagnostic influence"
@@ -433,13 +444,39 @@ def _practice_design(
 
 def _execution(registration: dict[str, Any]) -> dict[str, Any]:
     execution = _object(registration.get("execution"), "execution")
+    if set(execution) != {
+        "suites",
+        "minimum_repeats",
+        "exact_repeats_per_anchor",
+        "temperature",
+        "max_tokens",
+        "seed",
+        "agent_tool_call_mode",
+        "execution_evidence",
+        "pilot_execution_preflight",
+        "immutable_model_revision_required",
+        "clean_evaluator_commit_required",
+    }:
+        raise ValueError("execution fields do not match the successor pilot contract")
     if execution.get("suites") != list(ranking.OFFICIAL_SUITES):
         raise ValueError("execution.suites must contain all official suites")
-    _positive_int(execution.get("minimum_repeats"), "execution.minimum_repeats")
+    minimum_repeats = _positive_int(
+        execution.get("minimum_repeats"),
+        "execution.minimum_repeats",
+    )
+    exact_repeats = _positive_int(
+        execution.get("exact_repeats_per_anchor"),
+        "execution.exact_repeats_per_anchor",
+    )
+    if minimum_repeats != 3 or exact_repeats != minimum_repeats:
+        raise ValueError("successor pilot requires exactly three repeats per anchor")
     temperature = _number(execution.get("temperature"), "execution.temperature")
     if not 0.0 <= temperature <= 2.0:
         raise ValueError("execution.temperature must be between 0 and 2")
     _positive_int(execution.get("max_tokens"), "execution.max_tokens")
+    seed = execution.get("seed")
+    if not isinstance(seed, int) or isinstance(seed, bool) or seed < 0:
+        raise ValueError("execution.seed must be a non-negative integer")
     if execution.get("agent_tool_call_mode") != "prompt_json_v1":
         raise ValueError("execution.agent_tool_call_mode must be prompt_json_v1")
     expected_evidence = {
@@ -448,6 +485,49 @@ def _execution(registration: dict[str, Any]) -> dict[str, Any]:
     }
     if execution.get("execution_evidence") != expected_evidence:
         raise ValueError("execution evidence contract does not match v5")
+    preflight = _object(
+        execution.get("pilot_execution_preflight"),
+        "execution.pilot_execution_preflight",
+    )
+    if set(preflight) != {
+        "schema",
+        "artifact_schema",
+        "required",
+        "slurm_gpu_required",
+        "independent_job_per_repeat",
+        "independent_serving_session_per_repeat",
+        "registration_publication_commit_required",
+        "remote_tracking_ref_required",
+        "manifest_reference_key",
+        "validator_path",
+        "validator_sha256",
+        "entrypoint_path",
+        "entrypoint_sha256",
+    }:
+        raise ValueError("pilot execution preflight contract fields changed")
+    expected_preflight = {
+        "schema": PILOT_EXECUTION_PREFLIGHT_CONTRACT_SCHEMA,
+        "artifact_schema": PILOT_EXECUTION_PREFLIGHT_SCHEMA,
+        "required": True,
+        "slurm_gpu_required": True,
+        "independent_job_per_repeat": True,
+        "independent_serving_session_per_repeat": True,
+        "registration_publication_commit_required": True,
+        "remote_tracking_ref_required": True,
+        "manifest_reference_key": PILOT_EXECUTION_PREFLIGHT_REFERENCE_KEY,
+        "validator_path": PILOT_EXECUTION_PREFLIGHT_VALIDATOR_PATH,
+        "entrypoint_path": PILOT_EXECUTION_PREFLIGHT_ENTRYPOINT_PATH,
+    }
+    if any(preflight.get(key) != value for key, value in expected_preflight.items()):
+        raise ValueError("pilot execution preflight contract is not fail-closed")
+    _sha256(
+        preflight.get("validator_sha256"),
+        "execution.pilot_execution_preflight.validator_sha256",
+    )
+    _sha256(
+        preflight.get("entrypoint_sha256"),
+        "execution.pilot_execution_preflight.entrypoint_sha256",
+    )
     if execution.get("immutable_model_revision_required") is not True:
         raise ValueError("immutable model revisions must be required")
     if execution.get("clean_evaluator_commit_required") is not True:

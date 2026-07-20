@@ -30,6 +30,9 @@ Evidence-eligible tier는 이 프로토콜 안에서 통계적으로 분리된 �
   provenance gate를 통과할 수 없다.
 - 온도 0에서도 런타임과 분산 추론의 비결정성이 남을 수 있어 최소 3회 반복만으로 모든 변동을 설명하지
   못한다.
+- pilot preflight는 로컬 Git object·remote-tracking ref와 Slurm/GPU 환경 변수를 재검증하는 운영 통제이며,
+  원격 서버 상태나 물리 GPU 사용을 암호학적으로 증명하는 attestation은 아니다. 공식 검토에서는 별도 Slurm
+  accounting·job log와 접근 기록을 preflight hash에 대조해야 한다.
 - 공개 practice split 최적화, 데이터 오염과 의미 중복을 완전히 배제할 수 없다. 공식 split 감사와 외부
   검토는 위험을 줄이지만 악의적 조작이 불가능함을 증명하지 않는다.
 - 종합 profile 가중치는 가치 판단을 포함한다. `balanced`만 primary 추론에 사용하고 safety·utility 관점은

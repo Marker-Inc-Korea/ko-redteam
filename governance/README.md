@@ -27,6 +27,7 @@
 | [`RELEASE_MANIFEST_WORKFLOW.md`](./RELEASE_MANIFEST_WORKFLOW.md) | 수동 digest 없이 candidate를 사전검증하고 외부서명 뒤 publishable final manifest만 만드는 절차 |
 | [`EXTERNAL_REVIEW_WORKFLOW.md`](./EXTERNAL_REVIEW_WORKFLOW.md) | 공식 release scope와 공개 검토 증거를 검토자별 SSHSIG로 결합하는 절차 |
 | [`SUCCESSOR_PILOT_REGISTRATION_SPEC.json`](./SUCCESSOR_PILOT_REGISTRATION_SPEC.json) | 사람 검수 후 재현 가능한 v2 pilot registration을 생성하는 공개 사양 |
+| [`SUCCESSOR_PILOT_EXECUTION_WORKFLOW.md`](./SUCCESSOR_PILOT_EXECUTION_WORKFLOW.md) | 등록 전용 Git publication과 2 anchor × 3개 독립 GPU Slurm preflight·재실행 절차 |
 | [`SEASON_2026Q3.md`](./SEASON_2026Q3.md) | S4 중단 상태와 S1·S2·S3 변경 이력 |
 | [`SEASON_2026Q3_S4_PREREGISTRATION.json`](./SEASON_2026Q3_S4_PREREGISTRATION.json) | 과거 324그룹 S4 동결 설계와 v3 실행 증거 계약 |
 | [`SEASON_2026Q3_S4_POWER_ANALYSIS.json`](./SEASON_2026Q3_S4_POWER_ANALYSIS.json) | S4 v3 reference 기반 단일 비교 검정력 증거 |

@@ -729,6 +729,32 @@ def _validate_cross_bindings(
     ):
         raise ValueError("season execution settings changed after the reference pilot")
 
+    pilot_execution = pilot_audit["execution"]
+    exact_repeats = pilot_execution["exact_repeats_per_anchor"]
+    preflight_sha256s = source.get("pilot_execution_preflight_sha256s")
+    expected_preflight_count = exact_repeats * 2
+    if (
+        source.get("exact_repeats_per_anchor") != exact_repeats
+        or source.get("upper_runs") != exact_repeats
+        or source.get("lower_runs") != exact_repeats
+        or source.get("generation_seed") != pilot_execution.get("seed")
+        or source.get("independent_slurm_job_count")
+        != expected_preflight_count
+        or source.get("independent_serving_session_count")
+        != expected_preflight_count
+        or not isinstance(preflight_sha256s, list)
+        or len(preflight_sha256s) != expected_preflight_count
+        or not all(
+            isinstance(value, str) and SHA256_RE.fullmatch(value)
+            for value in preflight_sha256s
+        )
+        or len(set(preflight_sha256s)) != len(preflight_sha256s)
+        or not GIT_COMMIT_RE.fullmatch(
+            str(source.get("registration_publication_commit") or "")
+        )
+    ):
+        raise ValueError("successor pilot execution preflight evidence is incomplete")
+
     pilot_references = pilot_audit["reference_models"]
     for role, reference in validate_season_preregistration_spec(spec)[
         "references_by_role"
@@ -898,6 +924,22 @@ def _expected_preregistration(
                     "registration_canonical_sha256"
                 ],
                 "practice_review_sha256": pilot_audit["review_canonical_sha256"],
+                "registration_publication_commit": power_source[
+                    "registration_publication_commit"
+                ],
+                "pilot_execution_preflight_sha256s": deepcopy(
+                    power_source["pilot_execution_preflight_sha256s"]
+                ),
+                "exact_repeats_per_anchor": power_source[
+                    "exact_repeats_per_anchor"
+                ],
+                "generation_seed": power_source["generation_seed"],
+                "independent_slurm_job_count": power_source[
+                    "independent_slurm_job_count"
+                ],
+                "independent_serving_session_count": power_source[
+                    "independent_serving_session_count"
+                ],
                 "ranking_manifest_schema": ranking.RANKING_MANIFEST_SCHEMA,
                 "suites": list(ranking.OFFICIAL_SUITES),
                 "practice_benchmark_fingerprints": deepcopy(

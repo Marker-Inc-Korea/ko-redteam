@@ -1903,6 +1903,22 @@ def _audit_power(audit: _Audit, power: dict[str, Any]) -> None:
         if isinstance(pilot_source.get("benchmark_fingerprints"), dict)
         else {}
     )
+    pilot_preflight_sha256s = (
+        pilot_source.get("pilot_execution_preflight_sha256s")
+        if isinstance(
+            pilot_source.get("pilot_execution_preflight_sha256s"), list
+        )
+        else []
+    )
+    pilot_total_runs = (
+        pilot_source.get("upper_runs", 0) + pilot_source.get("lower_runs", 0)
+        if all(
+            isinstance(pilot_source.get(key), int)
+            and not isinstance(pilot_source.get(key), bool)
+            for key in ("upper_runs", "lower_runs")
+        )
+        else 0
+    )
     pilot_design_valid = (
         pilot_source.get("schema") == POWER_PILOT_SOURCE_SCHEMA
         and bool(
@@ -1915,6 +1931,19 @@ def _audit_power(audit: _Audit, power: dict[str, Any]) -> None:
                 str(pilot_source.get("practice_review_sha256") or "")
             )
         )
+        and bool(
+            GIT_COMMIT_RE.fullmatch(
+                str(
+                    pilot_source.get("registration_publication_commit") or ""
+                )
+            )
+        )
+        and len(pilot_preflight_sha256s) == pilot_total_runs
+        and all(
+            isinstance(value, str) and bool(SHA256_RE.fullmatch(value))
+            for value in pilot_preflight_sha256s
+        )
+        and len(set(pilot_preflight_sha256s)) == len(pilot_preflight_sha256s)
         and isinstance(pilot_source.get("pilot_id"), str)
         and bool(pilot_source.get("pilot_id", "").strip())
         and _iso_with_timezone(pilot_source.get("pilot_registered_at"))
@@ -1955,6 +1984,18 @@ def _audit_power(audit: _Audit, power: dict[str, Any]) -> None:
             and pilot_source.get(key) >= pilot_source.get("minimum_repeats")
             for key in ("upper_runs", "lower_runs")
         )
+        and pilot_source.get("exact_repeats_per_anchor")
+        == pilot_source.get("minimum_repeats")
+        and pilot_source.get("upper_runs")
+        == pilot_source.get("exact_repeats_per_anchor")
+        and pilot_source.get("lower_runs")
+        == pilot_source.get("exact_repeats_per_anchor")
+        and isinstance(pilot_source.get("generation_seed"), int)
+        and not isinstance(pilot_source.get("generation_seed"), bool)
+        and pilot_source.get("generation_seed") >= 0
+        and pilot_source.get("independent_slurm_job_count") == pilot_total_runs
+        and pilot_source.get("independent_serving_session_count")
+        == pilot_total_runs
         and _number(pilot_source.get("temperature")) is not None
         and 0.0 <= float(pilot_source.get("temperature")) <= 2.0
         and isinstance(pilot_source.get("max_tokens"), int)
@@ -2122,6 +2163,12 @@ def _audit_pilot_evidence(
         if isinstance(pilot_summary.get("source"), dict)
         else {}
     )
+    pilot_execution = (
+        validation.get("execution")
+        if isinstance(validation, dict)
+        and isinstance(validation.get("execution"), dict)
+        else {}
+    )
     benchmark_artifacts = (
         validation.get("benchmark_artifacts")
         if isinstance(validation, dict)
@@ -2149,6 +2196,17 @@ def _audit_pilot_evidence(
         and source.get("evaluator_git_commit") == pilot.get("protocol_git_commit")
         and source.get("builder_code_sha256")
         == statistics.get("builder_code_sha256")
+        and source.get("exact_repeats_per_anchor")
+        == pilot_execution.get("exact_repeats_per_anchor")
+        and source.get("generation_seed") == pilot_execution.get("seed")
+        and source.get("upper_runs")
+        == pilot_execution.get("exact_repeats_per_anchor")
+        and source.get("lower_runs")
+        == pilot_execution.get("exact_repeats_per_anchor")
+        and source.get("independent_slurm_job_count")
+        == 2 * pilot_execution.get("exact_repeats_per_anchor", 0)
+        and source.get("independent_serving_session_count")
+        == 2 * pilot_execution.get("exact_repeats_per_anchor", 0)
         and isinstance(power, dict)
         and power.get("analysis_code_sha256")
         == statistics.get("power_analysis_code_sha256")
@@ -3295,6 +3353,17 @@ def _audit_preregistration(
         == power_pilot_source.get("pilot_registration_sha256")
         and power_pilot_design.get("practice_review_sha256")
         == power_pilot_source.get("practice_review_sha256")
+        and all(
+            power_pilot_design.get(key) == power_pilot_source.get(key)
+            for key in (
+                "registration_publication_commit",
+                "pilot_execution_preflight_sha256s",
+                "exact_repeats_per_anchor",
+                "generation_seed",
+                "independent_slurm_job_count",
+                "independent_serving_session_count",
+            )
+        )
         and bool(
             SHA256_RE.fullmatch(
                 str(power_pilot_design.get("pilot_registration_sha256") or "")

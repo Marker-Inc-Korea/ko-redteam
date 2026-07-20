@@ -19,6 +19,7 @@ import ko_leaderboard as L  # noqa: E402
 import ko_external_review as ER  # noqa: E402
 import ko_familywise_power as F  # noqa: E402
 import ko_model_ranking as R  # noqa: E402
+import ko_pilot_execution_preflight as PX  # noqa: E402
 import ko_pilot_registration as PR  # noqa: E402
 import ko_power_pilot as PP  # noqa: E402
 import ko_power_design as D  # noqa: E402
@@ -162,6 +163,42 @@ def _pilot_build_evidence(
     }
 
 
+def _pilot_execution_contract() -> dict:
+    return {
+        "schema": PR.PILOT_EXECUTION_PREFLIGHT_CONTRACT_SCHEMA,
+        "artifact_schema": PR.PILOT_EXECUTION_PREFLIGHT_SCHEMA,
+        "required": True,
+        "slurm_gpu_required": True,
+        "independent_job_per_repeat": True,
+        "independent_serving_session_per_repeat": True,
+        "registration_publication_commit_required": True,
+        "remote_tracking_ref_required": True,
+        "manifest_reference_key": PR.PILOT_EXECUTION_PREFLIGHT_REFERENCE_KEY,
+        "validator_path": PR.PILOT_EXECUTION_PREFLIGHT_VALIDATOR_PATH,
+        "validator_sha256": _sha_file(ROOT / PX.VALIDATOR_PATH),
+        "entrypoint_path": PR.PILOT_EXECUTION_PREFLIGHT_ENTRYPOINT_PATH,
+        "entrypoint_sha256": _sha_file(ROOT / PX.ENTRYPOINT_PATH),
+    }
+
+
+def _pilot_execution() -> dict:
+    return {
+        "suites": list(R.SUITES),
+        "minimum_repeats": 3,
+        "exact_repeats_per_anchor": 3,
+        "temperature": 0.0,
+        "max_tokens": 512,
+        "seed": 0,
+        "agent_tool_call_mode": "prompt_json_v1",
+        "execution_evidence": json.loads(
+            json.dumps(R.EXECUTION_EVIDENCE_CONTRACT)
+        ),
+        "pilot_execution_preflight": _pilot_execution_contract(),
+        "immutable_model_revision_required": True,
+        "clean_evaluator_commit_required": True,
+    }
+
+
 def _context(
     model: str,
     run: int,
@@ -170,8 +207,9 @@ def _context(
 ) -> dict:
     empty_sha = C.canonical_sha256("")
     revision_seed = hashlib.sha1(model.encode()).hexdigest()
+    job_id = str(int(revision_seed[:8], 16) * 10 + run)
     return {
-        "schema": C.SCHEMA,
+        "schema": C.DEPLOYMENT_SCHEMA,
         "run_id": f"{model}-official-{run:03d}",
         "started_at": started_at or f"2026-07-{10 + run:02d}T10:00:00+09:00",
         "model": {
@@ -200,6 +238,17 @@ def _context(
             "evaluator_git_commit": "a" * 40,
             "source_dirty": False,
             "protocol_version": "1.0.0",
+        },
+        "execution": {
+            "scheduler": "slurm",
+            "job_id": job_id,
+            "serving_session_id": f"{model}-session-{run:03d}",
+            "repeat_index": run,
+        },
+        "generation": {
+            "temperature": 0.0,
+            "max_tokens": 512,
+            "seed": 0,
         },
     }
 
@@ -307,6 +356,7 @@ def _report(
         "evaluation": {
             "temperature": 0.0,
             "max_tokens": 512,
+            "seed": 0,
             **({"tool_call_mode": "prompt_json_v1"} if suite == "agent_harness" else {}),
         },
         "model": model,
@@ -461,6 +511,125 @@ def _execution_evidence(
             "sha256": _sha_file(evidence_path),
         }
     return references
+
+
+def _attach_pilot_preflights(
+    manifest_path: Path,
+    pilot_registration: dict,
+    practice_review: dict,
+) -> None:
+    audit = PR.validate_pilot_registration(
+        pilot_registration,
+        practice_review,
+    )
+    manifest = json.loads(manifest_path.read_text("utf-8"))
+    role_by_model = {
+        reference["name"]: role
+        for role, reference in audit["reference_models"].items()
+    }
+    contract = audit["execution"]["pilot_execution_preflight"]
+    benchmark_content_sha256 = {
+        suite: row["content_sha256"]
+        for suite, row in audit["benchmark_artifacts"].items()
+    }
+    for model in manifest["models"]:
+        role = role_by_model[model["name"]]
+        reference = audit["reference_models"][role]
+        for repeat_index, run in enumerate(model["runs"], 1):
+            report_path = manifest_path.parent / run["paperbench"]["path"]
+            provenance = json.loads(report_path.read_text("utf-8"))["provenance"]
+            context = {
+                key: value
+                for key, value in provenance.items()
+                if key != "context_sha256"
+            }
+            started_at = datetime.fromisoformat(context["started_at"])
+            checked_at = (started_at - timedelta(minutes=1)).isoformat()
+            value = {
+                "schema": PX.SCHEMA,
+                "status": PX.STATUS,
+                "checked_at": checked_at,
+                "pilot_id": audit["pilot_id"],
+                "anchor_role": role,
+                "model": {
+                    "name": reference["name"],
+                    "model_id": reference["model_id"],
+                    "revision": reference["revision"],
+                },
+                "protocol_git_commit": audit["protocol_git_commit"],
+                "registration_publication": {
+                    "commit": "b" * 40,
+                    "remote_ref": "refs/remotes/origin/main",
+                    "remote_ref_commit": "c" * 40,
+                    "registration_git_path": "governance/registration.json",
+                    "audit_git_path": "governance/registration-audit.json",
+                },
+                "registration": {
+                    "file_sha256": "d" * 64,
+                    "canonical_sha256": audit[
+                        "registration_canonical_sha256"
+                    ],
+                    "audit_file_sha256": "e" * 64,
+                },
+                "practice_review": {
+                    "canonical_sha256": audit["review_canonical_sha256"],
+                },
+                "source_checkout": {
+                    "head": audit["protocol_git_commit"],
+                    "clean": True,
+                    "source_bindings_sha256": "f" * 64,
+                },
+                "execution": {
+                    "run_id": context["run_id"],
+                    "repeat_index": repeat_index,
+                    "serving_session_id": context["execution"][
+                        "serving_session_id"
+                    ],
+                    "suites": audit["execution"]["suites"],
+                    "benchmark_content_sha256": benchmark_content_sha256,
+                    "exact_repeats_per_anchor": audit["execution"][
+                        "exact_repeats_per_anchor"
+                    ],
+                    "temperature": audit["execution"]["temperature"],
+                    "max_tokens": audit["execution"]["max_tokens"],
+                    "seed": audit["execution"]["seed"],
+                    "agent_tool_call_mode": audit["execution"][
+                        "agent_tool_call_mode"
+                    ],
+                },
+                "slurm": {
+                    "scheduler": "slurm",
+                    "job_id": context["execution"]["job_id"],
+                    "partition": "unit-gpu",
+                    "node_list": "gpu-unit-01",
+                    "gpu_allocation": "SLURM_GPUS_ON_NODE=1",
+                    "visible_devices": "0",
+                },
+                "implementation": {
+                    "validator_path": contract["validator_path"],
+                    "validator_sha256": contract["validator_sha256"],
+                    "entrypoint_path": contract["entrypoint_path"],
+                    "entrypoint_sha256": contract["entrypoint_sha256"],
+                },
+                "raw_prompt_or_response_used": False,
+            }
+            PX.validate_preflight_report(
+                value,
+                audit,
+                expected_role=role,
+                expected_context=context,
+            )
+            preflight_path = (
+                manifest_path.parent
+                / "preflights"
+                / f"{model['name']}-run-{repeat_index}.json"
+            )
+            _write_json(preflight_path, value)
+            run[PX.MANIFEST_REFERENCE_KEY] = {
+                "path": str(preflight_path.relative_to(manifest_path.parent)),
+                "sha256": _sha_file(preflight_path),
+            }
+    _write_json(manifest_path, manifest)
 
 
 def _ranking_bundle(
@@ -902,18 +1071,7 @@ def _valid_release(
             "weight_profile": "balanced",
             "construction_method": PR.CONSTRUCTION_METHOD,
         },
-        "execution": {
-            "suites": list(R.SUITES),
-            "minimum_repeats": 3,
-            "temperature": 0.0,
-            "max_tokens": 512,
-            "agent_tool_call_mode": "prompt_json_v1",
-            "execution_evidence": json.loads(
-                json.dumps(R.EXECUTION_EVIDENCE_CONTRACT)
-            ),
-            "immutable_model_revision_required": True,
-            "clean_evaluator_commit_required": True,
-        },
+        "execution": _pilot_execution(),
         "statistics": {
             "estimand": "paired balanced diagnostic profile score difference",
             "minimum_detectable_effect": 5.0,
@@ -946,6 +1104,11 @@ def _valid_release(
         },
     }
     _write_json(pilot_registration_path, pilot_registration)
+    _attach_pilot_preflights(
+        pilot_manifest_path,
+        pilot_registration,
+        practice_review,
+    )
     power_seed = 20260713
     power_required_groups = PE._required_sample_size(
         5.0,
@@ -998,6 +1161,18 @@ def _valid_release(
                     pilot_registration
                 ),
                 "practice_review_sha256": C.canonical_sha256(practice_review),
+                "registration_publication_commit": "b" * 40,
+                "pilot_execution_preflight_sha256s": [
+                    run[PX.MANIFEST_REFERENCE_KEY]["sha256"]
+                    for model in json.loads(
+                        pilot_manifest_path.read_text("utf-8")
+                    )["models"]
+                    for run in model["runs"]
+                ],
+                "exact_repeats_per_anchor": 3,
+                "generation_seed": 0,
+                "independent_slurm_job_count": 6,
+                "independent_serving_session_count": 6,
                 "pilot_id": pilot_registration["pilot"]["id"],
                 "pilot_registered_at": pilot_registration["pilot"][
                     "registered_at"
@@ -1710,7 +1885,7 @@ def test_v4_power_pilot_accepts_frozen_pilot_registration_before_season(tmp_path
             "weight_profile": "balanced",
             "construction_method": PR.CONSTRUCTION_METHOD,
         },
-        "execution": preregistration["execution"],
+        "execution": _pilot_execution(),
         "statistics": {
             "estimand": "paired balanced diagnostic profile score difference",
             "minimum_detectable_effect": 5.0,
@@ -1739,6 +1914,8 @@ def test_v4_power_pilot_accepts_frozen_pilot_registration_before_season(tmp_path
         },
     }
 
+    _attach_pilot_preflights(manifest_path, pilot_registration, review)
+
     power_input = PP.build_power_pilot_input(
         manifest_path,
         pilot_registration,
@@ -1746,7 +1923,16 @@ def test_v4_power_pilot_accepts_frozen_pilot_registration_before_season(tmp_path
         practice_review=review,
     )
 
-    assert power_input["pilot_clusters"] == historical_input["pilot_clusters"]
+    assert [
+        (row["stratum"], row["difference"])
+        for row in power_input["pilot_clusters"]
+    ] == [
+        (row["stratum"], row["difference"])
+        for row in historical_input["pilot_clusters"]
+    ]
+    assert [row["id"] for row in power_input["pilot_clusters"]] != [
+        row["id"] for row in historical_input["pilot_clusters"]
+    ]
     assert power_input["pilot_source"]["schema"] == (
         "ko-redteam.power-pilot-source.v2"
     )
@@ -1765,6 +1951,58 @@ def test_v4_power_pilot_accepts_frozen_pilot_registration_before_season(tmp_path
     assert power_input["pilot_source"]["last_execution_completed_at"] == (
         "2026-05-23T10:10:00+09:00"
     )
+    assert power_input["pilot_source"]["exact_repeats_per_anchor"] == 3
+    assert power_input["pilot_source"]["generation_seed"] == 0
+    assert power_input["pilot_source"]["independent_slurm_job_count"] == 6
+    assert power_input["pilot_source"][
+        "independent_serving_session_count"
+    ] == 6
+    assert len(
+        power_input["pilot_source"][
+            "pilot_execution_preflight_sha256s"
+        ]
+    ) == 6
+
+    frozen_manifest = json.loads(manifest_path.read_text("utf-8"))
+    missing_preflight = json.loads(json.dumps(frozen_manifest))
+    missing_preflight["models"][0]["runs"][0].pop(
+        PX.MANIFEST_REFERENCE_KEY
+    )
+    _write_json(manifest_path, missing_preflight)
+    with pytest.raises(ValueError, match="preflight must be an object"):
+        PP.build_power_pilot_input(
+            manifest_path,
+            pilot_registration,
+            preregistered_at="2026-06-01T00:00:00+09:00",
+            practice_review=review,
+        )
+
+    invalid_preflight_hash = json.loads(json.dumps(frozen_manifest))
+    invalid_preflight_hash["models"][0]["runs"][0][
+        PX.MANIFEST_REFERENCE_KEY
+    ]["sha256"] = "A" * 64
+    _write_json(manifest_path, invalid_preflight_hash)
+    with pytest.raises(ValueError, match="must be SHA-256"):
+        PP.build_power_pilot_input(
+            manifest_path,
+            pilot_registration,
+            preregistered_at="2026-06-01T00:00:00+09:00",
+            practice_review=review,
+        )
+
+    extra_repeat = json.loads(json.dumps(frozen_manifest))
+    extra_repeat["models"][0]["runs"].append(
+        json.loads(json.dumps(extra_repeat["models"][0]["runs"][0]))
+    )
+    _write_json(manifest_path, extra_repeat)
+    with pytest.raises(ValueError, match="exactly the frozen repeat count"):
+        PP.build_power_pilot_input(
+            manifest_path,
+            pilot_registration,
+            preregistered_at="2026-06-01T00:00:00+09:00",
+            practice_review=review,
+        )
+    _write_json(manifest_path, frozen_manifest)
 
     late_registration = json.loads(json.dumps(pilot_registration))
     late_registration["pilot"]["registered_at"] = (
@@ -1773,7 +2011,7 @@ def test_v4_power_pilot_accepts_frozen_pilot_registration_before_season(tmp_path
     late_registration["build_evidence"]["built_at"] = (
         "2026-05-22T00:00:00+09:00"
     )
-    with pytest.raises(ValueError, match="outside the frozen pilot window"):
+    with pytest.raises(ValueError, match="preflight precedes registration"):
         PP.build_power_pilot_input(
             manifest_path,
             late_registration,
@@ -1798,7 +2036,7 @@ def test_v4_power_pilot_accepts_frozen_pilot_registration_before_season(tmp_path
     changed_registration["build_evidence"]["practice_review"][
         "canonical_sha256"
     ] = C.canonical_sha256(changed_review)
-    with pytest.raises(ValueError, match="independence-group set"):
+    with pytest.raises(ValueError, match="registration canonical digest changed"):
         PP.build_power_pilot_input(
             manifest_path,
             changed_registration,

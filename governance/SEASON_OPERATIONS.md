@@ -25,8 +25,11 @@
    이상이 의미상 근접 중복을 포함해 각 사례를 승인해야 한다.
 2. protocol commit, benchmark fingerprint, 정확한 upper/lower immutable revision, generation settings,
    execution evidence 계약, MDE, alpha, target power와 분산·다중비교 방법을 `power-pilot-registration.v2`로
-   동결한다.
-3. 두 reference model을 실행하고 95% 단측 pilot-variance 상한으로 최대 cohort power를 계산한다. 층별 정밀도
+   동결한다. registration과 audit만 추가하는 direct-child commit을 별도로 push한다.
+3. [`SUCCESSOR_PILOT_EXECUTION_WORKFLOW.md`](./SUCCESSOR_PILOT_EXECUTION_WORKFLOW.md)에 따라 두 reference
+   model을 각각 3개의 독립 GPU Slurm job에서 실행한다. 각 job은 모델 작업 전에 protocol checkout, remote에
+   게시된 registration commit, 등록 구현 해시와 GPU allocation preflight를 통과해야 한다. 이후 95% 단측
+   pilot-variance 상한으로 최대 cohort power를 계산한다. 층별 정밀도
    gate가 미달하면 official season과 split을 만들기 전에 중단한다.
 4. 고정 MDE·alpha·target power와 최대 7모델의 최소 Holm 임계값으로 `power-derived-split-design.v1`을 만들고,
    계획 표본 수에서 tier power를 재생한다. 관측 평균 차이로 표본 수를 줄이거나 threshold를 완화하지 않는다.
@@ -53,7 +56,7 @@
    공개 artifact를 대조하고 blocking finding을 해소한다.
 13. release bundle을 동결하고 verifier를 새 환경에서 재실행한 뒤 게시한다.
 
-프로토콜 검증기는 `pilot 등록·review -> anchor 실행·evidence 완료 -> power 분석 -> derived split 설계 -> season 사전등록 ->
+프로토콜 검증기는 `pilot review·등록 publication -> 6개 anchor preflight·실행 evidence 완료 -> power 분석 -> derived split 설계 -> season 사전등록 ->
 calibration 시작·expert adjudication -> 첫 제출 -> 공식 실행 -> 외부 검토 -> release 동결`의 필수 경계와
 `split 감사 -> split 동결 -> 첫 제출` 시각 순서를 확인한다.
 현재 활성 후보는 없다.

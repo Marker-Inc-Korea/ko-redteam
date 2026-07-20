@@ -133,6 +133,8 @@ def _project_copy(tmp_path: Path) -> tuple[Path, Path, Path]:
             for row in spec["practice_design"]["benchmark_artifacts"].values()
         ),
         *spec["statistics"]["analysis_code_paths"].values(),
+        spec["execution"]["pilot_execution_preflight"]["validator_path"],
+        spec["execution"]["pilot_execution_preflight"]["entrypoint_path"],
     }
     for relative in relative_paths:
         destination = tmp_path / relative
@@ -185,6 +187,8 @@ def test_registration_spec_source_paths_cover_every_build_input():
             for row in spec["practice_design"]["benchmark_artifacts"].values()
         ),
         *spec["statistics"]["analysis_code_paths"].values(),
+        spec["execution"]["pilot_execution_preflight"]["validator_path"],
+        spec["execution"]["pilot_execution_preflight"]["entrypoint_path"],
     }
 
 
@@ -273,6 +277,16 @@ def test_registration_spec_source_tampering_fails_closed():
     spec["design_sources"]["review_draft"]["sha256"] = "0" * 64
 
     with pytest.raises(ValueError, match="file digest mismatch"):
+        B.validate_registration_spec(spec, project_root=ROOT)
+
+
+@pytest.mark.parametrize("key", ["validator", "entrypoint"])
+def test_registration_spec_rejects_preflight_implementation_tampering(key):
+    spec = deepcopy(_load(SPEC_PATH))
+    preflight = spec["execution"]["pilot_execution_preflight"]
+    preflight[f"{key}_sha256"] = "0" * 64
+
+    with pytest.raises(ValueError, match=f"preflight {key} SHA-256 mismatch"):
         B.validate_registration_spec(spec, project_root=ROOT)
 
 

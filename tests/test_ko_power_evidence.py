@@ -155,6 +155,14 @@ def test_stratified_power_accepts_registration_bound_v2_source():
         "schema": P.PILOT_SOURCE_V2_SCHEMA,
         "pilot_registration_sha256": "5" * 64,
         "practice_review_sha256": "6" * 64,
+        "registration_publication_commit": "7" * 40,
+        "pilot_execution_preflight_sha256s": [
+            f"{index:x}" * 64 for index in range(1, 7)
+        ],
+        "exact_repeats_per_anchor": 3,
+        "generation_seed": 0,
+        "independent_slurm_job_count": 6,
+        "independent_serving_session_count": 6,
         "pilot_id": "unit-power-pilot-v1",
         "pilot_registered_at": "2026-04-30T00:00:00+09:00",
         "first_run_started_at": "2026-04-30T01:00:00+09:00",
@@ -170,6 +178,24 @@ def test_stratified_power_accepts_registration_bound_v2_source():
     assert report["pilot_summary"]["source"][
         "pilot_registration_sha256"
     ] == "5" * 64
+    assert len(
+        report["pilot_summary"]["source"][
+            "pilot_execution_preflight_sha256s"
+        ]
+    ) == 6
+
+    preflight_sha256s = data["pilot_source"][
+        "pilot_execution_preflight_sha256s"
+    ]
+    data["pilot_source"]["pilot_execution_preflight_sha256s"] = [
+        {},
+        *preflight_sha256s[1:],
+    ]
+    with pytest.raises(ValueError, match="one unique preflight"):
+        P.build_power_report(data)
+    data["pilot_source"][
+        "pilot_execution_preflight_sha256s"
+    ] = preflight_sha256s
 
     data["pairwise_test"] = "legacy-bootstrap-tail"
     with pytest.raises(ValueError, match="official pairwise test"):

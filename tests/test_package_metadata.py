@@ -47,6 +47,7 @@ def test_console_script_targets_are_importable():
         "ko-redteam-verify-external-review",
         "ko-redteam-build-pilot-registration",
         "ko-redteam-validate-pilot-registration",
+        "ko-redteam-preflight-pilot-execution",
         "ko-redteam-audit-splits",
         "ko-redteam-analyze-power",
         "ko-redteam-analyze-familywise-power",
@@ -81,7 +82,7 @@ def test_distribution_metadata_has_release_basics():
     assert data["build-system"]["requires"][0].startswith("setuptools>=77")
     assert data["project"]["license"] == "MIT"
     assert data["project"]["license-files"] == ["LICENSE"]
-    assert data["project"]["version"] == "0.2.0rc4"
+    assert data["project"]["version"] == "0.2.0rc5"
     assert "Development Status :: 4 - Beta" in data["project"]["classifiers"]
     assert "korean" in data["project"]["keywords"]
     assert "Natural Language :: Korean" in data["project"]["classifiers"]
@@ -162,6 +163,9 @@ def test_package_data_paths_exist():
     ).exists()
     assert (ROOT / "governance" / "PRACTICE_REVIEW_WORKFLOW.md").exists()
     assert (ROOT / "governance" / "REVIEW_HANDOFF_WORKFLOW.md").exists()
+    assert (
+        ROOT / "governance" / "SUCCESSOR_PILOT_EXECUTION_WORKFLOW.md"
+    ).exists()
     assert (ROOT / "governance" / "REVIEWER_RESPONSE_TOOL.md").exists()
     assert (ROOT / "governance" / "CALIBRATION_REVIEW_WORKFLOW.md").exists()
     assert (ROOT / "gap_analysis" / "_vendor" / "mitigationbypass_substrings.txt").exists()
@@ -191,6 +195,7 @@ def test_analysis_package_imports_without_flat_pythonpath():
                 "from analysis.ko_power_design import build_power_derived_split_design;"
                 "from analysis.ko_season_preregistration import build_season_preregistration;"
                 "from analysis.ko_power_pilot import build_power_pilot_input;"
+                "from analysis.ko_pilot_execution_preflight import build_pilot_execution_preflight;"
                 "from analysis.ko_pilot_registration import validate_pilot_registration;"
                 "from analysis.ko_pilot_registration_builder import build_pilot_registration;"
                 "from analysis.ko_practice_review import build_review_workspace,build_reviewer_commitment,validate_public_review_signatures;"
@@ -215,6 +220,7 @@ def test_analysis_package_imports_without_flat_pythonpath():
                 "assert callable(build_power_derived_split_design);"
                 "assert callable(build_season_preregistration);"
                 "assert callable(build_power_pilot_input);"
+                "assert callable(build_pilot_execution_preflight);"
                 "assert callable(validate_pilot_registration);"
                 "assert callable(build_pilot_registration);"
                 "assert callable(build_review_workspace);"

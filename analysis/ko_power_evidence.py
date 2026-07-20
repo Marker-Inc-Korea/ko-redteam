@@ -263,6 +263,12 @@ def build_power_report(data: dict[str, Any]) -> dict[str, Any]:
             {
                 "pilot_registration_sha256",
                 "practice_review_sha256",
+                "registration_publication_commit",
+                "pilot_execution_preflight_sha256s",
+                "exact_repeats_per_anchor",
+                "generation_seed",
+                "independent_slurm_job_count",
+                "independent_serving_session_count",
                 "pilot_id",
                 "pilot_registered_at",
                 "first_run_started_at",
@@ -395,6 +401,61 @@ def build_power_report(data: dict[str, Any]) -> dict[str, Any]:
             ):
                 if not SHA256_RE.fullmatch(str(pilot_source.get(key) or "")):
                     raise ValueError(f"pilot_source.{key} must be SHA-256")
+            publication_commit = pilot_source.get(
+                "registration_publication_commit"
+            )
+            if not isinstance(publication_commit, str) or not re.fullmatch(
+                r"[0-9a-f]{40}", publication_commit
+            ):
+                raise ValueError(
+                    "pilot_source.registration_publication_commit must be a commit"
+                )
+            preflight_sha256s = pilot_source.get(
+                "pilot_execution_preflight_sha256s"
+            )
+            expected_preflights = pilot_source["upper_runs"] + pilot_source[
+                "lower_runs"
+            ]
+            if (
+                not isinstance(preflight_sha256s, list)
+                or len(preflight_sha256s) != expected_preflights
+                or not all(
+                    isinstance(value, str) and SHA256_RE.fullmatch(value)
+                    for value in preflight_sha256s
+                )
+                or len(set(preflight_sha256s)) != len(preflight_sha256s)
+            ):
+                raise ValueError(
+                    "pilot_source must bind one unique preflight per anchor repeat"
+                )
+            exact_repeats = pilot_source.get("exact_repeats_per_anchor")
+            if (
+                not isinstance(exact_repeats, int)
+                or isinstance(exact_repeats, bool)
+                or exact_repeats != repeats
+                or pilot_source["upper_runs"] != exact_repeats
+                or pilot_source["lower_runs"] != exact_repeats
+            ):
+                raise ValueError(
+                    "pilot_source exact repeat count must match both anchors"
+                )
+            generation_seed = pilot_source.get("generation_seed")
+            if (
+                not isinstance(generation_seed, int)
+                or isinstance(generation_seed, bool)
+                or generation_seed < 0
+            ):
+                raise ValueError(
+                    "pilot_source.generation_seed must be non-negative"
+                )
+            for key in (
+                "independent_slurm_job_count",
+                "independent_serving_session_count",
+            ):
+                if pilot_source.get(key) != expected_preflights:
+                    raise ValueError(
+                        f"pilot_source.{key} must cover every anchor repeat"
+                    )
             if not isinstance(pilot_source.get("pilot_id"), str) or not pilot_source[
                 "pilot_id"
             ].strip():
