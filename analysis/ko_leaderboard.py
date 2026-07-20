@@ -658,8 +658,31 @@ def _audit_ranking(audit: _Audit, ranking: dict[str, Any], ranking_manifest: dic
         and method.get("gate_precedes_ranking") is False
         and method.get("evidence_gate_precedes_ranking") is True
         and method.get("deployment_screen_affects_ranking") is False,
-        "primary pairwise comparisons must use the frozen evidence-gated Holm policy while sensitivity profiles remain descriptive",
+        "primary pairwise comparisons must use the frozen evidence-gated Holm policy while sensitivity profiles gate tier direction",
         actual=method.get("multiple_comparison_correction"),
+    )
+    expected_sensitivity_gate = {
+        "enabled": True,
+        "profiles": RANKING_POLICY["sensitivity_weight_profiles"],
+        "observed_difference_required": "strictly_positive",
+        "paired_bootstrap_probability_operator": ">",
+        "paired_bootstrap_probability_threshold": RANKING_POLICY[
+            "minimum_sensitivity_direction_probability"
+        ],
+    }
+    audit.check(
+        "ranking.sensitivity_direction_policy",
+        "statistics",
+        method.get("sensitivity_direction_gate") == expected_sensitivity_gate
+        and method.get(
+            "tier_boundary_requires_sensitivity_direction_consistency"
+        )
+        is True
+        and RANKING_POLICY.get(
+            "tier_boundary_requires_sensitivity_direction_consistency"
+        )
+        is True,
+        "official tier boundaries must block pre-registered safety or utility direction reversals",
     )
     audit.check(
         "ranking.pairwise_test",
@@ -811,6 +834,83 @@ def _audit_ranking(audit: _Audit, ranking: dict[str, Any], ranking_manifest: dic
             "expected": expected_comparisons,
         },
     )
+    familywise_alpha = _number(method.get("familywise_alpha"))
+    sensitivity_profiles = set(RANKING_POLICY["sensitivity_weight_profiles"])
+
+    def robust_pairwise_row_is_valid(row: Any) -> bool:
+        if not isinstance(row, dict):
+            return False
+        adjusted = row.get("holm_adjusted_p_value_by_weight_profile")
+        probabilities = row.get("probability_by_weight_profile")
+        sensitivity_evidence = row.get("sensitivity_direction_evidence")
+        adjusted_balanced = (
+            _number(adjusted.get("balanced"))
+            if isinstance(adjusted, dict)
+            else None
+        )
+        if (
+            familywise_alpha is None
+            or adjusted_balanced is None
+            or not isinstance(row.get("primary_separated"), bool)
+            or not isinstance(row.get("sensitivity_direction_consistent"), bool)
+            or not isinstance(row.get("separated"), bool)
+            or not isinstance(probabilities, dict)
+            or set(probabilities) != sensitivity_profiles | {"balanced"}
+            or not isinstance(sensitivity_evidence, dict)
+            or set(sensitivity_evidence) != sensitivity_profiles
+        ):
+            return False
+        primary = adjusted_balanced <= familywise_alpha
+        direction_results: list[bool] = []
+        for profile in sensitivity_profiles:
+            evidence = sensitivity_evidence.get(profile)
+            if not isinstance(evidence, dict) or set(evidence) != {
+                "observed_difference",
+                "bootstrap_probability_higher",
+                "direction_pass",
+            }:
+                return False
+            observed = _number(evidence.get("observed_difference"))
+            probability = _number(evidence.get("bootstrap_probability_higher"))
+            if (
+                observed is None
+                or probability is None
+                or not 0.0 <= probability <= 100.0
+                or not isinstance(evidence.get("direction_pass"), bool)
+            ):
+                return False
+            expected_direction = (
+                observed > 0.0
+                and probability
+                > RANKING_POLICY["minimum_sensitivity_direction_probability"]
+            )
+            if evidence["direction_pass"] is not expected_direction:
+                return False
+            direction_results.append(expected_direction)
+        return (
+            row["primary_separated"] is primary
+            and row["sensitivity_direction_consistent"]
+            is all(direction_results)
+            and row["separated"]
+            is (primary and row["sensitivity_direction_consistent"])
+            and all(
+                _number(probabilities.get(profile)) is not None
+                and 0.0 <= float(probabilities[profile]) <= 100.0
+                for profile in sensitivity_profiles
+            )
+        )
+
+    robust_pairwise_valid = (
+        familywise_alpha is not None
+        and 0.0 <= familywise_alpha <= 0.05
+        and all(robust_pairwise_row_is_valid(row) for row in pairwise)
+    )
+    audit.check(
+        "ranking.robust_pairwise_gate",
+        "statistics",
+        robust_pairwise_valid,
+        "each pair must separate only when primary Holm significance and sensitivity direction consistency both pass",
+    )
     audit.check(
         "ranking.model_integrity",
         "provenance",
@@ -893,6 +993,41 @@ def _audit_ranking(audit: _Audit, ranking: dict[str, Any], ranking_manifest: dic
         and len(tier_models) == len(set(tier_models))
         and set(tier_models) == {row.get("model") for row in eligible},
         "official tiers must contain every and only ranking-eligible model exactly once",
+    )
+    tier_by_model = {
+        model: tier.get("tier")
+        for tier in tiers
+        if isinstance(tier, dict) and isinstance(tier.get("models"), list)
+        for model in tier["models"]
+        if isinstance(model, str)
+    }
+    pairwise_by_models = {
+        (row.get("higher"), row.get("lower")): row
+        for row in pairwise
+        if isinstance(row, dict)
+    }
+    ranking_order = ranking.get("ranking_eligible_order")
+    robust_boundaries = (
+        isinstance(ranking_order, list)
+        and ranking_order == [model for model in ranking_order if isinstance(model, str)]
+        and len(ranking_order) == len(set(ranking_order))
+        and set(ranking_order) == eligible_names
+        and bool(tier_by_model)
+        and all(
+            tier_by_model.get(higher) == tier_by_model.get(lower)
+            or (
+                isinstance(pairwise_by_models.get((higher, lower)), dict)
+                and pairwise_by_models[(higher, lower)].get("separated") is True
+            )
+            for higher_index, higher in enumerate(ranking_order)
+            for lower in ranking_order[higher_index + 1 :]
+        )
+    )
+    audit.check(
+        "ranking.robust_tier_boundaries",
+        "statistics",
+        robust_boundaries,
+        "every cross-tier model pair must pass the primary and sensitivity robustness gates",
     )
 
     manifest_artifact = audit.artifacts.get("ranking_manifest") or {}

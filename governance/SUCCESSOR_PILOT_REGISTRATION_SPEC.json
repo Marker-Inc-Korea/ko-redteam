@@ -138,7 +138,7 @@
    "schema": "ko-redteam.practice-review.v2",
    "path": "governance/SUCCESSOR_PILOT_PRACTICE_REVIEW.json"
   },
-  "ranking_manifest_schema": "ko-redteam.ranking-manifest.v5",
+  "ranking_manifest_schema": "ko-redteam.ranking-manifest.v6",
   "minimum_repeats": 3,
   "weight_profile": "balanced",
   "construction_method": "target-allocation linearized balanced diagnostic influence"
@@ -157,7 +157,7 @@
   "seed": 0,
   "agent_tool_call_mode": "prompt_json_v1",
   "execution_evidence": {
-   "ranking_manifest_schema": "ko-redteam.ranking-manifest.v5",
+   "ranking_manifest_schema": "ko-redteam.ranking-manifest.v6",
    "suite_execution_evidence_schema": "ko-redteam.suite-execution-evidence.v1",
    "required_manifest_profiles": [
     "core",

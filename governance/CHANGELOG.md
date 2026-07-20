@@ -5,6 +5,11 @@
 
 ## Unreleased - Evidence-Eligible Ranking Protocol
 
+- 공식 ranking 계약을 manifest v6, policy v3, model-ranking v5로 승격한다. Balanced profile의 Holm 보정
+  sign-flip 검정이 유의하더라도 safety 또는 utility sensitivity profile의 관측 차이가 양수가 아니거나
+  paired-bootstrap 방향 확률이 50%를 초과하지 않으면 tier 경계를 차단한다. 과거 v5/policy v2/model-ranking v4는
+  재현용으로 유지한다. Ranking manifest와 report 입력은 canonical 상대경로, symlink 금지, 단일 byte read와
+  lowercase SHA-256을 요구한다.
 - successor anchor 실행 전에 protocol commit과 clean checkout, registration/audit만 추가한 direct-child
   publication commit의 remote 반영, 등록된 모델·suite·temperature·max tokens·seed, 실제 preflight 구현 해시와
   GPU Slurm allocation을 재검증하는 metadata-only gate를 추가한다. 두 anchor는 각각 정확히 3개의 서로 다른

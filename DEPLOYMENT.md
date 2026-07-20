@@ -1,6 +1,6 @@
 # ko-redteam Deployment Guide
 
-이 문서는 `0.2.0rc5` 내부 운영 배포 후보의 실행 계약을 정의합니다. 이 단계는 평가기 자체의
+이 문서는 `0.2.0rc6` 내부 운영 배포 후보의 실행 계약을 정의합니다. 이 단계는 평가기 자체의
 재현성, 산출물 무결성, endpoint 오류 처리를 검증합니다. 특정 모델의 안전 인증이나 공식 순위 공개를
 의미하지 않습니다.
 
@@ -27,12 +27,12 @@ successor power pilot은 일반 배포 검증보다 강한 등록·Git publicati
 UID/GID `10001`입니다. Dockerfile의 `python:3.12-slim` base는 manifest digest로 고정합니다.
 
 ```bash
-docker build --target runtime -t ko-redteam:0.2.0rc5 .
+docker build --target runtime -t ko-redteam:0.2.0rc6 .
 docker run --rm --read-only \
   --tmpfs /tmp:rw,noexec,nosuid,size=64m \
   --cap-drop ALL \
   --security-opt no-new-privileges \
-  ko-redteam:0.2.0rc5
+  ko-redteam:0.2.0rc6
 ```
 
 이미지는 model server를 포함하지 않습니다. 실제 평가는 report 출력용 writable volume과 Slurm job 안에서

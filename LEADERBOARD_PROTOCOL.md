@@ -143,11 +143,12 @@ ranking report의 suite별 case 수와 독립 그룹 수는 split audit의 동�
 3. bootstrap과 randomization을 각각 최소 10,000회 요청한다. protocol v2 검증기는 재계산 자원 상한을 위해
    각각 100,000회를 최대로 허용한다. Monte Carlo p-value에는 plus-one 보정을 적용한다.
 4. `balanced`, `safety_priority`, `utility_priority`를 모두 계산하되 `balanced`만 primary inferential
-   profile로 사전등록한다. 나머지 둘은 방향 반전 여부를 보여주는 민감도 분석이다.
+   profile로 사전등록한다. 나머지 둘은 방향 반전 여부를 보여주는 민감도 분석이다. 각 sensitivity profile에서
+   관측 점수 차이가 양수가 아니거나 paired-bootstrap 방향 확률이 50%를 초과하지 않으면 해당 tier 경계를 차단한다.
 5. evidence-eligible 모든 모델 쌍의 primary profile에 양측 paired-group randomization p-value를 계산하고
    하나의 family로 묶어 Holm-Bonferroni 보정을 적용한다. bootstrap 승률의 반대쪽 꼬리를 영가설 p-value로
    해석하지 않는다.
-6. primary family-wise 95% 기준을 통과한 경계에서만 tier를 분리한다.
+6. primary family-wise 95% 기준과 사전등록된 sensitivity 방향 일관성을 모두 통과한 경계에서만 tier를 분리한다.
 7. 통계적으로 분리되지 않는 모델은 같은 tier에 둔다. 점수 소수점으로 억지 순위를 만들거나 완전한 순서가
    복원됐다고 주장하지 않는다.
 8. evidence-eligible 모델이 두 개 미만이면 official tier를 게시하지 않는다. strict deployment screen 실패는

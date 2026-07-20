@@ -14,9 +14,10 @@
 | 후속 practice 사람 검토 | 미완료 | 7개 층 x 20개 전량 신규 초안, exact 5종 중복 0·BGE-M3 0.85 이상 0쌍, 등록·GPU Slurm preflight gate 구현; reviewer 0명 | pilot 등록·anchor 실행 금지 |
 | 파일럿 분산 정밀도 | 실패 | 이전 실행은 층별 5그룹; 새 층별 20그룹 초안은 미검토·미실행이라 분산 증거 없음 | 공식 split 설계 금지 |
 | 다중비교 검정력 | 실패 | 현재 보수적 설계에서 최소 2모델 비교 필요량 796그룹, 기존 324그룹 | tier 주장 금지 |
+| 순위 통계 게이트 | 준비 | manifest v6는 balanced Holm 유의성과 safety·utility 방향 일관성을 모두 요구 | 실제 hidden cohort 없이는 tier 주장 금지 |
 | hidden official split | 없음 | split audit·동결 artifact 없음 | 공식 평가 금지 |
 | 사람 라벨 calibration | 없음 | 300개·3명·expert 2명 기준을 만족하는 signed report 없음 | 자동 판정 공식 사용 금지 |
-| official model cohort | 없음 | v5 ranking manifest와 official report 없음 | 현재 모델 순위 게시 금지 |
+| official model cohort | 없음 | v6 ranking manifest와 official report 없음 | 현재 모델 순위 게시 금지 |
 | 독립 외부 검토 | 없음 | reviewer attestation·독립 기관 보고서 없음 | official 표현 금지 |
 | final release manifest | 없음 | `ko-redteam.leaderboard-release.v3` 없음 | 정적 publisher 실행 불가 |
 

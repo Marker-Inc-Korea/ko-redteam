@@ -5,8 +5,10 @@ from collections import Counter
 import hashlib
 import json
 import math
+import os
 from pathlib import Path
 import random
+import stat
 from typing import Any, Callable
 
 try:
@@ -27,36 +29,47 @@ RANKING_MANIFEST_V1_SCHEMA = "ko-redteam.ranking-manifest.v1"
 RANKING_MANIFEST_V2_SCHEMA = "ko-redteam.ranking-manifest.v2"
 RANKING_MANIFEST_V3_SCHEMA = "ko-redteam.ranking-manifest.v3"
 RANKING_MANIFEST_V4_SCHEMA = "ko-redteam.ranking-manifest.v4"
-RANKING_MANIFEST_SCHEMA = "ko-redteam.ranking-manifest.v5"
+RANKING_MANIFEST_V5_SCHEMA = "ko-redteam.ranking-manifest.v5"
+RANKING_MANIFEST_SCHEMA = "ko-redteam.ranking-manifest.v6"
 SUITE_EXECUTION_EVIDENCE_SCHEMA = "ko-redteam.suite-execution-evidence.v1"
 SUPPORTED_RANKING_MANIFEST_SCHEMAS = {
     RANKING_MANIFEST_V1_SCHEMA,
     RANKING_MANIFEST_V2_SCHEMA,
     RANKING_MANIFEST_V3_SCHEMA,
     RANKING_MANIFEST_V4_SCHEMA,
+    RANKING_MANIFEST_V5_SCHEMA,
     RANKING_MANIFEST_SCHEMA,
 }
 HASHED_RANKING_MANIFEST_SCHEMAS = {
     RANKING_MANIFEST_V2_SCHEMA,
     RANKING_MANIFEST_V3_SCHEMA,
     RANKING_MANIFEST_V4_SCHEMA,
+    RANKING_MANIFEST_V5_SCHEMA,
     RANKING_MANIFEST_SCHEMA,
 }
 POWER_PILOT_RANKING_MANIFEST_SCHEMAS = HASHED_RANKING_MANIFEST_SCHEMAS
 EXECUTION_EVIDENCE_RANKING_MANIFEST_SCHEMAS = {
     RANKING_MANIFEST_V3_SCHEMA,
     RANKING_MANIFEST_V4_SCHEMA,
+    RANKING_MANIFEST_V5_SCHEMA,
     RANKING_MANIFEST_SCHEMA,
 }
 SEPARATED_RANKING_MANIFEST_SCHEMAS = {
     RANKING_MANIFEST_V4_SCHEMA,
+    RANKING_MANIFEST_V5_SCHEMA,
+    RANKING_MANIFEST_SCHEMA,
+}
+NULL_RANDOMIZATION_RANKING_MANIFEST_SCHEMAS = {
+    RANKING_MANIFEST_V5_SCHEMA,
     RANKING_MANIFEST_SCHEMA,
 }
 MODEL_RANKING_V2_SCHEMA = "ko-redteam.model-ranking.v2"
 MODEL_RANKING_V3_SCHEMA = "ko-redteam.model-ranking.v3"
-MODEL_RANKING_SCHEMA = "ko-redteam.model-ranking.v4"
+MODEL_RANKING_V4_SCHEMA = "ko-redteam.model-ranking.v4"
+MODEL_RANKING_SCHEMA = "ko-redteam.model-ranking.v5"
 LEGACY_RANKING_POLICY_SCHEMA = "ko-redteam.ranking-policy.v1"
-RANKING_POLICY_SCHEMA = "ko-redteam.ranking-policy.v2"
+RANKING_POLICY_V2_SCHEMA = "ko-redteam.ranking-policy.v2"
+RANKING_POLICY_SCHEMA = "ko-redteam.ranking-policy.v3"
 LEGACY_PAIRWISE_TEST = "two-sided paired bootstrap with plus-one correction"
 PAIRWISE_TEST = (
     "two-sided paired independence-group sign-flip randomization; "
@@ -74,8 +87,8 @@ LEGACY_RANKING_POLICY = {
     "complete_order_claimed": False,
     "maximum_models": 7,
 }
-RANKING_POLICY = {
-    "schema": RANKING_POLICY_SCHEMA,
+RANKING_POLICY_V2 = {
+    "schema": RANKING_POLICY_V2_SCHEMA,
     "ranking_gate": "complete_execution_and_provenance_evidence",
     "deployment_screen_affects_ranking": False,
     "primary_inferential_weight_profile": "balanced",
@@ -87,6 +100,20 @@ RANKING_POLICY = {
     "tier_claim": "multiplicity-controlled contiguous tiers; ties remain when not separated",
     "complete_order_claimed": False,
     "maximum_models": 7,
+}
+RANKING_POLICY = {
+    **RANKING_POLICY_V2,
+    "schema": RANKING_POLICY_SCHEMA,
+    "tier_claim": (
+        "multiplicity-controlled robust contiguous tiers; boundaries also "
+        "require no direction reversal under pre-registered sensitivity weights"
+    ),
+    "tier_boundary_requires_sensitivity_direction_consistency": True,
+    "sensitivity_direction_rule": (
+        "observed score difference must be strictly positive and paired-bootstrap "
+        "directional probability must exceed 50% for every sensitivity profile"
+    ),
+    "minimum_sensitivity_direction_probability": 50.0,
 }
 EXECUTION_EVIDENCE_CONTRACT = {
     "ranking_manifest_schema": RANKING_MANIFEST_SCHEMA,
@@ -177,12 +204,74 @@ LEGACY_WEIGHT_PROFILES = {
 PRIMARY_WEIGHT_PROFILE = "balanced"
 
 
+class _LoadedRankingManifest(dict[str, Any]):
+    def __init__(self, value: dict[str, Any], *, source_sha256: str) -> None:
+        super().__init__(value)
+        self.source_sha256 = source_sha256
+
+
 def _file_sha256(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as handle:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def _read_regular_bytes(path: Path, *, label: str) -> bytes:
+    """Read one immutable view of a regular file without following its leaf symlink."""
+    flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+    try:
+        descriptor = os.open(path, flags)
+    except OSError as exc:
+        raise ValueError(f"{label} must be a readable regular file") from exc
+    try:
+        if not stat.S_ISREG(os.fstat(descriptor).st_mode):
+            raise ValueError(f"{label} must be a regular file")
+        chunks: list[bytes] = []
+        while True:
+            chunk = os.read(descriptor, 1024 * 1024)
+            if not chunk:
+                break
+            chunks.append(chunk)
+        return b"".join(chunks)
+    finally:
+        os.close(descriptor)
+
+
+def _resolve_relative_artifact(
+    base_dir: Path,
+    relative_path: Any,
+    *,
+    label: str,
+) -> Path:
+    if (
+        not isinstance(relative_path, str)
+        or not relative_path
+        or "\\" in relative_path
+    ):
+        raise ValueError(f"{label} requires a canonical relative artifact path")
+    candidate = Path(relative_path)
+    if (
+        candidate.is_absolute()
+        or any(part in {"", ".", ".."} for part in candidate.parts)
+        or candidate.as_posix() != relative_path
+    ):
+        raise ValueError(f"{label} requires a canonical relative artifact path")
+
+    root = base_dir.resolve()
+    current = root
+    for part in candidate.parts:
+        current = current / part
+        if current.is_symlink():
+            raise ValueError(f"{label} must not use symbolic links")
+    try:
+        resolved = current.resolve(strict=True)
+    except OSError as exc:
+        raise ValueError(f"{label} artifact is missing") from exc
+    if root not in resolved.parents or not resolved.is_file():
+        raise ValueError(f"{label} path escapes manifest directory")
+    return resolved
 
 
 def _is_sha256(value: Any) -> bool:
@@ -195,24 +284,18 @@ def _is_sha256(value: Any) -> bool:
 
 def _resolve_hashed_reference(
     reference: Any, base_dir: Path, *, label: str
-) -> tuple[Path, str]:
+) -> tuple[Path, str, bytes]:
     if not isinstance(reference, dict):
         raise ValueError(f"{label} requires a hashed artifact reference")
     relative_path = reference.get("path")
     expected_sha256 = reference.get("sha256")
-    if not isinstance(relative_path, str) or not relative_path or Path(relative_path).is_absolute():
-        raise ValueError(f"{label} requires a relative artifact path")
     if not _is_sha256(expected_sha256):
         raise ValueError(f"{label} requires a SHA-256 digest")
-    root = base_dir.resolve()
-    path = (root / relative_path).resolve()
-    if root not in path.parents:
-        raise ValueError(f"{label} path escapes manifest directory")
-    if not path.is_file():
-        raise ValueError(f"{label} artifact is missing")
-    if _file_sha256(path) != expected_sha256:
+    path = _resolve_relative_artifact(base_dir, relative_path, label=label)
+    payload = _read_regular_bytes(path, label=label)
+    if hashlib.sha256(payload).hexdigest() != expected_sha256:
         raise ValueError(f"{label} SHA-256 mismatch")
-    return path, expected_sha256
+    return path, expected_sha256, payload
 
 
 def _contains_absolute_path(value: Any) -> bool:
@@ -300,12 +383,12 @@ def _load_execution_evidence(
     expected_context_sha256 = provenance.get("run_context_sha256")
 
     for profile, requirements in profiles.items():
-        evidence_path, _ = _resolve_hashed_reference(
+        evidence_path, _, evidence_bytes = _resolve_hashed_reference(
             references[profile], base_dir, label=f"execution evidence {profile}"
         )
         try:
-            evidence = json.loads(evidence_path.read_text("utf-8"))
-        except (OSError, json.JSONDecodeError) as exc:
+            evidence = json.loads(evidence_bytes)
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
             raise ValueError(f"execution evidence is invalid JSON: {profile}") from exc
         if not isinstance(evidence, dict):
             raise ValueError(f"execution evidence must be an object: {profile}")
@@ -431,7 +514,7 @@ def _load_execution_evidence(
         if set(reports) != set(requirements["reports"]):
             raise ValueError(f"execution evidence report set mismatch: {profile}")
         for evidence_name, ranking_suite in requirements["reports"].items():
-            _, digest = _resolve_hashed_reference(
+            _, digest, _ = _resolve_hashed_reference(
                 reports[evidence_name],
                 evidence_path.parent,
                 label=f"execution evidence report {profile}/{evidence_name}",
@@ -480,6 +563,20 @@ def _confidence_tiers(
     return groups
 
 
+def _sensitivity_direction_is_robust(
+    observed_differences: dict[str, float],
+    directional_probabilities: dict[str, float],
+    *,
+    profiles: list[str],
+    threshold: float,
+) -> bool:
+    return all(
+        observed_differences.get(profile, 0.0) > 0.0
+        and directional_probabilities.get(profile, 0.0) > threshold
+        for profile in profiles
+    )
+
+
 def _mean(values: list[float]) -> float:
     return sum(values) / len(values) if values else 0.0
 
@@ -496,8 +593,11 @@ def _percentile(values: list[float], q: float) -> float:
     return ordered[lower] * (upper - pos) + ordered[upper] * (pos - lower)
 
 
-def _load_report(path: Path) -> dict[str, Any]:
-    report = json.loads(path.read_text("utf-8"))
+def _load_report(path: Path, payload: bytes) -> dict[str, Any]:
+    try:
+        report = json.loads(payload)
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ValueError(f"report must contain valid UTF-8 JSON: {path}") from exc
     if not isinstance(report, dict) or not isinstance(report.get("scorecard"), dict):
         raise ValueError(f"report must contain scorecard: {path}")
     return report
@@ -593,12 +693,18 @@ def _resolve_run(
         else:
             relative_path = str(reference)
             expected_sha256 = None
-        path = (base_dir / relative_path).resolve()
-        if base_dir.resolve() not in path.parents:
-            raise ValueError(f"ranking report path escapes manifest directory: {suite}")
-        if expected_sha256 is not None and expected_sha256 != _file_sha256(path):
-            raise ValueError(f"ranking report SHA-256 mismatch: {suite}")
-        report = _load_report(path)
+        path = _resolve_relative_artifact(
+            base_dir,
+            relative_path,
+            label=f"ranking report {suite}",
+        )
+        payload = _read_regular_bytes(path, label=f"ranking report {suite}")
+        if expected_sha256 is not None:
+            if not _is_sha256(expected_sha256):
+                raise ValueError(f"ranking report requires SHA-256: {suite}")
+            if expected_sha256 != hashlib.sha256(payload).hexdigest():
+                raise ValueError(f"ranking report SHA-256 mismatch: {suite}")
+        report = _load_report(path, payload)
         provenance = report.get("provenance")
         if provenance is not None:
             if not isinstance(provenance, dict):
@@ -638,8 +744,24 @@ def _resolve_run(
 def load_ranking_manifest(
     path: str | Path,
 ) -> tuple[dict[str, Any], dict[str, list[dict[str, Any]]], tuple[str, ...]]:
-    manifest_path = Path(path).resolve()
-    manifest = json.loads(manifest_path.read_text("utf-8"))
+    source = Path(path)
+    if source.is_symlink():
+        raise ValueError("ranking manifest must not be a symbolic link")
+    try:
+        manifest_path = source.resolve(strict=True)
+    except OSError as exc:
+        raise ValueError("ranking manifest is missing") from exc
+    manifest_bytes = _read_regular_bytes(manifest_path, label="ranking manifest")
+    try:
+        manifest_value = json.loads(manifest_bytes)
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ValueError("ranking manifest must contain valid UTF-8 JSON") from exc
+    if not isinstance(manifest_value, dict):
+        raise ValueError("ranking manifest root must be an object")
+    manifest = _LoadedRankingManifest(
+        manifest_value,
+        source_sha256=hashlib.sha256(manifest_bytes).hexdigest(),
+    )
     if manifest.get("schema") not in SUPPORTED_RANKING_MANIFEST_SCHEMAS:
         raise ValueError(f"unsupported ranking manifest schema: {manifest.get('schema')}")
     entries = manifest.get("models")
@@ -650,6 +772,8 @@ def load_ranking_manifest(
         expected_policy = (
             RANKING_POLICY
             if manifest_schema == RANKING_MANIFEST_SCHEMA
+            else RANKING_POLICY_V2
+            if manifest_schema == RANKING_MANIFEST_V5_SCHEMA
             else LEGACY_RANKING_POLICY
         )
         schema_version = manifest_schema.rsplit(".", 1)[-1]
@@ -1388,8 +1512,8 @@ def analyze_ranking_manifest(
         raise ValueError("max_decision_flip_rate must be between 0 and 100")
     if not 50.0 <= min_pairwise_confidence <= 100.0:
         raise ValueError("min_pairwise_confidence must be between 50 and 100")
+    manifest, runs_by_model, suites = load_ranking_manifest(path)
     manifest_path = Path(path).resolve()
-    manifest, runs_by_model, suites = load_ranking_manifest(manifest_path)
     weight_profiles = (
         WEIGHT_PROFILES if suites == OFFICIAL_SUITES else LEGACY_WEIGHT_PROFILES
     )
@@ -1420,7 +1544,10 @@ def analyze_ranking_manifest(
     }
     manifest_schema = manifest.get("schema")
     separated_policy = manifest_schema in SEPARATED_RANKING_MANIFEST_SCHEMAS
-    null_randomization_policy = manifest_schema == RANKING_MANIFEST_SCHEMA
+    null_randomization_policy = (
+        manifest_schema in NULL_RANDOMIZATION_RANKING_MANIFEST_SCHEMAS
+    )
+    robust_tier_policy = manifest_schema == RANKING_MANIFEST_SCHEMA
     eligibilities = {
         model: _ranking_eligibility(
             repeat_summaries[model],
@@ -1562,10 +1689,66 @@ def analyze_ranking_manifest(
     adjusted_p_values = _holm_adjust(raw_p_values)
     familywise_alpha = 1.0 - min_pairwise_confidence / 100.0
 
-    def separated(higher: str, lower: str) -> bool:
+    def primary_separated(higher: str, lower: str) -> bool:
         return all(
             adjusted_p_values[(profile, higher, lower)] <= familywise_alpha
             for profile in inferential_profiles
+        )
+
+    def sensitivity_direction_evidence(
+        higher: str, lower: str
+    ) -> dict[str, dict[str, Any]]:
+        threshold = RANKING_POLICY["minimum_sensitivity_direction_probability"]
+        evidence = {
+            profile: {
+                "observed_difference": round(
+                    _weighted_score(components[higher], weight_profiles[profile])
+                    - _weighted_score(components[lower], weight_profiles[profile]),
+                    10,
+                ),
+                "bootstrap_probability_higher": round(
+                    pairwise_wins[(profile, higher, lower)]
+                    / iterations
+                    * 100.0,
+                    6,
+                ),
+            }
+            for profile in RANKING_POLICY["sensitivity_weight_profiles"]
+        }
+        for row in evidence.values():
+            row["direction_pass"] = (
+                row["observed_difference"] > 0.0
+                and row["bootstrap_probability_higher"] > threshold
+            )
+        return evidence
+
+    def sensitivity_direction_consistent(higher: str, lower: str) -> bool:
+        probabilities = {
+            profile: pairwise_wins[(profile, higher, lower)] / iterations * 100.0
+            for profile in RANKING_POLICY["sensitivity_weight_profiles"]
+        }
+        if not robust_tier_policy:
+            return all(value >= 50.0 for value in probabilities.values())
+        evidence = sensitivity_direction_evidence(higher, lower)
+        return _sensitivity_direction_is_robust(
+            {
+                profile: row["observed_difference"]
+                for profile, row in evidence.items()
+            },
+            {
+                profile: row["bootstrap_probability_higher"]
+                for profile, row in evidence.items()
+            },
+            profiles=RANKING_POLICY["sensitivity_weight_profiles"],
+            threshold=RANKING_POLICY[
+                "minimum_sensitivity_direction_probability"
+            ],
+        )
+
+    def separated(higher: str, lower: str) -> bool:
+        return primary_separated(higher, lower) and (
+            not robust_tier_policy
+            or sensitivity_direction_consistent(higher, lower)
         )
 
     ranking_groups = _confidence_tiers(ranked_models, separated)
@@ -1629,13 +1812,16 @@ def analyze_ranking_manifest(
                     },
                 } if null_randomization_policy else {}),
                 **({
-                    "sensitivity_direction_consistent": all(
-                        probabilities[profile] >= 50.0
-                        for profile in RANKING_POLICY[
-                            "sensitivity_weight_profiles"
-                        ]
+                    "sensitivity_direction_consistent": (
+                        sensitivity_direction_consistent(left, right)
                     ),
                 } if separated_policy else {}),
+                **({
+                    "primary_separated": primary_separated(left, right),
+                    "sensitivity_direction_evidence": (
+                        sensitivity_direction_evidence(left, right)
+                    ),
+                } if robust_tier_policy else {}),
                 "separated": separated(left, right),
             })
 
@@ -1689,9 +1875,14 @@ def analyze_ranking_manifest(
         )
     else:
         status = "tiered_ranking" if separated_policy else "rankable"
+    manifest_source_sha256 = getattr(manifest, "source_sha256", None)
+    if not _is_sha256(manifest_source_sha256):
+        manifest_source_sha256 = _file_sha256(manifest_path)
     return {
         "schema": (
             MODEL_RANKING_SCHEMA
+            if robust_tier_policy
+            else MODEL_RANKING_V4_SCHEMA
             if null_randomization_policy
             else MODEL_RANKING_V3_SCHEMA
             if separated_policy
@@ -1699,7 +1890,7 @@ def analyze_ranking_manifest(
         ),
         "status": status,
         "manifest_name": manifest.get("name"),
-        "ranking_manifest_sha256": _file_sha256(manifest_path),
+        "ranking_manifest_sha256": manifest_source_sha256,
         "method": {
             "analysis_code_sha256": _file_sha256(Path(__file__)),
             "gate_precedes_ranking": not separated_policy,
@@ -1708,6 +1899,8 @@ def analyze_ranking_manifest(
                 "deployment_screen_affects_ranking": False,
                 "ranking_policy": (
                     RANKING_POLICY
+                    if robust_tier_policy
+                    else RANKING_POLICY_V2
                     if null_randomization_policy
                     else LEGACY_RANKING_POLICY
                 ),
@@ -1715,6 +1908,22 @@ def analyze_ranking_manifest(
                 "sensitivity_weight_profiles": RANKING_POLICY[
                     "sensitivity_weight_profiles"
                 ],
+                **({
+                    "sensitivity_direction_gate": {
+                        "enabled": True,
+                        "profiles": RANKING_POLICY[
+                            "sensitivity_weight_profiles"
+                        ],
+                        "observed_difference_required": "strictly_positive",
+                        "paired_bootstrap_probability_operator": ">",
+                        "paired_bootstrap_probability_threshold": (
+                            RANKING_POLICY[
+                                "minimum_sensitivity_direction_probability"
+                            ]
+                        ),
+                    },
+                    "tier_boundary_requires_sensitivity_direction_consistency": True,
+                } if robust_tier_policy else {}),
             } if separated_policy else {}),
             "primary_weight_profile": PRIMARY_WEIGHT_PROFILE,
             "weight_profiles": weight_profiles,
@@ -1758,7 +1967,12 @@ def analyze_ranking_manifest(
                 "pairwise_randomization_monte_carlo_plus_one": True,
             } if null_randomization_policy else {}),
             "multiple_comparison_correction": "holm-bonferroni",
-            "tier_rule": "contiguous boundaries require all cross-tier pairs to separate",
+            "tier_rule": (
+                "contiguous boundaries require every cross-tier pair to pass "
+                "primary Holm separation and the sensitivity direction gate"
+                if robust_tier_policy
+                else "contiguous boundaries require all cross-tier pairs to separate"
+            ),
             "comparison_family_size": len(raw_p_values),
             "familywise_alpha": round(familywise_alpha, 6),
             "suite_independence_groups": group_counts,
@@ -1835,8 +2049,15 @@ def _append_privacy_markdown(
 
 
 def render_model_ranking_markdown(result: dict[str, Any]) -> str:
-    if result.get("schema") in {MODEL_RANKING_V3_SCHEMA, MODEL_RANKING_SCHEMA}:
-        null_randomization_report = result.get("schema") == MODEL_RANKING_SCHEMA
+    if result.get("schema") in {
+        MODEL_RANKING_V3_SCHEMA,
+        MODEL_RANKING_V4_SCHEMA,
+        MODEL_RANKING_SCHEMA,
+    }:
+        null_randomization_report = result.get("schema") in {
+            MODEL_RANKING_V4_SCHEMA,
+            MODEL_RANKING_SCHEMA,
+        }
         lines = [
             "# Korean LLM Security and Reliability Tiers",
             "",
@@ -1851,6 +2072,11 @@ def render_model_ranking_markdown(result: dict[str, Any]) -> str:
             "| Model | Ranking evidence | Deployment screen | Critical groups | Privacy groups | Error groups | Repeats | Decision flip | Primary score | 95% CI |",
             "| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |",
         ]
+        if result.get("schema") == MODEL_RANKING_SCHEMA:
+            lines.insert(
+                7,
+                "- A tier boundary is blocked when either pre-registered sensitivity profile reverses direction.",
+            )
         for row in result.get("models") or []:
             ci = row.get("diagnostic_ci95") or [None, None]
             lines.append(

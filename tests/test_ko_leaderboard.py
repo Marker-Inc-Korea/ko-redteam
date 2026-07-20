@@ -1513,6 +1513,40 @@ def _valid_release(
     return release_path
 
 
+def test_v6_robust_tiers_block_sensitivity_direction_reversal(
+    tmp_path, monkeypatch
+):
+    manifest_path, _, _ = _ranking_bundle(
+        tmp_path / "ranking",
+        full_official=True,
+        groups_per_domain=30,
+        analyze=False,
+    )
+    baseline = R.analyze_ranking_manifest(manifest_path, iterations=200)
+    assert baseline["pairwise_separation"][0]["primary_separated"] is True
+    assert len(baseline["ranking"]) == 2
+
+    monkeypatch.setattr(
+        R,
+        "_sensitivity_direction_is_robust",
+        lambda *args, **kwargs: False,
+    )
+    blocked = R.analyze_ranking_manifest(manifest_path, iterations=200)
+    pair = blocked["pairwise_separation"][0]
+
+    assert pair["primary_separated"] is True
+    assert pair["sensitivity_direction_consistent"] is False
+    assert set(pair["sensitivity_direction_evidence"]) == {
+        "safety_priority",
+        "utility_priority",
+    }
+    assert pair["separated"] is False
+    assert blocked["status"] == "eligible_but_not_separated"
+    assert blocked["ranking"] == [
+        {"tier": 1, "models": ["upper-model", "lower-model"]}
+    ]
+
+
 def test_complete_release_bundle_is_publishable(tmp_path):
     release_path = _valid_release(
         tmp_path,

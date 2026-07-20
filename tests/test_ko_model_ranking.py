@@ -1,6 +1,7 @@
 """ko_model_ranking gate-first 모델 비교 회귀."""
 from __future__ import annotations
 
+import hashlib
 import json
 import subprocess
 import sys
@@ -101,7 +102,7 @@ def test_current_policy_separates_ranking_evidence_from_deployment_screen():
     assert deployment_reasons == ["critical_safety_failure", "privacy_failure"]
 
 
-def test_v5_manifest_requires_frozen_policy_and_model_cap(tmp_path):
+def test_v6_manifest_requires_frozen_policy_and_model_cap(tmp_path):
     path = tmp_path / "ranking_manifest.json"
     path.write_text(
         json.dumps({
@@ -122,6 +123,32 @@ def test_v5_manifest_requires_frozen_policy_and_model_cap(tmp_path):
         "utf-8",
     )
     with pytest.raises(ValueError, match="maximum model count"):
+        R.load_ranking_manifest(path)
+
+
+def test_v5_manifest_preserves_policy_v2_contract(tmp_path):
+    path = tmp_path / "ranking_manifest.json"
+    models = [{"name": "model-a", "runs": []}, {"name": "model-b", "runs": []}]
+    path.write_text(
+        json.dumps({
+            "schema": R.RANKING_MANIFEST_V5_SCHEMA,
+            "ranking_policy": R.RANKING_POLICY,
+            "models": models,
+        }),
+        "utf-8",
+    )
+    with pytest.raises(ValueError, match="freeze its canonical ranking policy"):
+        R.load_ranking_manifest(path)
+
+    path.write_text(
+        json.dumps({
+            "schema": R.RANKING_MANIFEST_V5_SCHEMA,
+            "ranking_policy": R.RANKING_POLICY_V2,
+            "models": models,
+        }),
+        "utf-8",
+    )
+    with pytest.raises(ValueError, match="non-empty runs"):
         R.load_ranking_manifest(path)
 
 
@@ -160,6 +187,29 @@ def test_confidence_tiers_do_not_claim_nontransitive_boundaries():
     )
 
     assert tiers == [{"tier": 1, "models": ["a", "b", "c"]}]
+
+
+def test_sensitivity_direction_gate_requires_positive_effect_and_probability():
+    profiles = ["safety_priority", "utility_priority"]
+
+    assert R._sensitivity_direction_is_robust(
+        {"safety_priority": 1.0, "utility_priority": 0.1},
+        {"safety_priority": 90.0, "utility_priority": 50.1},
+        profiles=profiles,
+        threshold=50.0,
+    )
+    assert not R._sensitivity_direction_is_robust(
+        {"safety_priority": 1.0, "utility_priority": -0.1},
+        {"safety_priority": 90.0, "utility_priority": 90.0},
+        profiles=profiles,
+        threshold=50.0,
+    )
+    assert not R._sensitivity_direction_is_robust(
+        {"safety_priority": 1.0, "utility_priority": 0.1},
+        {"safety_priority": 90.0, "utility_priority": 50.0},
+        profiles=profiles,
+        threshold=50.0,
+    )
 
 
 def _case(case_id: str, *, score: float, expected: str, outcome: str, group: str) -> dict:
@@ -458,6 +508,58 @@ def test_manifest_rejects_mixed_benchmark_fingerprints(tmp_path):
         assert "benchmark_fingerprint" in str(exc)
     else:
         raise AssertionError("mixed benchmark fingerprints must be rejected")
+
+
+def test_manifest_and_reports_reject_symbolic_links(tmp_path):
+    models = [
+        _add_model(tmp_path, "model-a", scores=[80.0, 80.0, 80.0]),
+        _add_model(tmp_path, "model-b", scores=[70.0, 70.0, 70.0]),
+    ]
+    target = tmp_path / models[0]["runs"][0]["paperbench"]
+    linked_report = tmp_path / "linked-report.json"
+    linked_report.symlink_to(target)
+    models[0]["runs"][0]["paperbench"] = linked_report.name
+    manifest = _manifest(tmp_path, models)
+
+    with pytest.raises(ValueError, match="symbolic links"):
+        R.analyze_ranking_manifest(manifest, iterations=100)
+
+    manifest_link = tmp_path / "linked-manifest.json"
+    manifest_link.symlink_to(manifest)
+    with pytest.raises(ValueError, match="manifest must not be a symbolic link"):
+        R.analyze_ranking_manifest(manifest_link, iterations=100)
+
+
+def test_manifest_rejects_noncanonical_report_paths(tmp_path):
+    models = [
+        _add_model(tmp_path, "model-a", scores=[80.0, 80.0, 80.0]),
+        _add_model(tmp_path, "model-b", scores=[70.0, 70.0, 70.0]),
+    ]
+    models[0]["runs"][0]["paperbench"] = (
+        "./" + models[0]["runs"][0]["paperbench"]
+    )
+
+    with pytest.raises(ValueError, match="canonical relative artifact path"):
+        R.analyze_ranking_manifest(_manifest(tmp_path, models), iterations=100)
+
+
+def test_manifest_digest_reuses_the_validated_byte_view(tmp_path, monkeypatch):
+    manifest = _manifest(tmp_path, [
+        _add_model(tmp_path, "model-a", scores=[80.0, 80.0, 80.0]),
+        _add_model(tmp_path, "model-b", scores=[70.0, 70.0, 70.0]),
+    ])
+    expected = hashlib.sha256(manifest.read_bytes()).hexdigest()
+    original = R._file_sha256
+
+    def reject_manifest_reopen(path):
+        if Path(path).resolve() == manifest.resolve():
+            raise AssertionError("ranking manifest was reopened after validation")
+        return original(path)
+
+    monkeypatch.setattr(R, "_file_sha256", reject_manifest_reopen)
+    result = R.analyze_ranking_manifest(manifest, iterations=100)
+
+    assert result["ranking_manifest_sha256"] == expected
 
 
 def test_legacy_reports_without_identity_metadata_are_provisional(tmp_path):

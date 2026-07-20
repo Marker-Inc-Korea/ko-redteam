@@ -417,7 +417,10 @@ def _practice_design(
         _positive_int(value.get("cases"), f"practice benchmark artifact {suite}.cases")
 
     if practice.get("ranking_manifest_schema") != ranking.RANKING_MANIFEST_SCHEMA:
-        raise ValueError("current practice pilot requires ranking manifest v5")
+        raise ValueError(
+            "current practice pilot requires "
+            f"{ranking.RANKING_MANIFEST_SCHEMA}"
+        )
     if practice.get("weight_profile") != "balanced":
         raise ValueError("practice pilot weight_profile must be balanced")
     if practice.get("construction_method") != CONSTRUCTION_METHOD:
