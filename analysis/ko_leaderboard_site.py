@@ -20,10 +20,18 @@ except ModuleNotFoundError:  # package import path
 
 PUBLICATION_SCHEMA = "ko-redteam.public-leaderboard.v1"
 PUBLICATION_AUDIT_SCHEMA = "ko-redteam.publication-snapshot-audit.v1"
+PUBLICATION_VERIFICATION_SCHEMA = "ko-redteam.publication-verification.v1"
 MAX_JSON_BYTES = 64 * 1024 * 1024
 MAX_PUBLICATION_FILES = 10_000
 MAX_PUBLICATION_BYTES = 512 * 1024 * 1024
+MAX_SNAPSHOT_BYTES = MAX_PUBLICATION_BYTES + (4 * MAX_JSON_BYTES)
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
+GENERATED_PUBLICATION_FILES = frozenset({
+    "SHA256SUMS",
+    "index.html",
+    "leaderboard.json",
+    "publication-audit.json",
+})
 
 COMPONENT_LABELS = {
     "paperbench_clustered": "Paperbench",
@@ -34,6 +42,7 @@ COMPONENT_LABELS = {
     "task_adherence": "Task adherence",
     "benign_utility": "Benign utility",
 }
+RANKING_SUITES = tuple(leaderboard.SUITES)
 
 
 def _sha256_bytes(value: bytes) -> str:
@@ -189,6 +198,56 @@ def _public_evidence_closure(
                 reference.get("sha256"),
                 f"release {namespace}.{name}",
             )
+
+    ranking_reference = manifest["artifacts"].get("ranking_manifest")
+    if not isinstance(ranking_reference, dict):
+        raise ValueError("release artifacts.ranking_manifest must be a reference")
+    ranking_relative = _relative_path(
+        ranking_reference.get("path"),
+        "release artifacts.ranking_manifest",
+    )
+    ranking_path, _ = _resolve_file(
+        root,
+        ranking_relative,
+        "release artifacts.ranking_manifest",
+        expected_sha256=ranking_reference.get("sha256"),
+    )
+    ranking_manifest = _load_json(ranking_path, "ranking manifest")
+
+    def add_ranking_reference(reference: Any, label: str) -> None:
+        if not isinstance(reference, dict):
+            raise ValueError(f"{label} must be a reference")
+        child = _relative_path(reference.get("path"), label)
+        release_relative = (
+            PurePosixPath(ranking_relative).parent / PurePosixPath(child)
+        ).as_posix()
+        add(release_relative, reference.get("sha256"), label)
+
+    models = ranking_manifest.get("models")
+    if not isinstance(models, list):
+        raise ValueError("ranking manifest models must be a list")
+    for model_index, model in enumerate(models):
+        if not isinstance(model, dict):
+            raise ValueError(f"ranking model must be an object: {model_index}")
+        runs = model.get("runs")
+        if not isinstance(runs, list):
+            raise ValueError(f"ranking model runs must be a list: {model_index}")
+        for run_index, run in enumerate(runs):
+            if not isinstance(run, dict):
+                raise ValueError(
+                    f"ranking run must be an object: {model_index}/{run_index}"
+                )
+            prefix = f"ranking run {model_index}/{run_index}"
+            for suite in RANKING_SUITES:
+                add_ranking_reference(run.get(suite), f"{prefix}.{suite}")
+            execution_evidence = run.get("execution_evidence")
+            if not isinstance(execution_evidence, dict):
+                raise ValueError(f"{prefix}.execution_evidence must be an object")
+            for profile in ("core", "mini_single"):
+                add_ranking_reference(
+                    execution_evidence.get(profile),
+                    f"{prefix}.execution_evidence.{profile}",
+                )
 
     review_reference = manifest["artifacts"].get("external_review")
     if not isinstance(review_reference, dict):
@@ -424,6 +483,7 @@ def build_public_payload(
             "checks": (audit.get("summary") or {}).get("checks"),
             "failed": (audit.get("summary") or {}).get("failed"),
             "validator_code_sha256": audit.get("validator_code_sha256"),
+            "publisher_code_sha256": _sha256_file(Path(__file__).resolve()),
             "release_manifest_sha256": _sha256_file(source),
             "claim_boundary": (
                 "Protocol-compliant relative evidence tiers; not a universal model "
@@ -707,7 +767,7 @@ def render_public_leaderboard_html(
     </div></section>
 
     <section><div class="wrap">
-      <div class="section-head"><h2>Evidence bundle</h2><p>모든 링크는 이 snapshot에 복제된 해시 검증 파일입니다. 원본 prompt·response·내부 endpoint는 포함하지 않습니다.</p></div>
+      <div class="section-head"><h2>Evidence bundle</h2><p>모든 링크는 이 snapshot에 복제된 해시 검증 파일입니다. 원본 prompt·response·내부 endpoint는 포함하지 않습니다. 전체 디렉터리는 <code>ko-redteam-verify-publication &lt;snapshot&gt;</code>으로 독립 재검증할 수 있습니다.</p></div>
       <div class="evidence">
         <a href="{manifest_url}"><span>release manifest</span><code>{_e(str(publication.get("release_manifest_sha256"))[:12])}</code></a>
         <a href="leaderboard.json"><span>public data</span><code>JSON</code></a>
@@ -720,7 +780,7 @@ def render_public_leaderboard_html(
     <section><div class="wrap"><div class="limits"><h3>해석 경계</h3><p>{_e(publication.get("claim_boundary"))}</p><ul>{limitation_items or '<li>Release artifact에 선언된 범위 밖 일반화는 보장하지 않습니다.</li>'}</ul></div></div></section>
   </main>
 
-  <footer><div class="wrap">Frozen at {_e(release.get("frozen_at"))} · Protocol {_e(release.get("protocol_version"))} · {method.get("multiple_comparison_correction") and _e(method.get("multiple_comparison_correction"))} · <a href="{manifest_url}">검증 가능한 manifest</a></div></footer>
+  <footer><div class="wrap">Frozen at {_e(release.get("frozen_at"))} · Protocol {_e(release.get("protocol_version"))} · Publisher {_e(str(publication.get("publisher_code_sha256"))[:12])} · {method.get("multiple_comparison_correction") and _e(method.get("multiple_comparison_correction"))} · <a href="{manifest_url}">검증 가능한 manifest</a></div></footer>
 </body>
 </html>
 """
@@ -757,6 +817,76 @@ def _set_public_directory_permissions(root: Path) -> None:
     ):
         os.chmod(path, 0o755)
     os.chmod(root, 0o755)
+
+
+def _snapshot_tree(root: Path) -> tuple[dict[str, Path], int]:
+    files: dict[str, Path] = {}
+    directories: set[str] = set()
+    total_bytes = 0
+    for path in sorted(root.rglob("*")):
+        relative = path.relative_to(root).as_posix()
+        _relative_path(relative, "snapshot entry")
+        if path.is_symlink():
+            raise ValueError(f"snapshot must not contain symlinks: {relative}")
+        if path.is_dir():
+            directories.add(relative)
+            continue
+        if not path.is_file():
+            raise ValueError(f"snapshot must contain only regular files: {relative}")
+        size = path.stat().st_size
+        total_bytes += size
+        if len(files) + 1 > MAX_PUBLICATION_FILES + len(
+            GENERATED_PUBLICATION_FILES
+        ):
+            raise ValueError("snapshot exceeds the file-count limit")
+        if total_bytes > MAX_SNAPSHOT_BYTES:
+            raise ValueError("snapshot exceeds the byte limit")
+        files[relative] = path
+
+    expected_directories: set[str] = set()
+    for relative in files:
+        for parent in PurePosixPath(relative).parents:
+            if parent.as_posix() != ".":
+                expected_directories.add(parent.as_posix())
+    unexpected_directories = directories - expected_directories
+    if unexpected_directories:
+        detail = ", ".join(sorted(unexpected_directories)[:8])
+        raise ValueError(f"snapshot contains unexpected empty directories: {detail}")
+    return files, total_bytes
+
+
+def _publication_audit(
+    payload: dict[str, Any],
+    source_audit: dict[str, Any],
+    manifest_sha256: str,
+    manifest_relative: str,
+    closure: dict[str, dict[str, Any]],
+) -> dict[str, Any]:
+    return {
+        "schema": PUBLICATION_AUDIT_SCHEMA,
+        "status": "pass",
+        "release_id": payload["release"].get("id"),
+        "release_manifest_sha256": manifest_sha256,
+        "release_manifest_path": f"release/{manifest_relative}",
+        "validator_code_sha256": source_audit.get("validator_code_sha256"),
+        "publisher_code_sha256": _sha256_file(Path(__file__).resolve()),
+        "source_audit_summary": source_audit.get("summary"),
+        "copied_files": len(closure),
+        "copied_bytes": sum(int(row["bytes"]) for row in closure.values()),
+        "evidence_files": {
+            f"release/{relative}": {
+                "sha256": row["sha256"],
+                "bytes": row["bytes"],
+            }
+            for relative, row in closure.items()
+        },
+        "deterministic": True,
+        "release_evidence_scope": (
+            "manifest-references-sanitized-run-provenance-and-public-review-evidence"
+        ),
+        "validator_confirmed_raw_reports": 0,
+        "publisher_generated_raw_prompt_or_response": False,
+    }
 
 
 def _require_publishable(manifest_path: Path) -> dict[str, Any]:
@@ -812,29 +942,13 @@ def build_publication_snapshot(
     try:
         _copy_public_evidence(closure, temporary)
         _write(temporary / "leaderboard.json", _json_bytes(payload))
-        publication_audit = {
-            "schema": PUBLICATION_AUDIT_SCHEMA,
-            "status": "pass",
-            "release_id": payload["release"].get("id"),
-            "release_manifest_sha256": initial_manifest_sha256,
-            "release_manifest_path": f"release/{manifest_relative}",
-            "validator_code_sha256": audit.get("validator_code_sha256"),
-            "source_audit_summary": audit.get("summary"),
-            "copied_files": len(closure),
-            "copied_bytes": sum(int(row["bytes"]) for row in closure.values()),
-            "evidence_files": {
-                f"release/{relative}": {
-                    "sha256": row["sha256"],
-                    "bytes": row["bytes"],
-                }
-                for relative, row in closure.items()
-            },
-            "deterministic": True,
-            "release_evidence_scope": (
-                "manifest-direct-references-and-external-review-public-evidence"
-            ),
-            "publisher_generated_raw_prompt_or_response": False,
-        }
+        publication_audit = _publication_audit(
+            payload,
+            audit,
+            initial_manifest_sha256,
+            manifest_relative,
+            closure,
+        )
         _write(temporary / "publication-audit.json", _json_bytes(publication_audit))
         html = render_public_leaderboard_html(
             payload,
@@ -852,3 +966,147 @@ def build_publication_snapshot(
     except BaseException:
         shutil.rmtree(temporary, ignore_errors=True)
         raise
+
+
+def verify_publication_snapshot(
+    snapshot_directory: str | Path,
+) -> dict[str, Any]:
+    requested = Path(snapshot_directory)
+    if requested.is_symlink():
+        raise ValueError("publication snapshot must not be a symlink")
+    try:
+        root = requested.resolve(strict=True)
+    except OSError as exc:
+        raise ValueError("publication snapshot must exist") from exc
+    if not root.is_dir():
+        raise ValueError("publication snapshot must be a directory")
+
+    files, total_bytes = _snapshot_tree(root)
+    missing_generated = GENERATED_PUBLICATION_FILES - set(files)
+    if missing_generated:
+        detail = ", ".join(sorted(missing_generated))
+        raise ValueError(f"publication snapshot is missing generated files: {detail}")
+
+    checksum_path = files["SHA256SUMS"]
+    if checksum_path.stat().st_size > MAX_JSON_BYTES:
+        raise ValueError("SHA256SUMS exceeds the size limit")
+    try:
+        initial_checksum_bytes = checksum_path.read_bytes()
+    except OSError as exc:
+        raise ValueError("SHA256SUMS must be readable") from exc
+    if initial_checksum_bytes != _checksum_manifest(root):
+        raise ValueError("snapshot checksum manifest does not match the file tree")
+
+    publication_audit = _load_json(
+        files["publication-audit.json"], "publication audit"
+    )
+    if publication_audit.get("schema") != PUBLICATION_AUDIT_SCHEMA:
+        raise ValueError("publication audit schema is invalid")
+    if publication_audit.get("status") != "pass":
+        raise ValueError("publication audit status must be pass")
+    manifest_path_value = _relative_path(
+        publication_audit.get("release_manifest_path"),
+        "publication release manifest",
+    )
+    manifest_parts = PurePosixPath(manifest_path_value).parts
+    if len(manifest_parts) != 2 or manifest_parts[0] != "release":
+        raise ValueError(
+            "publication release manifest must be directly below release/"
+        )
+    manifest_path, _ = _resolve_file(
+        root,
+        manifest_path_value,
+        "publication release manifest",
+        expected_sha256=publication_audit.get("release_manifest_sha256"),
+    )
+    release_root = (root / "release").resolve(strict=True)
+    if manifest_path.parent != release_root:
+        raise ValueError("publication release manifest root is invalid")
+
+    source_audit = _require_publishable(manifest_path)
+    manifest = _load_json(manifest_path, "release manifest")
+    manifest_relative = manifest_path.name
+    payload = build_public_payload(manifest_path, manifest, source_audit)
+    closure = _public_evidence_closure(
+        release_root,
+        manifest_relative,
+        manifest,
+    )
+    expected_audit = _publication_audit(
+        payload,
+        source_audit,
+        _sha256_file(manifest_path),
+        manifest_relative,
+        closure,
+    )
+    if publication_audit != expected_audit:
+        raise ValueError("publication audit does not replay from release evidence")
+    if files["publication-audit.json"].read_bytes() != _json_bytes(expected_audit):
+        raise ValueError("publication audit is not canonically encoded")
+
+    expected_files = set(GENERATED_PUBLICATION_FILES) | {
+        f"release/{relative}" for relative in closure
+    }
+    actual_files = set(files)
+    if actual_files != expected_files:
+        missing = sorted(expected_files - actual_files)
+        unexpected = sorted(actual_files - expected_files)
+        detail = f"missing={missing[:4]} unexpected={unexpected[:4]}"
+        raise ValueError(f"publication snapshot file set is not canonical: {detail}")
+
+    expected_payload_bytes = _json_bytes(payload)
+    if files["leaderboard.json"].read_bytes() != expected_payload_bytes:
+        raise ValueError("leaderboard JSON does not replay from release evidence")
+    expected_html_bytes = render_public_leaderboard_html(
+        payload,
+        manifest_relative=manifest_relative,
+    ).encode("utf-8")
+    if files["index.html"].read_bytes() != expected_html_bytes:
+        raise ValueError("leaderboard HTML does not replay from release evidence")
+
+    final_files, final_total_bytes = _snapshot_tree(root)
+    if set(final_files) != actual_files or final_total_bytes != total_bytes:
+        raise ValueError("publication snapshot changed during verification")
+    if checksum_path.read_bytes() != initial_checksum_bytes:
+        raise ValueError("SHA256SUMS changed during verification")
+    if _checksum_manifest(root) != initial_checksum_bytes:
+        raise ValueError("publication snapshot changed during verification")
+
+    return {
+        "schema": PUBLICATION_VERIFICATION_SCHEMA,
+        "status": "pass",
+        "release_id": payload["release"].get("id"),
+        "release_manifest_sha256": _sha256_file(manifest_path),
+        "validator_code_sha256": source_audit.get("validator_code_sha256"),
+        "verification_code_sha256": _sha256_file(Path(__file__).resolve()),
+        "checksum_manifest_sha256": _sha256_bytes(initial_checksum_bytes),
+        "snapshot_files": len(files),
+        "snapshot_bytes": total_bytes,
+        "release_evidence_files": len(closure),
+        "source_audit_summary": source_audit.get("summary"),
+        "deterministic_rebuild": True,
+    }
+
+
+def write_publication_verification_audit(
+    snapshot_directory: str | Path,
+    verification: dict[str, Any],
+    output_path: str | Path,
+) -> Path:
+    snapshot_root = Path(snapshot_directory).resolve(strict=True)
+    requested = Path(output_path)
+    parent = requested.parent.resolve()
+    destination = parent / requested.name
+    if destination.exists() or destination.is_symlink():
+        raise ValueError("verification audit output must not already exist")
+    try:
+        destination.relative_to(snapshot_root)
+    except ValueError:
+        pass
+    else:
+        raise ValueError("verification audit output must be outside the snapshot")
+    parent.mkdir(parents=True, exist_ok=True)
+    if destination.exists() or destination.is_symlink():
+        raise ValueError("verification audit output must not already exist")
+    _write(destination, _json_bytes(verification))
+    return destination

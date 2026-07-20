@@ -254,13 +254,22 @@ ko-redteam-validate-leaderboard release_manifest.json \
 
 ko-redteam-publish-leaderboard \
   release_manifest.json ../public/ko-redteam-release-id
+
+ko-redteam-verify-publication \
+  ../public/ko-redteam-release-id \
+  --output ../public-audits/ko-redteam-release-id.verify.json
 ```
 
 정적 publisher는 validator가 `publishable`인 최종 manifest만 받는다. source release root 밖의 새 디렉터리에
 HTML, metadata-only JSON, manifest가 직접 해시 고정한 artifact·governance 문서, 공개 외부검토
-attestation/report와 `SHA256SUMS`를 원자적으로 생성한다. 원시 run report처럼 release artifact 내부에서만
-참조하는 비공개 입력은 복제하지 않는다. 기존 디렉터리 덮어쓰기, symlink, digest 불일치, 검증 중 evidence
-변경 또는 publication gate 실패는 모두 출력 없이 거부한다.
+attestation/report, deterministic replay에 필요한 sanitized suite report·execution evidence와 `SHA256SUMS`를
+원자적으로 생성한다. validator가 raw field·절대경로 0건을 확인한 run artifact만 포함하고 원시 prompt·response,
+private execution log는 복제하지 않는다. 기존 디렉터리 덮어쓰기, symlink, digest 불일치, 검증 중 evidence 변경
+또는 publication gate 실패는 모두 출력 없이 거부한다.
+
+독립 verifier는 `SHA256SUMS`를 신뢰점으로 사용하지 않는다. copied release의 외부검토 서명과 전체 publication
+gate를 다시 검증하고 ranking을 deterministic replay한 뒤 publication audit, metadata JSON과 HTML을 canonical
+byte로 재생성한다. checksum을 함께 바꾼 변조, evidence 누락, 임의 파일·빈 디렉터리·symlink도 실패한다.
 
 사전 증거 생성 명령:
 

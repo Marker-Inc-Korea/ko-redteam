@@ -55,6 +55,7 @@ def test_console_script_targets_are_importable():
         "ko-redteam-validate-season-preregistration",
         "ko-redteam-build-release-manifest",
         "ko-redteam-publish-leaderboard",
+        "ko-redteam-verify-publication",
         "ko-redteam-compare-reports",
         "ko-redteam-check-regression",
         "ko-redteam-validate-deployment",
@@ -80,7 +81,7 @@ def test_distribution_metadata_has_release_basics():
     assert data["build-system"]["requires"][0].startswith("setuptools>=77")
     assert data["project"]["license"] == "MIT"
     assert data["project"]["license-files"] == ["LICENSE"]
-    assert data["project"]["version"] == "0.2.0rc2"
+    assert data["project"]["version"] == "0.2.0rc3"
     assert "Development Status :: 4 - Beta" in data["project"]["classifiers"]
     assert "korean" in data["project"]["keywords"]
     assert "Natural Language :: Korean" in data["project"]["classifiers"]
@@ -182,7 +183,7 @@ def test_analysis_package_imports_without_flat_pythonpath():
                 "from analysis.ko_benchmark_identity import benchmark_content_sha256;"
                 "from analysis.ko_model_ranking import analyze_ranking_manifest;"
                 "from analysis.ko_leaderboard import audit_leaderboard_release;"
-                "from analysis.ko_leaderboard_site import build_publication_snapshot;"
+                "from analysis.ko_leaderboard_site import build_publication_snapshot,verify_publication_snapshot;"
                 "from analysis.ko_calibration import build_calibration_report;"
                 "from analysis.ko_calibration_evidence import validate_public_calibration_signatures;"
                 "from analysis.ko_split_evidence import build_split_audit;"
@@ -201,6 +202,7 @@ def test_analysis_package_imports_without_flat_pythonpath():
                 "assert callable(score_unlabeled_scan);"
                 "assert callable(render_markdown);"
                 "assert callable(build_publication_snapshot);"
+                "assert callable(verify_publication_snapshot);"
                 "assert evaluate_response_contract('정상 응답', None)['pass'];"
                 "assert parse_thresholds(['privacy=90']) == {'privacy': 90.0};"
                 "assert len(benchmark_content_sha256({'schema':'unit','cases':[]})) == 64;"

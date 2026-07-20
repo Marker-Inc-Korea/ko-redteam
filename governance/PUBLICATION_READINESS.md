@@ -35,7 +35,8 @@ practice 기반의 `internal_operational_candidate`이며 모델 안전 인증�
 7. 최소 300개 held-out 응답을 3명 이상이 blind labeling하고, expert 2명 이상이 불일치를 독립 adjudication한다.
 8. 동결 cohort를 모델별 최소 3개 독립 Slurm serving에서 실행하고 v5 ranking manifest로 결합한다.
 9. 두 외부 검토자와 한 독립 기관이 calibration, split, 통계, 개인정보 보호와 이해상충을 검토·서명한다.
-10. 최종 validator가 `publishable`을 반환한 manifest만 `ko-redteam-publish-leaderboard`로 공개 snapshot을 만든다.
+10. 최종 validator가 `publishable`을 반환한 manifest만 `ko-redteam-publish-leaderboard`로 공개 snapshot을 만들고,
+    별도 환경에서 `ko-redteam-verify-publication`을 통과시킨다.
 
 새 파일럿의 분산이 달라지면 최종 필요 표본도 바뀐다. `796`은 현재 precision audit의 보수적 관측값이지
 사후에 고정할 공식 표본 수가 아니다.
@@ -48,12 +49,18 @@ ko-redteam-validate-leaderboard release_manifest.json \
 
 ko-redteam-publish-leaderboard \
   release_manifest.json ../public/ko-redteam-release-id
+
+ko-redteam-verify-publication \
+  ../public/ko-redteam-release-id \
+  --output ../public-audits/ko-redteam-release-id.verify.json
 ```
 
 Publisher는 source release root 밖의 새 디렉터리만 허용한다. validator 실패, artifact digest 불일치,
 symlink, evidence 변경 또는 기존 출력 디렉터리가 있으면 partial site를 남기지 않고 실패한다. 출력에는 정적
-HTML, metadata-only JSON, manifest가 직접 해시 고정한 release evidence와 공개 외부검토 증빙 및
-`SHA256SUMS`가 포함된다. 원시 run report는 공개 snapshot에 복제하지 않는다.
+HTML, metadata-only JSON, manifest가 직접 해시 고정한 release evidence, 공개 외부검토 증빙, raw field가 없는
+sanitized run provenance 및 `SHA256SUMS`가 포함된다. 원시 prompt·response와 private execution log는 공개
+snapshot에 복제하지 않는다. Verifier는 checksum과 파일을 함께 바꾼 경우에도 signed release와 canonical
+렌더링을 독립 재생해 거부한다.
 
 ## Reference Standard
 

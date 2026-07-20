@@ -5,6 +5,10 @@
 
 ## Unreleased - Evidence-Eligible Ranking Protocol
 
+- 공개 snapshot의 checksum을 신뢰하지 않고 copied release의 외부검토 서명·publication gate·ranking을 다시
+  실행한 뒤 audit·metadata JSON·HTML을 canonical byte로 재생성하는 독립 verifier를 추가한다. Publisher는 이
+  재생에 필요한 raw-free suite report와 execution evidence만 manifest 기준 경로로 포함하며 checksum 동시 변조,
+  evidence 누락, 추가 파일·빈 디렉터리와 symlink를 거부한다.
 - 최종 publication validator가 `publishable`인 release만 정적 HTML·metadata JSON으로 내보내는 fail-closed
   publisher를 추가한다. manifest가 직접 고정한 release evidence와 공개 외부검토 증빙을 SHA-256으로 다시
   확인해 source root 밖에 원자적으로 생성하며, 원시 run 입력·기존 출력 덮어쓰기·symlink·검증 중 변경을

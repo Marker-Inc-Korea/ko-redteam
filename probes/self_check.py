@@ -98,6 +98,7 @@ REQUIRED_MODULES = [
     "validate_leaderboard",
     "validate_deployment",
     "verify_external_review",
+    "verify_leaderboard_site",
     "verify_calibration_signatures",
     "verify_review_signatures",
 ]

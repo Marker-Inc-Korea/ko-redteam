@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ko-redteam"
-version = "0.2.0rc2"
+version = "0.2.0rc3"
 description = "Korean LLM redteam and forensics toolkit"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -75,6 +75,7 @@ ko-redteam-build-season-preregistration = "probes.build_season_preregistration:m
 ko-redteam-validate-season-preregistration = "probes.validate_season_preregistration:main"
 ko-redteam-build-release-manifest = "probes.build_release_manifest:main"
 ko-redteam-publish-leaderboard = "probes.build_leaderboard_site:main"
+ko-redteam-verify-publication = "probes.verify_leaderboard_site:main"
 ko-redteam-compare-reports = "probes.compare_reports:main"
 ko-redteam-check-regression = "probes.check_regression:main"
 ko-redteam-gate-reports = "probes.gate_reports:main"

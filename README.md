@@ -4,7 +4,7 @@
 과잉거부, 한국어 응답 품질을 한 번에 점검하는 레드팀/포렌식 평가 도구입니다.
 
 > [!NOTE]
-> 현재 버전은 **0.2.0rc2 내부 운영 배포 후보**입니다. 평가기 배포 준비도와 3회 독립 Slurm 실행 증거는
+> 현재 버전은 **0.2.0rc3 내부 운영 배포 후보**입니다. 평가기 배포 준비도와 3회 독립 Slurm 실행 증거는
 > 검증할 수 있지만, 특정 모델의 안전 인증이나 공식 leaderboard 공개를 의미하지 않습니다.
 
 | 바로가기 | 목적 |
@@ -134,7 +134,7 @@ ko-redteam-suite \
 | 사람 calibration | `ko-redteam-calibration-collection`, `ko-redteam-calibration-response` | rater별 blinded 라벨, expert disagreement 합의, 독립 SSHSIG와 최종 v3 commitment 조립 |
 | 모델 비교 | `ko-redteam-rank-models`, `ko-redteam-analyze-repeats` | evidence eligibility, 배포 screen, 반복 안정성, 신뢰구간 기반 tier 분석 |
 | 공식 증거 생성 | `ko-redteam-validate-pilot-registration`, `ko-redteam-build-calibration-commitments`, `ko-redteam-build-calibration`, `ko-redteam-verify-calibration-signatures`, `ko-redteam-build-power-pilot`, `ko-redteam-semantic-embeddings`, `ko-redteam-audit-splits`, `ko-redteam-analyze-power`, `ko-redteam-analyze-familywise-power`, `ko-redteam-build-power-design` | practice 검토·등록, signed 사람 판정 보정, 고정 GPU semantic replay, split 중복, marginal·다중비교 검정력과 공식 분할 규모의 metadata-only 증거 생성 |
-| 공식 게시 검증 | `ko-redteam-build-release-manifest`, `ko-redteam-build-external-review-statement`, `ko-redteam-assemble-external-review`, `ko-redteam-verify-external-review`, `ko-redteam-validate-leaderboard`, `ko-redteam-publish-leaderboard` | deterministic manifest 조립, signed 외부 검토 scope와 hidden split, calibration, provenance, 통계 publication gate 및 정적 snapshot 생성 |
+| 공식 게시 검증 | `ko-redteam-build-release-manifest`, `ko-redteam-build-external-review-statement`, `ko-redteam-assemble-external-review`, `ko-redteam-verify-external-review`, `ko-redteam-validate-leaderboard`, `ko-redteam-publish-leaderboard`, `ko-redteam-verify-publication` | deterministic manifest 조립, signed 외부 검토 scope와 hidden split, calibration, provenance, 통계 publication gate, 정적 snapshot 생성·독립 재검증 |
 | 평가셋 관리 | `ko-redteam-import-benchmark`, `ko-redteam-merge-benchmarks`, `ko-redteam-expand-benchmark` | 외부 파일 변환, 병합, 한국어 변형 생성 |
 | 릴리스 게이트 | `ko-redteam-compare-reports`, `ko-redteam-check-regression`, `ko-redteam-gate-reports`, `ko-redteam-doctor-reports`, `ko-redteam-check-public-hygiene` | 점수 비교, 회귀 판정, CI threshold, 공개 배포 위생 점검 |
 
@@ -620,6 +620,11 @@ ko-redteam-validate-leaderboard release_manifest.json \
 # publishable final manifest만 별도 검증 가능한 snapshot으로 변환
 ko-redteam-publish-leaderboard \
   release_manifest.json ../public/ko-redteam-release-id
+
+# 공개 snapshot을 받은 제3자가 checksum과 signed release를 독립 재생
+ko-redteam-verify-publication \
+  ../public/ko-redteam-release-id \
+  --output ../public-audits/ko-redteam-release-id.verify.json
 ```
 
 Candidate assembler는 외부 검토와 최종 동결에 종속된 세 check 외 publication failure가 있으면 manifest를 만들지
