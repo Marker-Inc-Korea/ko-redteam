@@ -15,7 +15,7 @@ from ko_calibration_evidence import build_calibration_commitments  # noqa: E402
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("input", help="private calibration-input.v1 JSON")
+    parser.add_argument("input", help="private calibration-input.v2 JSON")
     parser.add_argument("config", help="private calibration-signature-config.v1 JSON")
     parser.add_argument(
         "--evidence-root",

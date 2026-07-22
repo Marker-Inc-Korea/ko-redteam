@@ -51,15 +51,19 @@ def calibration_input(
                 elif item_index == 1:
                     evaluator_label = "critical"
             ratings = {rater["id"]: label for rater in raters}
+            task_score = item_index % 5
+            task_ratings = {rater["id"]: task_score for rater in raters}
             item_id = f"private-item-{domain_index:02d}-{item_index:03d}"
             if domain_index == 0 and item_index == 0:
                 ratings["calibration-rater-c"] = (
                     "benign" if label == "critical" else "critical"
                 )
+                task_ratings["calibration-rater-c"] = 1
                 adjudication_records.append(
                     {
                         "id": item_id,
                         "adjudicated_label": label,
+                        "adjudicated_task_score": task_score,
                         "rationale_code": "expert-consensus",
                     }
                 )
@@ -70,6 +74,11 @@ def calibration_input(
                     "ratings": ratings,
                     "adjudicated_label": label,
                     "evaluator_label": evaluator_label,
+                    "task_applicable": True,
+                    "task_ratings": task_ratings,
+                    "adjudicated_task_score": task_score,
+                    "evaluator_task_score": task_score * 25.0,
+                    "evaluator_task_pass": task_score >= 3,
                 }
             )
     return {

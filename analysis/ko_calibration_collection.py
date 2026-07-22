@@ -8,6 +8,7 @@ from datetime import datetime
 import fcntl
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 import re
@@ -34,20 +35,20 @@ except ModuleNotFoundError:  # package import path
     from .ko_run_context import canonical_sha256
 
 
-SPEC_SCHEMA = "ko-redteam.calibration-collection-spec.v1"
-PLAN_SCHEMA = "ko-redteam.calibration-collection-plan.v1"
-RATER_PACKET_SCHEMA = "ko-redteam.calibration-rater-packet.v1"
-RATER_RESPONSE_SCHEMA = "ko-redteam.calibration-rater-response.v1"
+SPEC_SCHEMA = "ko-redteam.calibration-collection-spec.v2"
+PLAN_SCHEMA = "ko-redteam.calibration-collection-plan.v2"
+RATER_PACKET_SCHEMA = "ko-redteam.calibration-rater-packet.v2"
+RATER_RESPONSE_SCHEMA = "ko-redteam.calibration-rater-response.v2"
 RATER_ATTESTATION_SCHEMA = "ko-redteam.calibration-rater-attestation.v1"
-RATER_HANDOFF_SCHEMA = "ko-redteam.calibration-rater-handoff.v1"
-RATER_COMMITMENT_SCHEMA = "ko-redteam.calibration-rater-response-commitment.v1"
+RATER_HANDOFF_SCHEMA = "ko-redteam.calibration-rater-handoff.v2"
+RATER_COMMITMENT_SCHEMA = "ko-redteam.calibration-rater-response-commitment.v2"
 RATER_AUDIT_SCHEMA = "ko-redteam.calibration-rater-submission-audit.v1"
 COLLECTION_RECEIPT_SCHEMA = "ko-redteam.calibration-collection-receipt.v1"
-ADJUDICATION_PACKET_SCHEMA = "ko-redteam.calibration-adjudication-packet.v1"
-ADJUDICATION_RESPONSE_SCHEMA = "ko-redteam.calibration-adjudication-response.v1"
-ADJUDICATION_HANDOFF_SCHEMA = "ko-redteam.calibration-adjudication-handoff.v1"
+ADJUDICATION_PACKET_SCHEMA = "ko-redteam.calibration-adjudication-packet.v2"
+ADJUDICATION_RESPONSE_SCHEMA = "ko-redteam.calibration-adjudication-response.v2"
+ADJUDICATION_HANDOFF_SCHEMA = "ko-redteam.calibration-adjudication-handoff.v2"
 ADJUDICATION_PROPOSAL_SCHEMA = (
-    "ko-redteam.calibration-adjudication-proposal-commitment.v1"
+    "ko-redteam.calibration-adjudication-proposal-commitment.v2"
 )
 ADJUDICATION_AUDIT_SCHEMA = (
     "ko-redteam.calibration-adjudication-submission-audit.v1"
@@ -77,6 +78,8 @@ MAX_PRIVATE_EVIDENCE_BYTES = 10 * 1024 * 1024
 MAX_NOTES_CHARS = 2000
 MIN_OFFICIAL_ITEMS = 300
 MIN_OFFICIAL_DOMAIN_ITEMS = 30
+MIN_OFFICIAL_TASK_ITEMS = 180
+MIN_OFFICIAL_TASK_DOMAIN_ITEMS = 20
 
 SPEC_FIELDS = {
     "schema",
@@ -97,6 +100,9 @@ SPEC_ITEM_FIELDS = {
     "response",
     "source_record_sha256",
     "evaluator_label",
+    "task_applicable",
+    "evaluator_task_score",
+    "evaluator_task_pass",
 }
 PLAN_FIELDS = {
     "schema",
@@ -109,6 +115,8 @@ PLAN_FIELDS = {
     "dataset_content_sha256",
     "item_count",
     "domain_counts",
+    "task_item_count",
+    "task_domain_counts",
     "raters",
     "rater_packet_schema",
     "rater_response_schema",
@@ -154,6 +162,8 @@ RATER_PACKET_FIELDS = {
     "dataset_content_sha256",
     "assignment_count",
     "domain_counts",
+    "task_assignment_count",
+    "task_domain_counts",
     "items",
     "response_path",
     "attestation_path",
@@ -174,6 +184,7 @@ RATER_PACKET_ITEM_FIELDS = {
     "prompt",
     "response",
     "source_record_sha256",
+    "task_applicable",
 }
 RATER_RESPONSE_FIELDS = {
     "schema",
@@ -186,7 +197,7 @@ RATER_RESPONSE_FIELDS = {
     "attestation_sha256",
     "ratings",
 }
-RATING_FIELDS = {"id", "label", "notes"}
+RATING_FIELDS = {"id", "label", "task_score", "notes"}
 RATER_ATTESTATION_FIELDS = {
     "schema",
     "status",
@@ -279,6 +290,8 @@ ADJUDICATION_ITEM_FIELDS = {
     "response",
     "source_record_sha256",
     "rater_labels",
+    "task_applicable",
+    "rater_task_scores",
 }
 ADJUDICATION_RESPONSE_FIELDS = {
     "schema",
@@ -298,7 +311,13 @@ ADJUDICATION_ATTESTATION_FIELDS = {
     "all_disagreements_individually_reviewed",
     "private_key_not_shared",
 }
-ADJUDICATION_DECISION_FIELDS = {"id", "adjudicated_label", "rationale_code", "notes"}
+ADJUDICATION_DECISION_FIELDS = {
+    "id",
+    "adjudicated_label",
+    "adjudicated_task_score",
+    "rationale_code",
+    "notes",
+}
 ADJUDICATION_HANDOFF_FIELDS = {
     "schema",
     "status",
@@ -636,6 +655,31 @@ def validate_collection_spec(spec: dict[str, Any], *, official: bool = True) -> 
         evaluator_label = row.get("evaluator_label")
         if evaluator_label not in calibration.LABELS:
             raise ValueError(f"calibration evaluator label is invalid: {item_id}")
+        task_applicable = row.get("task_applicable")
+        if not isinstance(task_applicable, bool):
+            raise ValueError(f"calibration task applicability is invalid: {item_id}")
+        evaluator_task_score = row.get("evaluator_task_score")
+        evaluator_task_pass = row.get("evaluator_task_pass")
+        if task_applicable:
+            try:
+                normalized_task_score = float(evaluator_task_score)
+            except (TypeError, ValueError) as exc:
+                raise ValueError(
+                    f"calibration evaluator task score is invalid: {item_id}"
+                ) from exc
+            if (
+                isinstance(evaluator_task_score, bool)
+                or not math.isfinite(normalized_task_score)
+                or not 0.0 <= normalized_task_score <= 100.0
+                or not isinstance(evaluator_task_pass, bool)
+            ):
+                raise ValueError(f"calibration evaluator task evidence is invalid: {item_id}")
+        else:
+            if evaluator_task_score is not None or evaluator_task_pass is not None:
+                raise ValueError(
+                    f"non-applicable calibration task evidence must be null: {item_id}"
+                )
+            normalized_task_score = None
         items.append({
             "id": item_id,
             "domain": domain,
@@ -643,10 +687,16 @@ def validate_collection_spec(spec: dict[str, Any], *, official: bool = True) -> 
             "response": response,
             "source_record_sha256": source_sha256,
             "evaluator_label": evaluator_label,
+            "task_applicable": task_applicable,
+            "evaluator_task_score": normalized_task_score,
+            "evaluator_task_pass": evaluator_task_pass,
         })
     if [row["id"] for row in items] != sorted(row["id"] for row in items):
         raise ValueError("calibration items must be sorted by ID")
     domain_counts = Counter(row["domain"] for row in items)
+    task_domain_counts = Counter(
+        row["domain"] for row in items if row["task_applicable"]
+    )
     if official:
         if len(items) < MIN_OFFICIAL_ITEMS:
             raise ValueError("official calibration requires at least 300 items")
@@ -658,6 +708,21 @@ def validate_collection_spec(spec: dict[str, Any], *, official: bool = True) -> 
             raise ValueError(
                 "official calibration requires at least 30 items per domain: "
                 + ", ".join(missing)
+            )
+        task_items = sum(task_domain_counts.values())
+        if task_items < MIN_OFFICIAL_TASK_ITEMS:
+            raise ValueError(
+                f"official calibration requires at least {MIN_OFFICIAL_TASK_ITEMS} task items"
+            )
+        missing_task = [
+            domain for domain in sorted(calibration.DOMAINS)
+            if task_domain_counts[domain] < MIN_OFFICIAL_TASK_DOMAIN_ITEMS
+        ]
+        if missing_task:
+            raise ValueError(
+                "official calibration requires at least "
+                f"{MIN_OFFICIAL_TASK_DOMAIN_ITEMS} task items per domain: "
+                + ", ".join(missing_task)
             )
 
     adjudication = _required_string(
@@ -698,6 +763,22 @@ def validate_collection_spec(spec: dict[str, Any], *, official: bool = True) -> 
             "ratings": {rater_id: probe_label for rater_id in rater_ids},
             "adjudicated_label": probe_label,
             "evaluator_label": row["evaluator_label"],
+            "task_applicable": row["task_applicable"],
+            "task_ratings": (
+                {
+                    rater_id: (3 if row["evaluator_task_pass"] else 0)
+                    for rater_id in rater_ids
+                }
+                if row["task_applicable"]
+                else None
+            ),
+            "adjudicated_task_score": (
+                (3 if row["evaluator_task_pass"] else 0)
+                if row["task_applicable"]
+                else None
+            ),
+            "evaluator_task_score": row["evaluator_task_score"],
+            "evaluator_task_pass": row["evaluator_task_pass"],
         })
     calibration.build_calibration_report({
         "schema": calibration.INPUT_SCHEMA,
@@ -722,7 +803,14 @@ def validate_collection_spec(spec: dict[str, Any], *, official: bool = True) -> 
     dataset_rows = [
         {
             key: row[key]
-            for key in ("id", "domain", "prompt", "response", "source_record_sha256")
+            for key in (
+                "id",
+                "domain",
+                "prompt",
+                "response",
+                "source_record_sha256",
+                "task_applicable",
+            )
         }
         for row in items
     ]
@@ -732,6 +820,7 @@ def validate_collection_spec(spec: dict[str, Any], *, official: bool = True) -> 
         "raters": raters,
         "items": items,
         "domain_counts": dict(sorted(domain_counts.items())),
+        "task_domain_counts": dict(sorted(task_domain_counts.items())),
         "dataset_content_sha256": canonical_sha256(dataset_rows),
         "adjudication": adjudication,
         "evaluator": copy.deepcopy(evaluator),
@@ -768,7 +857,14 @@ def _packet_items(spec_context: dict[str, Any], rater_id: str) -> list[dict[str,
     rows = [
         {
             key: row[key]
-            for key in ("id", "domain", "prompt", "response", "source_record_sha256")
+            for key in (
+                "id",
+                "domain",
+                "prompt",
+                "response",
+                "source_record_sha256",
+                "task_applicable",
+            )
         }
         for row in spec_context["items"]
     ]
@@ -798,6 +894,8 @@ def _rater_packet(
         "dataset_content_sha256": plan["dataset_content_sha256"],
         "assignment_count": len(items),
         "domain_counts": plan["domain_counts"],
+        "task_assignment_count": sum(int(row["task_applicable"]) for row in items),
+        "task_domain_counts": plan["task_domain_counts"],
         "items": items,
         "response_path": rater["response_path"],
         "attestation_path": rater["attestation_path"],
@@ -825,7 +923,12 @@ def _rater_response_template(packet: dict[str, Any], packet_sha256: str) -> dict
         "completed_at": None,
         "attestation_sha256": None,
         "ratings": [
-            {"id": row["id"], "label": None, "notes": ""}
+            {
+                "id": row["id"],
+                "label": None,
+                "task_score": None,
+                "notes": "",
+            }
             for row in packet["items"]
         ],
     }
@@ -885,6 +988,8 @@ def build_collection_workspace(
         "dataset_content_sha256": context["dataset_content_sha256"],
         "item_count": len(context["items"]),
         "domain_counts": context["domain_counts"],
+        "task_item_count": sum(context["task_domain_counts"].values()),
+        "task_domain_counts": context["task_domain_counts"],
         "raters": raters,
         "rater_packet_schema": RATER_PACKET_SCHEMA,
         "rater_response_schema": RATER_RESPONSE_SCHEMA,
@@ -1161,6 +1266,7 @@ def _validate_rater_packet(packet: dict[str, Any]) -> dict[str, dict[str, Any]]:
         raise ValueError("calibration rater packet items must be a non-empty list")
     items: dict[str, dict[str, Any]] = {}
     domain_counts: Counter[str] = Counter()
+    task_domain_counts: Counter[str] = Counter()
     for index, row in enumerate(raw_items):
         if not isinstance(row, dict):
             raise ValueError(f"calibration packet item must be an object: {index}")
@@ -1177,12 +1283,20 @@ def _validate_rater_packet(packet: dict[str, Any]) -> dict[str, dict[str, Any]]:
             row.get("source_record_sha256"),
             f"calibration packet source SHA-256: {item_id}",
         )
+        if not isinstance(row.get("task_applicable"), bool):
+            raise ValueError(f"calibration packet task applicability is invalid: {item_id}")
         items[item_id] = row
         domain_counts[domain] += 1
+        if row["task_applicable"]:
+            task_domain_counts[domain] += 1
     if packet.get("assignment_count") != len(items):
         raise ValueError("calibration rater packet assignment count mismatch")
     if packet.get("domain_counts") != dict(sorted(domain_counts.items())):
         raise ValueError("calibration rater packet domain counts mismatch")
+    if packet.get("task_assignment_count") != sum(task_domain_counts.values()):
+        raise ValueError("calibration rater packet task assignment count mismatch")
+    if packet.get("task_domain_counts") != dict(sorted(task_domain_counts.items())):
+        raise ValueError("calibration rater packet task domain counts mismatch")
     return items
 
 
@@ -1272,13 +1386,26 @@ def _validate_rater_response(
         if item_id not in items or item_id in ratings:
             raise ValueError(f"unknown or duplicate calibration rating: {item_id}")
         label = row.get("label")
+        task_score = row.get("task_score")
         notes = row.get("notes")
         if not isinstance(notes, str) or len(notes) > MAX_NOTES_CHARS:
             raise ValueError(f"calibration rating notes are invalid: {item_id}")
-        if label is None:
-            pending += 1
-        elif label not in calibration.LABELS:
+        if label is not None and label not in calibration.LABELS:
             raise ValueError(f"calibration rating label is invalid: {item_id}")
+        task_required = items[item_id]["task_applicable"]
+        if task_required:
+            if task_score is not None and (
+                not isinstance(task_score, int)
+                or isinstance(task_score, bool)
+                or task_score not in calibration.TASK_SCORES
+            ):
+                raise ValueError(f"calibration task score is invalid: {item_id}")
+        elif task_score is not None:
+            raise ValueError(
+                f"non-applicable calibration task score must be null: {item_id}"
+            )
+        if label is None or (task_required and task_score is None):
+            pending += 1
         ratings[item_id] = row
     if set(ratings) != set(items):
         raise ValueError("calibration rater response does not cover every item")
@@ -1391,11 +1518,26 @@ def load_rater_session(
 
 def rater_progress(session: RaterSession) -> dict[str, Any]:
     counts = {"critical": 0, "benign": 0, "pending": 0}
+    task_assignments = 0
+    task_completed = 0
     for row in session.ratings.values():
         key = row["label"] if row["label"] in calibration.LABELS else "pending"
         counts[key] += 1
+        item = session.items[row["id"]]
+        if item["task_applicable"]:
+            task_assignments += 1
+            task_completed += int(row["task_score"] in calibration.TASK_SCORES)
     order = [row["id"] for row in session.packet["items"]]
-    next_id = next((item_id for item_id in order if session.ratings[item_id]["label"] is None), None)
+    complete_ids = {
+        item_id
+        for item_id in order
+        if session.ratings[item_id]["label"] in calibration.LABELS
+        and (
+            not session.items[item_id]["task_applicable"]
+            or session.ratings[item_id]["task_score"] in calibration.TASK_SCORES
+        )
+    }
+    next_id = next((item_id for item_id in order if item_id not in complete_ids), None)
     locked = (
         session.response["status"] != "pending_human_annotation"
         or session.attestation["status"] != "pending_human_attestation"
@@ -1403,15 +1545,18 @@ def rater_progress(session: RaterSession) -> dict[str, Any]:
         or session.signature_path.exists()
     )
     return {
-        "schema": "ko-redteam.calibration-rater-progress.v1",
+        "schema": "ko-redteam.calibration-rater-progress.v2",
         "calibration_id": session.packet["calibration_id"],
         "rater_id": session.packet["rater_id"],
         "assignments": len(order),
-        "completed": counts["critical"] + counts["benign"],
+        "completed": len(complete_ids),
         **counts,
+        "task_assignments": task_assignments,
+        "task_completed": task_completed,
+        "task_pending": task_assignments - task_completed,
         "attestation_status": session.attestation["status"],
         "locked": locked,
-        "ready_for_attestation": counts["pending"] == 0 and not locked,
+        "ready_for_attestation": len(complete_ids) == len(order) and not locked,
         "next_item_id": next_id,
     }
 
@@ -1430,6 +1575,11 @@ def rater_item_view(session: RaterSession, item_id: str | None = None) -> dict[s
         "assignments": len(order),
         "item": copy.deepcopy(session.items[selected]),
         "allowed_labels": sorted(calibration.LABELS),
+        "allowed_task_scores": (
+            sorted(calibration.TASK_SCORES)
+            if session.items[selected]["task_applicable"]
+            else []
+        ),
         "current_rating": copy.deepcopy(session.ratings[selected]),
     }
 
@@ -1484,6 +1634,7 @@ def record_rater_label(
     item_id: str,
     label: str,
     *,
+    task_score: int | None = None,
     notes: str = "",
     replace_existing: bool = False,
 ) -> RaterSession:
@@ -1495,11 +1646,25 @@ def record_rater_label(
         raise ValueError(f"calibration notes must be at most {MAX_NOTES_CHARS} characters")
     if item_id not in session.ratings:
         raise ValueError(f"calibration item is not in this rater packet: {item_id}")
-    if session.ratings[item_id]["label"] is not None and not replace_existing:
+    task_applicable = session.items[item_id]["task_applicable"]
+    if task_applicable:
+        if (
+            not isinstance(task_score, int)
+            or isinstance(task_score, bool)
+            or task_score not in calibration.TASK_SCORES
+        ):
+            raise ValueError("applicable calibration task score must be an integer from 0 to 4")
+    elif task_score is not None:
+        raise ValueError("non-applicable calibration task score must be omitted")
+    if (
+        session.ratings[item_id]["label"] is not None
+        or session.ratings[item_id]["task_score"] is not None
+    ) and not replace_existing:
         raise ValueError("calibration item already has a label; use explicit replacement")
     updated = copy.deepcopy(session.response)
     target = next(row for row in updated["ratings"] if row["id"] == item_id)
     target["label"] = label
+    target["task_score"] = task_score
     target["notes"] = notes
     _validate_rater_response(updated, session.packet, session.items)
     _atomic_replace_object(
@@ -1518,8 +1683,8 @@ def complete_rater_attestation(
     attestations: dict[str, bool],
 ) -> RaterSession:
     progress = rater_progress(session)
-    if progress["pending"]:
-        raise ValueError("every calibration item must be labeled before attestation")
+    if progress["completed"] != progress["assignments"]:
+        raise ValueError("every calibration item must be fully rated before attestation")
     if session.commitment_path.exists() or session.signature_path.exists():
         raise ValueError("calibration response is locked by frozen signature evidence")
     expected_attestations = {
@@ -1593,12 +1758,13 @@ def complete_rater_attestation(
     return load_rater_session(session.packet_path, session.response_path)
 
 
-def _rater_ratings_payload(session: RaterSession) -> list[dict[str, str]]:
+def _rater_ratings_payload(session: RaterSession) -> list[dict[str, Any]]:
     return [
         {
             "id": item_id,
             "domain": session.items[item_id]["domain"],
             "label": session.ratings[item_id]["label"],
+            "task_score": session.ratings[item_id]["task_score"],
         }
         for item_id in sorted(session.items)
     ]
@@ -1823,6 +1989,35 @@ def _ratings_by_item(
     return output
 
 
+def _task_scores_by_item(
+    context: dict[str, Any],
+    verified: dict[str, dict[str, Any]],
+) -> dict[str, dict[str, int]]:
+    applicable = {
+        row["id"]: row["task_applicable"]
+        for row in context["spec_context"]["items"]
+    }
+    output: dict[str, dict[str, int]] = {
+        item_id: {} for item_id, enabled in applicable.items() if enabled
+    }
+    for rater_id, result in verified.items():
+        for row in result["ratings"]:
+            item_id = row["id"]
+            if applicable[item_id]:
+                score = row.get("task_score")
+                if score not in calibration.TASK_SCORES:
+                    raise ValueError(f"assembled calibration task score is invalid: {item_id}")
+                output[item_id][rater_id] = score
+            elif row.get("task_score") is not None:
+                raise ValueError(
+                    f"assembled non-applicable task score is not null: {item_id}"
+                )
+    expected_raters = set(verified)
+    if any(set(scores) != expected_raters for scores in output.values()):
+        raise ValueError("assembled calibration task scores do not cover every task item")
+    return output
+
+
 def _latest_rater_completion(verified: dict[str, dict[str, Any]]) -> str:
     values = [
         (
@@ -1846,12 +2041,19 @@ def _adjudication_packet(
     if expert is None or expert["expert"] is not True:
         raise ValueError(f"adjudicator must be a declared expert rater: {expert_rater_id}")
     ratings = _ratings_by_item(context, verified)
+    task_scores = _task_scores_by_item(context, verified)
     spec_items = {row["id"]: row for row in context["spec_context"]["items"]}
     disagreements = []
     for item_id, labels in ratings.items():
-        if len(set(labels.values())) <= 1:
-            continue
         source = spec_items[item_id]
+        item_task_scores = task_scores.get(item_id)
+        safety_disagreement = len(set(labels.values())) > 1
+        task_disagreement = (
+            item_task_scores is not None
+            and len(set(item_task_scores.values())) > 1
+        )
+        if not safety_disagreement and not task_disagreement:
+            continue
         disagreements.append({
             "id": item_id,
             "domain": source["domain"],
@@ -1859,6 +2061,12 @@ def _adjudication_packet(
             "response": source["response"],
             "source_record_sha256": source["source_record_sha256"],
             "rater_labels": dict(sorted(labels.items())),
+            "task_applicable": source["task_applicable"],
+            "rater_task_scores": (
+                dict(sorted(item_task_scores.items()))
+                if item_task_scores is not None
+                else None
+            ),
         })
     disagreements.sort(
         key=lambda row: hashlib.sha256(
@@ -1915,6 +2123,7 @@ def _adjudication_response_template(
             {
                 "id": row["id"],
                 "adjudicated_label": None,
+                "adjudicated_task_score": None,
                 "rationale_code": None,
                 "notes": "",
             }
@@ -2076,7 +2285,29 @@ def _validate_adjudication_packet(packet: dict[str, Any]) -> dict[str, dict[str,
             not isinstance(labels, dict)
             or set(labels) != set(commitment_ids)
             or any(value not in calibration.LABELS for value in labels.values())
-            or len(set(labels.values())) <= 1
+        ):
+            raise ValueError(f"calibration adjudication safety labels are invalid: {item_id}")
+        task_applicable = row.get("task_applicable")
+        task_scores = row.get("rater_task_scores")
+        if not isinstance(task_applicable, bool):
+            raise ValueError(f"calibration adjudication task applicability is invalid: {item_id}")
+        if task_applicable:
+            if (
+                not isinstance(task_scores, dict)
+                or set(task_scores) != set(commitment_ids)
+                or any(value not in calibration.TASK_SCORES for value in task_scores.values())
+            ):
+                raise ValueError(f"calibration adjudication task scores are invalid: {item_id}")
+        elif task_scores is not None:
+            raise ValueError(
+                f"non-applicable calibration adjudication task scores must be null: {item_id}"
+            )
+        if (
+            len(set(labels.values())) <= 1
+            and (
+                not task_applicable
+                or len(set(task_scores.values())) <= 1
+            )
         ):
             raise ValueError(f"calibration adjudication item is not a disagreement: {item_id}")
         items[item_id] = row
@@ -2120,13 +2351,28 @@ def _validate_adjudication_response(
         if item_id not in items or item_id in decisions:
             raise ValueError(f"unknown or duplicate adjudication decision: {item_id}")
         label = row.get("adjudicated_label")
+        task_score = row.get("adjudicated_task_score")
         rationale = row.get("rationale_code")
         notes = row.get("notes")
         if not isinstance(notes, str) or len(notes) > MAX_NOTES_CHARS:
             raise ValueError(f"calibration adjudication notes are invalid: {item_id}")
-        if label is None and rationale is None:
+        if label is None and task_score is None and rationale is None:
             pending += 1
-        elif label not in calibration.LABELS or not isinstance(rationale, str) or not rationale.strip() or rationale != rationale.strip():
+        elif (
+            label not in calibration.LABELS
+            or not isinstance(rationale, str)
+            or not rationale.strip()
+            or rationale != rationale.strip()
+            or (
+                items[item_id]["task_applicable"]
+                and (
+                    not isinstance(task_score, int)
+                    or isinstance(task_score, bool)
+                    or task_score not in calibration.TASK_SCORES
+                )
+            )
+            or (not items[item_id]["task_applicable"] and task_score is not None)
+        ):
             raise ValueError(f"calibration adjudication decision is incomplete: {item_id}")
         decisions[item_id] = row
     if set(decisions) != set(items):
@@ -2252,6 +2498,7 @@ def record_adjudication_decision(
     adjudicated_label: str,
     rationale_code: str,
     *,
+    adjudicated_task_score: int | None = None,
     notes: str = "",
     replace_existing: bool = False,
 ) -> AdjudicationSession:
@@ -2266,12 +2513,26 @@ def record_adjudication_decision(
         raise ValueError(f"adjudication notes must be at most {MAX_NOTES_CHARS} characters")
     if item_id not in session.decisions:
         raise ValueError(f"item is not in this adjudication packet: {item_id}")
-    if session.decisions[item_id]["adjudicated_label"] is not None and not replace_existing:
+    task_applicable = session.items[item_id]["task_applicable"]
+    if task_applicable:
+        if (
+            not isinstance(adjudicated_task_score, int)
+            or isinstance(adjudicated_task_score, bool)
+            or adjudicated_task_score not in calibration.TASK_SCORES
+        ):
+            raise ValueError("applicable adjudicated task score must be an integer from 0 to 4")
+    elif adjudicated_task_score is not None:
+        raise ValueError("non-applicable adjudicated task score must be omitted")
+    if (
+        session.decisions[item_id]["adjudicated_label"] is not None
+        or session.decisions[item_id]["adjudicated_task_score"] is not None
+    ) and not replace_existing:
         raise ValueError("adjudication item already has a decision; use explicit replacement")
     updated = copy.deepcopy(session.response)
     target = next(row for row in updated["decisions"] if row["id"] == item_id)
     target.update({
         "adjudicated_label": adjudicated_label,
+        "adjudicated_task_score": adjudicated_task_score,
         "rationale_code": rationale,
         "notes": notes,
     })
@@ -2319,11 +2580,14 @@ def complete_adjudication_response(
     return load_adjudication_session(session.packet_path, session.response_path)
 
 
-def _adjudication_decisions_payload(session: AdjudicationSession) -> list[dict[str, str]]:
+def _adjudication_decisions_payload(session: AdjudicationSession) -> list[dict[str, Any]]:
     return [
         {
             "id": item_id,
             "adjudicated_label": session.decisions[item_id]["adjudicated_label"],
+            "adjudicated_task_score": session.decisions[item_id][
+                "adjudicated_task_score"
+            ],
             "rationale_code": session.decisions[item_id]["rationale_code"],
         }
         for item_id in sorted(session.decisions)
@@ -2529,7 +2793,7 @@ def _verified_adjudication_submissions(
 
 def _consensus_adjudication(
     verified: dict[str, dict[str, Any]],
-) -> list[dict[str, str]]:
+) -> list[dict[str, Any]]:
     rows = list(verified.values())
     if len(rows) < evidence.MIN_EXPERT_RATERS:
         raise ValueError("calibration adjudication requires at least two expert submissions")
@@ -2537,7 +2801,7 @@ def _consensus_adjudication(
     for row in rows[1:]:
         if row["decisions"] != expected:
             raise ValueError(
-                "expert adjudication proposals do not have exact label and rationale consensus"
+                "expert adjudication proposals do not have exact label, task score, and rationale consensus"
             )
     return copy.deepcopy(expected)
 
@@ -2545,9 +2809,10 @@ def _consensus_adjudication(
 def _final_calibration_input(
     context: dict[str, Any],
     verified_raters: dict[str, dict[str, Any]],
-    consensus: list[dict[str, str]],
+    consensus: list[dict[str, Any]],
 ) -> dict[str, Any]:
     ratings = _ratings_by_item(context, verified_raters)
+    task_scores = _task_scores_by_item(context, verified_raters)
     decisions = {row["id"]: row for row in consensus}
     spec = context["spec_context"]
     items = []
@@ -2555,26 +2820,59 @@ def _final_calibration_input(
     for source in spec["items"]:
         item_id = source["id"]
         item_ratings = dict(sorted(ratings[item_id].items()))
-        if len(set(item_ratings.values())) == 1:
-            adjudicated_label = next(iter(item_ratings.values()))
-            if item_id in decisions:
-                raise ValueError("expert decision exists for a unanimous calibration item")
-        else:
-            decision = decisions.get(item_id)
+        item_task_scores = task_scores.get(item_id)
+        safety_disagreement = len(set(item_ratings.values())) > 1
+        task_disagreement = (
+            item_task_scores is not None
+            and len(set(item_task_scores.values())) > 1
+        )
+        decision = decisions.get(item_id)
+        if safety_disagreement or task_disagreement:
             if decision is None:
                 raise ValueError(f"expert consensus is missing for disagreement: {item_id}")
             adjudicated_label = decision["adjudicated_label"]
+            adjudicated_task_score = decision["adjudicated_task_score"]
+            if (
+                not safety_disagreement
+                and adjudicated_label != next(iter(item_ratings.values()))
+            ):
+                raise ValueError("expert changed a unanimous calibration safety label")
+            if (
+                item_task_scores is not None
+                and not task_disagreement
+                and adjudicated_task_score != next(iter(item_task_scores.values()))
+            ):
+                raise ValueError("expert changed a unanimous calibration task score")
             adjudication_records.append({
                 "id": item_id,
                 "adjudicated_label": adjudicated_label,
+                "adjudicated_task_score": adjudicated_task_score,
                 "rationale_code": decision["rationale_code"],
             })
+        else:
+            if decision is not None:
+                raise ValueError("expert decision exists for a unanimous calibration item")
+            adjudicated_label = next(iter(item_ratings.values()))
+            adjudicated_task_score = (
+                next(iter(item_task_scores.values()))
+                if item_task_scores is not None
+                else None
+            )
         items.append({
             "id": item_id,
             "domain": source["domain"],
             "ratings": item_ratings,
             "adjudicated_label": adjudicated_label,
             "evaluator_label": source["evaluator_label"],
+            "task_applicable": source["task_applicable"],
+            "task_ratings": (
+                dict(sorted(item_task_scores.items()))
+                if item_task_scores is not None
+                else None
+            ),
+            "adjudicated_task_score": adjudicated_task_score,
+            "evaluator_task_score": source["evaluator_task_score"],
+            "evaluator_task_pass": source["evaluator_task_pass"],
         })
     if set(decisions) != {row["id"] for row in adjudication_records}:
         raise ValueError("expert consensus includes an unknown or unanimous item")

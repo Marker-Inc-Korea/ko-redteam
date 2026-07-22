@@ -1,6 +1,6 @@
 # Official Leaderboard Publication Readiness
 
-기준일은 2026-07-21 KST다. 현재 `ko-redteam` 평가 도구는 **내부 운영 RC**로 실행할 수 있지만, 현재
+기준일은 2026-07-22 KST다. 현재 `ko-redteam` 평가 도구는 **내부 운영 RC**로 실행할 수 있지만, 현재
 모델 결과와 공개 practice seed를 **공식 모델 리더보드**로 게시할 수는 없다. 이 문서는 코드 기능과 실제
 증거의 존재를 구분한다.
 
@@ -9,13 +9,13 @@
 | 영역 | 상태 | 현재 증거 | 판정 |
 |---|---|---|---|
 | 평가기 실행 | 준비 | 독립 Slurm serving 3회, endpoint error hard-fail, artifact digest, hardened container | 내부 RC 허용 |
-| Python package | 부분 준비 | 514개 test, clean wheel self-check 88/88, wheel 2회 byte-identical; sdist tar metadata 비결정적 | 내부 wheel 허용, sdist release evidence 금지 |
+| Python package | 준비 | RC9 518개 test, clean wheel self-check 88/88, wheel 2회 byte-identical; sdist tar metadata 비결정적 | 내부 wheel 허용, sdist release evidence 금지 |
 | 과거 6모델 증거 호환성 | 실패 | multiturn report v1 18개, task metric availability 불일치 66건 | 순위·등급·tier 재사용 금지 |
 | 공개 image 승격 | 미완료 | nonroot·read-only 실행 통과, base digest 고정; CVE scan·SBOM 보존·서명 증거 없음 | registry production channel 금지 |
 | 공개 practice 데이터 | 준비 | schema·coverage·privacy audit 통과 | 개발·연구 진단만 허용 |
 | 거부 판정 개발 회귀 | 준비 | 합성 개발 세트 2종에서 recall 100%, FPR 0%; 규칙 개선에 사용된 세트 | 독립 성능 또는 공식 calibration 주장 금지 |
 | 유해 혼합 응답 판정 | 준비 | 거부 문구가 PII·무단 tool call·강한 절차형 유해 출력을 숨기지 못하도록 failure-first 회귀 추가 | 사람 calibration 전 내부 진단만 허용 |
-| task-adherence 구성타당도 | 실패 | 문자열·구조 기반 response contract이며 현재 사람 calibration은 `critical/benign` 이진 label만 수집 | 연속형 task 점수를 공식 composite에 사용 금지 |
+| task-adherence 구성타당도 | 부분 준비 | v4 수집·서명·검증기는 사람 0-4점, task alpha·rho·MAE·pass 지표를 fail-closed로 요구; 실제 signed 사람 evidence는 없음 | 실제 v4 calibration 통과 전 연속형 task 점수를 공식 composite에 사용 금지 |
 | 후속 practice 사람 검토 | 미완료 | 7개 층 x 20개 전량 신규 초안, exact 5종 중복 0·BGE-M3 0.85 이상 0쌍, 등록·GPU Slurm preflight gate 구현; reviewer 0명 | pilot 등록·anchor 실행 금지 |
 | 파일럿 분산 정밀도 | 실패 | 이전 실행은 층별 5그룹; 새 층별 20그룹 초안은 미검토·미실행이라 분산 증거 없음 | 공식 split 설계 금지 |
 | 다중비교 검정력 | 실패 | 현재 보수적 설계에서 최소 2모델 비교 필요량 796그룹, 기존 324그룹 | tier 주장 금지 |
@@ -24,7 +24,7 @@
 | 사람 라벨 calibration | 없음 | 300개·3명·expert 2명 기준을 만족하는 signed report 없음 | 자동 판정 공식 사용 금지 |
 | official model cohort | 없음 | v7 ranking manifest와 official report 없음 | 현재 모델 순위 게시 금지 |
 | 독립 외부 검토 | 없음 | reviewer attestation·독립 기관 보고서 없음 | official 표현 금지 |
-| final release manifest | 없음 | `ko-redteam.leaderboard-release.v3` 없음 | 정적 publisher 실행 불가 |
+| final release manifest | 없음 | `ko-redteam.leaderboard-release.v4` 없음 | 정적 publisher 실행 불가 |
 
 공개 benchmark audit의 `pass`는 JSON 계약과 문항 메타데이터가 유효하다는 뜻이다. 후속 초안의 exact audit과
 BGE-M3 진단도 이미 초안 개선에 사용된 설계 단계 screen이다. 표본 대표성, 의미적 독립성, 자동 판정의 사람
@@ -34,6 +34,8 @@ BGE-M3 진단도 이미 초안 개선에 사용된 설계 단계 screen이다. �
 [`INTERNAL_SIX_MODEL_EVIDENCE_COMPATIBILITY_2026Q3.md`](./INTERNAL_SIX_MODEL_EVIDENCE_COMPATIBILITY_2026Q3.md)에
 기록한다. RC8 전체 재검증 판정과 packaging 제한은
 [`DEPLOYMENT_REVALIDATION_2026Q3.md`](./DEPLOYMENT_REVALIDATION_2026Q3.md)에 기록한다.
+RC9 task 구성타당성 계약과 현재 증거 경계는
+[`TASK_CONSTRUCT_VALIDITY_GATE_2026Q3.md`](./TASK_CONSTRUCT_VALIDITY_GATE_2026Q3.md)에 기록한다.
 
 ## Evidence Required Before Publication
 
@@ -57,10 +59,10 @@ BGE-M3 진단도 이미 초안 개선에 사용된 설계 단계 screen이다. �
 새 파일럿의 분산이 달라지면 최종 필요 표본도 바뀐다. `796`은 현재 precision audit의 보수적 관측값이지
 사후에 고정할 공식 표본 수가 아니다.
 
-현재 `evaluator-calibration.v3` 경로는 안전·무해성의 `critical/benign` 혼동행렬과 영역별 F1을 검증하지만,
-`response_contract`의 연속형 점수에 대한 사람 판정 합치도를 표현하지 않는다. 따라서 나머지 증거가 채워져도
-이 calibration 계약을 확장하거나 official composite에서 `task_adherence` 가중치를 제거하기 전에는 공식
-publication gate를 충분한 구성타당도 근거로 간주하지 않는다.
+`evaluator-calibration.v4` 경로는 안전·무해성의 `critical/benign` 혼동행렬과 별도로 사람 0-4점 task
+판정, interval alpha, 사람-평가기 Spearman rho, MAE와 pass confusion metric을 전역·영역별로 검증한다.
+다만 이는 증거를 받을 수 있는 코드 계약이 준비됐다는 뜻이다. 실제 180개 이상·영역별 20개 이상의 blind
+task 판정과 두 expert 합의·서명이 없으므로 현재 결과의 구성타당도가 입증된 것은 아니다.
 
 ## Publication Command
 

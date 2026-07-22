@@ -36,7 +36,7 @@ def _write(path: str | Path, content: str) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("input", help="private ko-redteam.calibration-input.v1 labels JSON")
+    parser.add_argument("input", help="private ko-redteam.calibration-input.v2 labels JSON")
     parser.add_argument(
         "--signature-config",
         required=True,

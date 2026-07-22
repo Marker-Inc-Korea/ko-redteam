@@ -19,7 +19,7 @@ from ko_season_preregistration import (  # noqa: E402
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("preregistration", help="season-preregistration.v3 JSON")
+    parser.add_argument("preregistration", help="season-preregistration.v4 JSON")
     parser.add_argument("--spec", required=True, help="season-preregistration-spec.v1 JSON")
     parser.add_argument("--root", default=".", help="ko-redteam project root")
     parser.add_argument("--output", help="new optional audit JSON")

@@ -83,6 +83,15 @@ def test_calibration_rejects_public_metric_and_signature_tampering(tmp_path):
         E.validate_public_calibration_signatures(report)
 
     report, _, _, _ = signed_calibration_report(
+        tmp_path / "calibration-task-tamper",
+        calibration_input(),
+        calibration_id="unit-calibration-task-tamper",
+    )
+    report["evaluator"]["task_construct_validity"]["spearman"]["value"] = 0.5
+    with pytest.raises(ValueError, match="adjudication commitment mismatch"):
+        E.validate_public_calibration_signatures(report)
+
+    report, _, _, _ = signed_calibration_report(
         tmp_path / "calibration-2",
         calibration_input(),
         calibration_id="unit-calibration-tamper",
@@ -157,7 +166,7 @@ def test_calibration_rejects_reused_paths_and_incomplete_ratings(tmp_path):
         data,
         calibration_id="unit-calibration-incomplete-ratings",
     )
-    with pytest.raises(ValueError, match="every rater to label every item"):
+    with pytest.raises(ValueError, match="same raters as safety ratings"):
         E.build_calibration_commitments(
             input_path,
             config_path,

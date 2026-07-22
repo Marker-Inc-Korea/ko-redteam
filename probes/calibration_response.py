@@ -88,7 +88,9 @@ def _print_rater_progress(progress: dict, *, as_json: bool = False) -> None:
         f"rater_id={progress['rater_id']} "
         f"completed={progress['completed']}/{progress['assignments']} "
         f"critical={progress['critical']} benign={progress['benign']} "
-        f"pending={progress['pending']} locked={str(progress['locked']).lower()} "
+        f"pending={progress['assignments'] - progress['completed']} "
+        f"task={progress['task_completed']}/{progress['task_assignments']} "
+        f"locked={str(progress['locked']).lower()} "
         f"attestation_status={progress['attestation_status']}"
     )
     if progress["next_item_id"]:
@@ -121,6 +123,16 @@ def _interactive_rater(session, item_id: str | None, replace_existing: bool) -> 
         if answer in {"critical", "benign"}:
             break
         print("critical, benign 또는 q만 입력하십시오.")
+    task_score = None
+    if view["item"]["task_applicable"]:
+        while True:
+            task_answer = input("업무수행 점수 [0/1/2/3/4/q]: ").strip().lower()
+            if task_answer == "q":
+                raise KeyboardInterrupt
+            if task_answer in {"0", "1", "2", "3", "4"}:
+                task_score = int(task_answer)
+                break
+            print("0, 1, 2, 3, 4 또는 q만 입력하십시오.")
     notes = input("검토 메모(선택, 최대 2000자): ")
     if input(f"{answer} 판정을 저장합니까? [yes/no]: ").strip().lower() != "yes":
         raise KeyboardInterrupt
@@ -128,6 +140,7 @@ def _interactive_rater(session, item_id: str | None, replace_existing: bool) -> 
         session,
         view["item"]["id"],
         answer,
+        task_score=task_score,
         notes=notes,
         replace_existing=replace_existing,
     )
@@ -150,6 +163,16 @@ def _interactive_adjudication(
         if answer in {"critical", "benign"}:
             break
         print("critical, benign 또는 q만 입력하십시오.")
+    task_score = None
+    if view["item"]["task_applicable"]:
+        while True:
+            task_answer = input("최종 업무수행 점수 [0/1/2/3/4/q]: ").strip().lower()
+            if task_answer == "q":
+                raise KeyboardInterrupt
+            if task_answer in {"0", "1", "2", "3", "4"}:
+                task_score = int(task_answer)
+                break
+            print("0, 1, 2, 3, 4 또는 q만 입력하십시오.")
     rationale = input("rationale code(필수): ").strip()
     notes = input("검토 메모(선택, 최대 2000자): ")
     if input(f"{answer} 합의안을 저장합니까? [yes/no]: ").strip().lower() != "yes":
@@ -159,6 +182,7 @@ def _interactive_adjudication(
         view["item"]["id"],
         answer,
         rationale,
+        adjudicated_task_score=task_score,
         notes=notes,
         replace_existing=replace_existing,
     )
@@ -180,6 +204,7 @@ def _rater_parser(commands) -> None:
     record = actions.add_parser("record")
     record.add_argument("--item-id")
     record.add_argument("--label", choices=("critical", "benign"), required=True)
+    record.add_argument("--task-score", choices=range(5), type=int)
     record.add_argument("--notes", default="")
     record.add_argument("--replace-existing", action="store_true")
 
@@ -218,6 +243,7 @@ def _adjudication_parser(commands) -> None:
         required=True,
     )
     record.add_argument("--rationale-code", required=True)
+    record.add_argument("--adjudicated-task-score", choices=range(5), type=int)
     record.add_argument("--notes", default="")
     record.add_argument("--replace-existing", action="store_true")
 
@@ -260,6 +286,7 @@ def main() -> None:
                     session,
                     item_id,
                     args.label,
+                    task_score=args.task_score,
                     notes=args.notes,
                     replace_existing=args.replace_existing,
                 )
@@ -311,6 +338,7 @@ def main() -> None:
                     item_id,
                     args.adjudicated_label,
                     args.rationale_code,
+                    adjudicated_task_score=args.adjudicated_task_score,
                     notes=args.notes,
                     replace_existing=args.replace_existing,
                 )

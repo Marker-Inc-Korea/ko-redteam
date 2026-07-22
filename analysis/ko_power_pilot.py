@@ -36,7 +36,7 @@ except ModuleNotFoundError:  # package import path
 
 LEGACY_PREREGISTRATION_SCHEMA = "ko-redteam.season-preregistration.v1"
 SEASON_PREREGISTRATION_V2_SCHEMA = "ko-redteam.season-preregistration.v2"
-PREREGISTRATION_SCHEMA = "ko-redteam.season-preregistration.v3"
+PREREGISTRATION_SCHEMA = "ko-redteam.season-preregistration.v4"
 SUPPORTED_PREREGISTRATION_SCHEMAS = {
     LEGACY_PREREGISTRATION_SCHEMA,
     SEASON_PREREGISTRATION_V2_SCHEMA,

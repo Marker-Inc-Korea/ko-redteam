@@ -83,7 +83,7 @@ def test_distribution_metadata_has_release_basics():
     assert data["build-system"]["requires"][0].startswith("setuptools>=77")
     assert data["project"]["license"] == "MIT"
     assert data["project"]["license-files"] == ["LICENSE"]
-    assert data["project"]["version"] == "0.2.0rc8"
+    assert data["project"]["version"] == "0.2.0rc9"
     assert "Development Status :: 4 - Beta" in data["project"]["classifiers"]
     assert "korean" in data["project"]["keywords"]
     assert "Natural Language :: Korean" in data["project"]["classifiers"]
@@ -175,6 +175,9 @@ def test_package_data_paths_exist():
     ).exists()
     assert (ROOT / "governance" / "REVIEWER_RESPONSE_TOOL.md").exists()
     assert (ROOT / "governance" / "CALIBRATION_REVIEW_WORKFLOW.md").exists()
+    assert (
+        ROOT / "governance" / "TASK_CONSTRUCT_VALIDITY_GATE_2026Q3.md"
+    ).exists()
     assert (ROOT / "gap_analysis" / "_vendor" / "mitigationbypass_substrings.txt").exists()
 
 

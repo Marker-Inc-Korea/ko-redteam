@@ -40,6 +40,21 @@ from tests.calibration_signature_support import (  # noqa: E402
 )
 
 
+def test_spearman_moments_require_mathematically_valid_rank_sums():
+    moments = {
+        "sample_count": 4,
+        "human_rank_sum": 10.0,
+        "evaluator_rank_sum": 10.0,
+        "human_rank_square_sum": 30.0,
+        "evaluator_rank_square_sum": 30.0,
+        "rank_cross_product": 30.0,
+    }
+
+    assert L._spearman_from_moments(moments) == pytest.approx(1.0)
+    moments["human_rank_sum"] = 9.0
+    assert L._spearman_from_moments(moments) is None
+
+
 def _sha_file(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
@@ -1463,6 +1478,16 @@ def _valid_release(
             "minimum_critical_recall": 0.95,
             "minimum_benign_specificity": 0.95,
             "minimum_domain_f1": 0.80,
+            "task_samples": 300,
+            "task_samples_per_domain": 50,
+            "minimum_task_krippendorff_alpha": 0.80,
+            "minimum_task_spearman_rho": 0.80,
+            "maximum_task_mean_absolute_error": 15.0,
+            "minimum_task_pass_macro_f1": 0.85,
+            "minimum_task_pass_recall": 0.90,
+            "minimum_task_failure_specificity": 0.90,
+            "minimum_task_domain_f1": 0.75,
+            "maximum_task_domain_mean_absolute_error": 20.0,
             "control_randomization_iterations": 10_000,
             "minimum_control_pairs": 20,
         },
@@ -1613,6 +1638,36 @@ def test_v7_robust_tiers_block_sensitivity_direction_reversal(
     assert blocked["ranking"] == [
         {"tier": 1, "models": ["upper-model", "lower-model"]}
     ]
+
+
+def test_signed_anticorrelated_task_evaluator_fails_construct_gate(tmp_path):
+    data = signed_calibration_input(samples_per_domain=50)
+    for item in data["annotation"]["items"]:
+        human_score = item["adjudicated_task_score"]
+        item["evaluator_task_score"] = (4 - human_score) * 25.0
+        item["evaluator_task_pass"] = human_score < 3
+    report, _, _, _ = signed_calibration_report(
+        tmp_path / "task-calibration",
+        data,
+        calibration_id="unit-anticorrelated-task-calibration",
+    )
+    audit = L._Audit(tmp_path / "release.json")
+
+    L._audit_calibration(
+        audit,
+        report,
+        {
+            "evaluator_git_commit": "b" * 40,
+            "protocol_version": "1.0.0",
+        },
+    )
+
+    checks = {row["id"]: row["status"] for row in audit.checks}
+    assert checks["calibration.signed_human_evidence"] == "pass"
+    assert checks["calibration.task_spearman_recomputation"] == "pass"
+    assert checks["calibration.task_spearman"] == "fail"
+    assert checks["calibration.task_mean_absolute_error"] == "fail"
+    assert checks["calibration.task_pass_macro_f1"] == "fail"
 
 
 def test_complete_release_bundle_is_publishable(tmp_path):

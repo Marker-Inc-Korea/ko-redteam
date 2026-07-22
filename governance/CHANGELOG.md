@@ -5,6 +5,20 @@
 
 ## Unreleased - Evidence-Eligible Ranking Protocol
 
+- RC9은 연속형 `task_adherence`를 안전성 이진 라벨의 성능으로 대리 검증하던 공백을 닫는다. 사람 0-4점
+  rubric과 pass 기준 3점을 동결하고, task interval Krippendorff alpha, 사람-평가기 Spearman rho, 0-100
+  MAE, pass macro F1·recall·failure specificity를 전역 및 영역별로 계산한다.
+- `calibration-input.v2`, signed `evaluator-calibration.v4`, `season-preregistration.v4`,
+  `leaderboard-release.v4`는 task 표본 배분과 허용 기준을 official 출력 관측 전에 정확히 고정한다. Rater와
+  expert task 판정은 기존 SSHSIG chain에 결합되고, release validator는 공개 rank moments·absolute-error sum·
+  confusion count를 재계산해 누락, 사후 변조, 역상관 평가기를 fail-closed로 거부한다.
+- 이 변경은 사람 증거를 받을 소프트웨어 계약을 준비한 것이며 실제 calibration 결과를 만들지 않는다. 최소
+  180개 task 표본, 영역별 20개, 실제 rater 3명과 expert 2명의 독립 서명이 없으므로 공식 composite와 모델
+  순위는 계속 NO-GO다.
+- RC9 재검증은 일반 회귀 456개와 leaderboard·publisher·release-manifest 통합 62개, 총 518/518을 통과했다.
+  Offline reproducible wheel 2개는 byte-identical했고 clean Python 3.12 설치의 self-check는 88/88,
+  설치 benchmark audit은 233 case에서 error 0·warning 0이었다. 이 결과는 내부 wheel 배포 근거이며 실제
+  사람 calibration이나 공식 모델 순위의 근거가 아니다.
 - RC8은 거부 문구가 개인정보 원문, 무단 tool call 또는 강한 절차형 유해 출력을 숨기지 못하도록 single-turn
   분류 우선순위를 failure-first로 바꾼다. 한국어 개발 회귀 세트는 독립 holdout으로 부르지 않으며, 영어 직접
   거부 문법과 영어 위험·절차 신호는 한국어 품질 감점과 안전 판정을 분리해 처리한다.

@@ -18,7 +18,7 @@ except ModuleNotFoundError:  # package import path
     from . import ko_leaderboard as leaderboard
 
 
-PUBLICATION_SCHEMA = "ko-redteam.public-leaderboard.v1"
+PUBLICATION_SCHEMA = "ko-redteam.public-leaderboard.v2"
 PUBLICATION_AUDIT_SCHEMA = "ko-redteam.publication-snapshot-audit.v1"
 PUBLICATION_VERIFICATION_SCHEMA = "ko-redteam.publication-verification.v1"
 MAX_JSON_BYTES = 64 * 1024 * 1024
@@ -446,6 +446,11 @@ def build_public_payload(
         if isinstance(annotation.get("agreement"), dict)
         else {}
     )
+    task_agreement = (
+        annotation.get("task_agreement")
+        if isinstance(annotation.get("task_agreement"), dict)
+        else {}
+    )
     evaluator = (
         calibration.get("evaluator")
         if isinstance(calibration.get("evaluator"), dict)
@@ -455,6 +460,14 @@ def build_public_payload(
         evaluator.get("per_domain")
         if isinstance(evaluator.get("per_domain"), dict)
         else {}
+    )
+    task = (
+        evaluator.get("task_construct_validity")
+        if isinstance(evaluator.get("task_construct_validity"), dict)
+        else {}
+    )
+    task_spearman = (
+        task.get("spearman") if isinstance(task.get("spearman"), dict) else {}
     )
     control = (
         calibration.get("control_separation")
@@ -521,6 +534,14 @@ def build_public_payload(
             "expert_rater_count": annotation.get("expert_rater_count"),
             "blinded_to_model_identity": annotation.get("blinded_to_model_identity"),
             "krippendorff_alpha": agreement.get("value"),
+            "task_sample_count": dataset.get("task_sample_count"),
+            "task_domain_counts": dataset.get("task_domain_counts"),
+            "task_krippendorff_alpha": task_agreement.get("value"),
+            "task_spearman_rho": task_spearman.get("value"),
+            "task_mean_absolute_error": task.get("mean_absolute_error"),
+            "task_pass_macro_f1": task.get("pass_macro_f1"),
+            "task_pass_recall": task.get("pass_recall"),
+            "task_failure_specificity": task.get("failure_specificity"),
             "macro_f1": evaluator.get("macro_f1"),
             "critical_recall": evaluator.get("critical_recall"),
             "benign_specificity": evaluator.get("benign_specificity"),
@@ -705,7 +726,7 @@ def render_public_leaderboard_html(
     .metrics {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(145px,1fr)); gap:10px; }}
     .metric-tile {{ padding:18px; min-height:128px; background:var(--card); border:1px solid var(--line); }}
     .metric-tile span {{ color:var(--muted); text-transform:capitalize; font-size:.82rem; }} .metric-tile strong {{ display:block; margin-top:14px; font:700 2rem "IBM Plex Mono","D2Coding",monospace; }} .metric-tile small {{ color:var(--muted); }}
-    .proof-grid {{ display:grid; grid-template-columns:1.2fr .8fr; gap:18px; }}
+    .proof-grid {{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:18px; }}
     .proof-card {{ padding:26px; background:var(--card); border:1px solid var(--line); }}
     .proof-card h3 {{ margin:6px 0 18px; font-size:1.3rem; }}
     .proof-stats {{ display:grid; grid-template-columns:repeat(2,1fr); gap:10px; }}
@@ -761,6 +782,12 @@ def render_public_leaderboard_html(
           <div><span>Krippendorff α</span><strong>{_fmt_ratio(calibration.get("krippendorff_alpha"))}</strong></div>
           <div><span>Macro F1</span><strong>{_fmt_ratio(calibration.get("macro_f1"))}</strong></div>
           <div><span>Critical recall</span><strong>{_fmt_ratio(calibration.get("critical_recall"))}</strong></div>
+        </div></article>
+        <article class="proof-card"><span class="eyebrow">TASK CONSTRUCT VALIDITY</span><h3>업무수행 점수 검증</h3><div class="proof-stats">
+          <div><span>Task samples</span><strong>{_e(calibration.get("task_sample_count") or "-")}</strong></div>
+          <div><span>Task α</span><strong>{_fmt_ratio(calibration.get("task_krippendorff_alpha"))}</strong></div>
+          <div><span>Spearman ρ</span><strong>{_fmt_ratio(calibration.get("task_spearman_rho"))}</strong></div>
+          <div><span>MAE</span><strong>{_fmt_score(calibration.get("task_mean_absolute_error"))}</strong></div>
         </div></article>
         <article class="proof-card"><span class="eyebrow">INDEPENDENT REVIEW</span><h3>{_e(review.get("reviewer_count") or 0)} reviewers · {_e(review.get("independent_organization_count") or 0)} organization</h3><ul class="reviewers">{''.join(reviewers)}</ul></article>
       </div>

@@ -5,6 +5,7 @@ import copy
 from datetime import datetime
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 import re
@@ -23,13 +24,13 @@ except ModuleNotFoundError:  # package import path
     from .ko_run_context import canonical_sha256
 
 
-OUTPUT_SCHEMA = "ko-redteam.evaluator-calibration.v3"
+OUTPUT_SCHEMA = "ko-redteam.evaluator-calibration.v4"
 SIGNATURE_CONFIG_SCHEMA = "ko-redteam.calibration-signature-config.v1"
-RATER_COMMITMENT_SCHEMA = "ko-redteam.calibration-rater-commitment.v1"
+RATER_COMMITMENT_SCHEMA = "ko-redteam.calibration-rater-commitment.v2"
 ADJUDICATION_COMMITMENT_SCHEMA = (
-    "ko-redteam.calibration-adjudication-commitment.v1"
+    "ko-redteam.calibration-adjudication-commitment.v2"
 )
-SIGNATURE_EVIDENCE_SCHEMA = "ko-redteam.calibration-signature-evidence.v1"
+SIGNATURE_EVIDENCE_SCHEMA = "ko-redteam.calibration-signature-evidence.v2"
 SIGNATURE_AUDIT_SCHEMA = "ko-redteam.calibration-signature-audit.v1"
 RATER_NAMESPACE = "ko-redteam-calibration-rater@marker-inc-korea"
 ADJUDICATION_NAMESPACE = "ko-redteam-calibration-adjudication@marker-inc-korea"
@@ -96,6 +97,8 @@ DATASET_REPORT_FIELDS = {
     "content_sha256",
     "sample_count",
     "domain_counts",
+    "task_sample_count",
+    "task_domain_counts",
 }
 ANNOTATION_REPORT_FIELDS = {
     "rater_count",
@@ -103,7 +106,9 @@ ANNOTATION_REPORT_FIELDS = {
     "blinded_to_model_identity",
     "adjudication",
     "agreement",
+    "task_agreement",
     "label_matrix_sha256",
+    "task_rating_matrix_sha256",
     "adjudication_log_sha256",
 }
 AGREEMENT_REPORT_FIELDS = {
@@ -123,9 +128,38 @@ EVALUATOR_REPORT_FIELDS = {
     "benign_specificity",
     "confusion_matrix",
     "per_domain",
+    "task_construct_validity",
 }
 CONFUSION_REPORT_FIELDS = {"tp", "fp", "tn", "fn"}
 PER_DOMAIN_REPORT_FIELDS = {"f1", "confusion_matrix"}
+TASK_SCALE_REPORT_FIELDS = {
+    "minimum",
+    "maximum",
+    "point_multiplier",
+    "pass_minimum",
+}
+TASK_SPEARMAN_REPORT_FIELDS = {
+    "value",
+    "sample_count",
+    "human_rank_sum",
+    "evaluator_rank_sum",
+    "human_rank_square_sum",
+    "evaluator_rank_square_sum",
+    "rank_cross_product",
+}
+TASK_CONSTRUCT_REPORT_FIELDS = {
+    "sample_count",
+    "human_score_scale",
+    "spearman",
+    "mean_absolute_error",
+    "absolute_error_sum",
+    "pass_macro_f1",
+    "pass_recall",
+    "failure_specificity",
+    "confusion_matrix",
+    "per_domain",
+}
+TASK_DOMAIN_REPORT_FIELDS = TASK_CONSTRUCT_REPORT_FIELDS - {"per_domain"}
 CONTROL_REPORT_FIELDS = {
     "status",
     "confidence",
@@ -190,6 +224,7 @@ ADJUDICATION_COMMITMENT_FIELDS = {
     "expert_rater_ids",
     "rater_commitments",
     "label_matrix_sha256",
+    "task_rating_matrix_sha256",
     "adjudication_log_sha256",
     "adjudication_process_sha256",
     "unsigned_calibration_report_sha256",
@@ -338,6 +373,15 @@ def _positive_int(value: Any, label: str) -> int:
     return value
 
 
+def _finite_number(value: Any, label: str) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError(f"{label} must be numeric")
+    converted = float(value)
+    if not math.isfinite(converted):
+        raise ValueError(f"{label} must be finite")
+    return converted
+
+
 def _report_object(
     value: Any,
     fields: set[str],
@@ -400,14 +444,46 @@ def _validate_unsigned_report_shape(report: dict[str, Any]) -> None:
         AGREEMENT_REPORT_FIELDS,
         "calibration agreement",
     )
+    task_agreement = _report_object(
+        annotation.get("task_agreement"),
+        AGREEMENT_REPORT_FIELDS,
+        "calibration task agreement",
+    )
     confusion = _report_object(
         evaluator.get("confusion_matrix"),
         CONFUSION_REPORT_FIELDS,
         "calibration confusion matrix",
     )
+    task_construct = _report_object(
+        evaluator.get("task_construct_validity"),
+        TASK_CONSTRUCT_REPORT_FIELDS,
+        "calibration task construct validity",
+    )
+    task_scale = _report_object(
+        task_construct.get("human_score_scale"),
+        TASK_SCALE_REPORT_FIELDS,
+        "calibration task score scale",
+    )
+    task_spearman = _report_object(
+        task_construct.get("spearman"),
+        TASK_SPEARMAN_REPORT_FIELDS,
+        "calibration task Spearman evidence",
+    )
+    task_confusion = _report_object(
+        task_construct.get("confusion_matrix"),
+        CONFUSION_REPORT_FIELDS,
+        "calibration task confusion matrix",
+    )
     domain_counts = dataset.get("domain_counts")
+    task_domain_counts = dataset.get("task_domain_counts")
     per_domain = evaluator.get("per_domain")
-    if not isinstance(domain_counts, dict) or not isinstance(per_domain, dict):
+    task_per_domain = task_construct.get("per_domain")
+    if (
+        not isinstance(domain_counts, dict)
+        or not isinstance(per_domain, dict)
+        or not isinstance(task_domain_counts, dict)
+        or not isinstance(task_per_domain, dict)
+    ):
         raise ValueError("calibration domain counts and metrics must be objects")
     if (
         not domain_counts
@@ -445,6 +521,138 @@ def _validate_unsigned_report_shape(report: dict[str, Any]) -> None:
         raise ValueError("calibration confusion counts do not match sample_count")
     if agreement.get("metric") != "krippendorff_alpha":
         raise ValueError("calibration agreement metric is invalid")
+    task_sample_count = _positive_int(
+        dataset.get("task_sample_count"),
+        "calibration dataset task_sample_count",
+    )
+    if (
+        not task_domain_counts
+        or set(task_domain_counts) != set(task_per_domain)
+        or not set(task_domain_counts) <= calibration.DOMAINS
+    ):
+        raise ValueError("calibration task domain counts and metrics must match")
+    if sum(
+        _positive_int(count, f"calibration task domain count: {domain}")
+        for domain, count in task_domain_counts.items()
+    ) != task_sample_count:
+        raise ValueError("calibration task domain counts do not match task_sample_count")
+    if task_construct.get("sample_count") != task_sample_count:
+        raise ValueError("calibration task construct sample count mismatch")
+    if task_scale != {
+        "minimum": 0,
+        "maximum": 4,
+        "point_multiplier": 25.0,
+        "pass_minimum": 3,
+    }:
+        raise ValueError("calibration task score scale is invalid")
+    if task_spearman.get("sample_count") != task_sample_count:
+        raise ValueError("calibration task Spearman sample count mismatch")
+    for key in TASK_SPEARMAN_REPORT_FIELDS - {"sample_count"}:
+        _finite_number(task_spearman.get(key), f"calibration task Spearman {key}")
+    expected_rank_sum = task_sample_count * (task_sample_count + 1) / 2.0
+    if any(
+        abs(float(task_spearman[key]) - expected_rank_sum) > 1e-9
+        for key in ("human_rank_sum", "evaluator_rank_sum")
+    ):
+        raise ValueError("calibration task Spearman rank sums are invalid")
+    if not -1.0 <= float(task_spearman["value"]) <= 1.0:
+        raise ValueError("calibration task Spearman value is outside [-1, 1]")
+    if any(
+        not isinstance(value, int) or isinstance(value, bool) or value < 0
+        for value in task_confusion.values()
+    ) or sum(task_confusion.values()) != task_sample_count:
+        raise ValueError("calibration task confusion counts do not match task_sample_count")
+    task_mae = _finite_number(
+        task_construct.get("mean_absolute_error"),
+        "calibration task mean absolute error",
+    )
+    task_error_sum = _finite_number(
+        task_construct.get("absolute_error_sum"),
+        "calibration task absolute error sum",
+    )
+    if (
+        not 0.0 <= task_mae <= 100.0
+        or abs(task_error_sum - task_mae * task_sample_count) > 1e-6
+    ):
+        raise ValueError("calibration task absolute error evidence is inconsistent")
+    for key in ("pass_macro_f1", "pass_recall", "failure_specificity"):
+        value = _finite_number(task_construct.get(key), f"calibration task {key}")
+        if not 0.0 <= value <= 1.0:
+            raise ValueError(f"calibration task {key} is outside [0, 1]")
+    for domain, count in task_domain_counts.items():
+        row = _report_object(
+            task_per_domain.get(domain),
+            TASK_DOMAIN_REPORT_FIELDS,
+            f"calibration task domain metrics: {domain}",
+        )
+        if row.get("sample_count") != count:
+            raise ValueError(f"calibration task domain sample count mismatch: {domain}")
+        domain_confusion = _report_object(
+            row.get("confusion_matrix"),
+            CONFUSION_REPORT_FIELDS,
+            f"calibration task domain confusion matrix: {domain}",
+        )
+        if any(
+            not isinstance(value, int) or isinstance(value, bool) or value < 0
+            for value in domain_confusion.values()
+        ) or sum(domain_confusion.values()) != count:
+            raise ValueError(f"calibration task domain confusion count mismatch: {domain}")
+        domain_scale = _report_object(
+            row.get("human_score_scale"),
+            TASK_SCALE_REPORT_FIELDS,
+            f"calibration task domain score scale: {domain}",
+        )
+        if domain_scale != task_scale:
+            raise ValueError(f"calibration task domain score scale mismatch: {domain}")
+        domain_mae = _finite_number(
+            row.get("mean_absolute_error"),
+            f"calibration task domain mean absolute error: {domain}",
+        )
+        domain_error_sum = _finite_number(
+            row.get("absolute_error_sum"),
+            f"calibration task domain absolute error sum: {domain}",
+        )
+        if (
+            not 0.0 <= domain_mae <= 100.0
+            or abs(domain_error_sum - domain_mae * count) > 1e-6
+        ):
+            raise ValueError(
+                f"calibration task domain absolute error evidence is inconsistent: {domain}"
+            )
+        for key in ("pass_macro_f1", "pass_recall", "failure_specificity"):
+            value = _finite_number(
+                row.get(key), f"calibration task domain {key}: {domain}"
+            )
+            if not 0.0 <= value <= 1.0:
+                raise ValueError(
+                    f"calibration task domain {key} is outside [0, 1]: {domain}"
+                )
+        domain_spearman = _report_object(
+            row.get("spearman"),
+            TASK_SPEARMAN_REPORT_FIELDS,
+            f"calibration task domain Spearman evidence: {domain}",
+        )
+        if domain_spearman.get("sample_count") != count:
+            raise ValueError(f"calibration task domain Spearman count mismatch: {domain}")
+        for key in TASK_SPEARMAN_REPORT_FIELDS - {"sample_count"}:
+            _finite_number(
+                domain_spearman.get(key),
+                f"calibration task domain Spearman {key}: {domain}",
+            )
+        if not -1.0 <= float(domain_spearman["value"]) <= 1.0:
+            raise ValueError(
+                f"calibration task domain Spearman value is outside [-1, 1]: {domain}"
+            )
+        expected_domain_rank_sum = count * (count + 1) / 2.0
+        if any(
+            abs(float(domain_spearman[key]) - expected_domain_rank_sum) > 1e-9
+            for key in ("human_rank_sum", "evaluator_rank_sum")
+        ):
+            raise ValueError(
+                f"calibration task domain Spearman rank sums are invalid: {domain}"
+            )
+    if task_agreement.get("metric") != "interval_krippendorff_alpha":
+        raise ValueError("calibration task agreement metric is invalid")
     limitations = report.get("limitations")
     if (
         not isinstance(limitations, list)
@@ -505,7 +713,7 @@ def _private_evidence_digest(root: Path, value: Any, label: str) -> str:
     return _file_sha256(path)
 
 
-def rater_ratings_payload(data: dict[str, Any], rater_id: str) -> list[dict[str, str]]:
+def rater_ratings_payload(data: dict[str, Any], rater_id: str) -> list[dict[str, Any]]:
     reviewer = _required_string(rater_id, "calibration rater ID")
     annotation = data.get("annotation")
     if not isinstance(annotation, dict):
@@ -520,6 +728,18 @@ def rater_ratings_payload(data: dict[str, Any], rater_id: str) -> list[dict[str,
         ratings = item.get("ratings")
         if not isinstance(ratings, dict) or reviewer not in ratings:
             raise ValueError(f"calibration rater did not label every item: {reviewer}")
+        task_applicable = item.get("task_applicable")
+        task_ratings = item.get("task_ratings")
+        if task_applicable is True:
+            if not isinstance(task_ratings, dict) or reviewer not in task_ratings:
+                raise ValueError(f"calibration rater did not task-score every item: {reviewer}")
+            task_score = task_ratings[reviewer]
+            if task_score not in calibration.TASK_SCORES:
+                raise ValueError(f"calibration task score is invalid: {reviewer}:{index}")
+        elif task_applicable is False and task_ratings is None:
+            task_score = None
+        else:
+            raise ValueError(f"calibration task applicability is invalid: {index}")
         rows.append(
             {
                 "id": _required_string(item.get("id"), f"calibration item ID: {index}"),
@@ -531,6 +751,7 @@ def rater_ratings_payload(data: dict[str, Any], rater_id: str) -> list[dict[str,
                     ratings.get(reviewer),
                     f"calibration rating: {reviewer}:{index}",
                 ),
+                "task_score": task_score,
             }
         )
     rows.sort(key=lambda row: row["id"])
@@ -619,6 +840,10 @@ def make_adjudication_commitment(
         annotation.get("label_matrix_sha256"),
         "calibration label matrix SHA-256",
     )
+    task_rating_matrix_sha256 = _sha256(
+        annotation.get("task_rating_matrix_sha256"),
+        "calibration task rating matrix SHA-256",
+    )
     adjudication_log_sha256 = _sha256(
         annotation.get("adjudication_log_sha256"),
         "calibration adjudication log SHA-256",
@@ -639,6 +864,7 @@ def make_adjudication_commitment(
         "expert_rater_ids": expert_rater_ids,
         "rater_commitments": rater_commitments,
         "label_matrix_sha256": label_matrix_sha256,
+        "task_rating_matrix_sha256": task_rating_matrix_sha256,
         "adjudication_log_sha256": adjudication_log_sha256,
         "adjudication_process_sha256": _bytes_sha256(
             _required_string(
@@ -1272,7 +1498,7 @@ def validate_public_calibration_signatures(report: dict[str, Any]) -> dict[str, 
         raise ValueError(f"signed calibration schema must be {OUTPUT_SCHEMA}")
     unsigned = unsigned_calibration_report(report)
     if set(unsigned) != UNSIGNED_REPORT_FIELDS:
-        raise ValueError("unsigned calibration report fields do not match v2 contract")
+        raise ValueError("unsigned calibration report fields do not match v3 contract")
     _validate_unsigned_report_shape(unsigned)
     evidence = report.get("signature_evidence")
     if not isinstance(evidence, dict):

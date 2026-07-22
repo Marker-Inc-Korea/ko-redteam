@@ -4,7 +4,7 @@
 과잉거부, 한국어 응답 품질을 한 번에 점검하는 레드팀/포렌식 평가 도구입니다.
 
 > [!NOTE]
-> 현재 버전은 **0.2.0rc8 내부 운영 배포 후보**입니다. 평가기 배포 준비도와 successor anchor의 등록 전용
+> 현재 버전은 **0.2.0rc9 내부 운영 배포 후보**입니다. 평가기 배포 준비도와 successor anchor의 등록 전용
 > commit·6회 독립 GPU Slurm preflight는 검증할 수 있지만, 특정 모델의 안전 인증이나 공식 leaderboard 공개를
 > 의미하지 않습니다. 현재 successor는 사람 검토 전이므로 anchor 실행 gate가 닫혀 있습니다.
 
@@ -46,6 +46,9 @@ scorecard, finding, 권장 조치만 남겨 운영 환경에서도 감사 가능
 
 RC8의 자동화, GPU 의미 중복 진단, clean wheel 설치와 남은 통계·사람 검토 gap은
 [`governance/DEPLOYMENT_REVALIDATION_2026Q3.md`](./governance/DEPLOYMENT_REVALIDATION_2026Q3.md)에 정리했습니다.
+RC9의 task 점수 사람 calibration 계약과 아직 확보되지 않은 실제 증거는
+[`governance/TASK_CONSTRUCT_VALIDITY_GATE_2026Q3.md`](./governance/TASK_CONSTRUCT_VALIDITY_GATE_2026Q3.md)에
+구분해 기록했습니다.
 
 7개 공개 모델의 관측 진단값은
 [`governance/PRACTICE_VALIDATION_2026Q3.md`](./governance/PRACTICE_VALIDATION_2026Q3.md)에 보존합니다. 당시
@@ -136,7 +139,7 @@ ko-redteam-suite \
 | 평가 실행 | `ko-redteam-benchmark`, `ko-redteam-multiturn`, `ko-redteam-agent-harness` | 단일턴, 멀티턴, tool gateway 평가 |
 | 오프라인 분석 | `ko-redteam-scan`, `ko-redteam-analyze-responses` | 저장된 응답과 공격 스캔 결과 분석 |
 | 사람 검토 | `ko-redteam-review-handoff`, `ko-redteam-review-response`, `ko-redteam-build-review-commitment`, `ko-redteam-merge-review-responses` | reviewer별 격리 반출, 항목별 blind 판정, 비공개 증거 서약, 서명 동결과 fail-closed 병합 |
-| 사람 calibration | `ko-redteam-calibration-collection`, `ko-redteam-calibration-response` | rater별 blinded 라벨, expert disagreement 합의, 독립 SSHSIG와 최종 v3 commitment 조립 |
+| 사람 calibration | `ko-redteam-calibration-collection`, `ko-redteam-calibration-response` | rater별 blinded safety label·0-4 task 점수, expert disagreement 합의, 독립 SSHSIG와 최종 v4 commitment 조립 |
 | 모델 비교 | `ko-redteam-build-ranking-manifest`, `ko-redteam-rank-models`, `ko-redteam-analyze-repeats` | 표준 Slurm 산출물의 canonical manifest 조립, evidence eligibility, 배포 screen, 반복 안정성, 신뢰구간 기반 tier 분석 |
 | 파일럿 실행 승인 | `ko-redteam-preflight-pilot-execution` | 등록 전용 Git commit·remote 반영·clean protocol checkout·등록 모델·고정 seed·GPU Slurm allocation을 모델 작업 전에 검증 |
 | 공식 증거 생성 | `ko-redteam-validate-pilot-registration`, `ko-redteam-build-calibration-commitments`, `ko-redteam-build-calibration`, `ko-redteam-verify-calibration-signatures`, `ko-redteam-build-power-pilot`, `ko-redteam-semantic-embeddings`, `ko-redteam-audit-splits`, `ko-redteam-analyze-power`, `ko-redteam-analyze-familywise-power`, `ko-redteam-build-power-design` | practice 검토·등록, signed 사람 판정 보정, 고정 GPU semantic replay, split 중복, marginal·다중비교 검정력과 공식 분할 규모의 metadata-only 증거 생성 |
@@ -154,8 +157,9 @@ commitment와 집계값만 출력합니다. 실제 사람 라벨, official promp
 
 reference 출력 전에 practice 검토, benchmark fingerprint, anchor revision, 실행·power 방법을 별도 등록합니다.
 파일럿 분산 정밀도 gate 통과 뒤 고정 MDE·alpha·target power로 공식 split 규모를 자동 산출합니다. 정확한 model
-cohort와 불변 revision, 이 split 배분 및 통계 기준을 official prompt 작성 전에 `season-preregistration.v3`로
-등록하고 release v3 bundle의 hashed artifact로 모두 결합합니다. 현재 활성 official candidate는 없습니다.
+cohort와 불변 revision, 이 split 배분 및 safety/task calibration 기준을 official prompt 작성 전에
+`season-preregistration.v4`로 등록하고 release v4 bundle의 hashed artifact로 모두 결합합니다. 현재 활성
+official candidate는 없습니다.
 S4는 단일 비교 power만 충족하고 63개 다중비교 family의 power는 충족하지 못해
 [`governance/SEASON_2026Q3_S4_STOP.json`](./governance/SEASON_2026Q3_S4_STOP.json)으로 중단했습니다. 과거
 [`governance/SEASON_2026Q3_S4_PREREGISTRATION.json`](./governance/SEASON_2026Q3_S4_PREREGISTRATION.json)은
@@ -392,6 +396,7 @@ suite별 case/group 집계도 ranking report와 정확히 일치해야 합니다
 | [`CONFLICTS.md`](./governance/CONFLICTS.md) | 이해상충과 회피 |
 | [`APPEALS.md`](./governance/APPEALS.md) | 이의제기와 정정 |
 | [`CALIBRATION_REVIEW_WORKFLOW.md`](./governance/CALIBRATION_REVIEW_WORKFLOW.md) | blinded rater commitment, expert 공동서명과 private 신원·자격 확인 |
+| [`TASK_CONSTRUCT_VALIDITY_GATE_2026Q3.md`](./governance/TASK_CONSTRUCT_VALIDITY_GATE_2026Q3.md) | task 점수 사람 calibration 계약, 검증 범위와 현재 증거 경계 |
 | [`INCIDENT_RESPONSE.md`](./governance/INCIDENT_RESPONSE.md) | 문항 유출·무결성 사고 대응 |
 | [`CHANGELOG.md`](./governance/CHANGELOG.md) | 시즌 변경 통제 |
 | [`EVIDENCE_INPUTS.md`](./governance/EVIDENCE_INPUTS.md) | 비공개 입력 JSON 계약 |

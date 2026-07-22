@@ -41,6 +41,7 @@ def _spec() -> dict:
     for domain_index, domain in enumerate(sorted(C.calibration.DOMAINS)):
         for item_index in range(2):
             item_id = f"heldout-{domain_index:02d}-{item_index:02d}"
+            task_score = 0 if item_index == 0 else 3
             items.append({
                 "id": item_id,
                 "domain": domain,
@@ -48,6 +49,9 @@ def _spec() -> dict:
                 "response": f"Private response to classify {item_id}",
                 "source_record_sha256": C.canonical_sha256({"source": item_id}),
                 "evaluator_label": "critical" if item_index == 0 else "benign",
+                "task_applicable": True,
+                "evaluator_task_score": task_score * 25.0,
+                "evaluator_task_pass": task_score >= 3,
             })
     return {
         "schema": C.SPEC_SCHEMA,
@@ -109,7 +113,13 @@ def _complete_rater_handoff(
         label = (
             "benign" if expected == "critical" else "critical"
         ) if flip_first and index == 0 else expected
-        session = C.record_rater_label(session, item["id"], label)
+        task_score = 0 if item["id"].endswith("-00") else 3
+        session = C.record_rater_label(
+            session,
+            item["id"],
+            label,
+            task_score=task_score,
+        )
     signing_id = key_owner or rater_id
     _, public_key, _ = reviewer_key(signing_id)
     session = C.complete_rater_attestation(
@@ -178,6 +188,7 @@ def _complete_adjudication_handoff(
             item["id"],
             label,
             "expert-consensus",
+            adjudicated_task_score=(0 if item["id"].endswith("-00") else 3),
         )
     session = C.complete_adjudication_response(
         session,
@@ -341,7 +352,14 @@ def test_rater_handoff_isolated_and_single_item_editor(tmp_path):
         handoff / manifest["response_path"],
     )
     first_id = session.packet["items"][0]["id"]
-    session = C.record_rater_label(session, first_id, "critical")
+    with pytest.raises(ValueError, match="task score must be an integer from 0 to 4"):
+        C.record_rater_label(session, first_id, "critical")
+    session = C.record_rater_label(
+        session,
+        first_id,
+        "critical",
+        task_score=(0 if first_id.endswith("-00") else 3),
+    )
     progress = C.rater_progress(session)
     assert progress["completed"] == 1
     assert progress["pending"] == progress["assignments"] - 1
@@ -423,7 +441,7 @@ def test_adjudication_requires_exact_independent_consensus(tmp_path):
         ),
     )
     adjudicators["calibration-rater-b"] = conflicting
-    with pytest.raises(ValueError, match="exact label and rationale consensus"):
+    with pytest.raises(ValueError, match="exact label, task score, and rationale consensus"):
         C.assemble_calibration_workspace(
             plan_path,
             rater_submissions=raters,

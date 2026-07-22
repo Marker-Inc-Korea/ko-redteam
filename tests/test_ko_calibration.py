@@ -25,14 +25,22 @@ def _input() -> dict:
         for item_index in range(4):
             label = "critical" if item_index % 2 == 0 else "benign"
             ratings = {rater["id"]: label for rater in raters}
+            task_score = item_index
+            task_ratings = {rater["id"]: task_score for rater in raters}
             if domain_index == 0 and item_index == 0:
                 ratings["rater-c"] = "benign"
+                task_ratings["rater-c"] = 1
             items.append({
                 "id": f"private-item-{domain_index}-{item_index}",
                 "domain": domain,
                 "ratings": ratings,
                 "adjudicated_label": label,
                 "evaluator_label": label,
+                "task_applicable": True,
+                "task_ratings": task_ratings,
+                "adjudicated_task_score": task_score,
+                "evaluator_task_score": task_score * 25.0,
+                "evaluator_task_pass": task_score >= C.TASK_HUMAN_PASS_MIN,
             })
     return {
         "schema": C.INPUT_SCHEMA,
@@ -46,6 +54,7 @@ def _input() -> dict:
                 {
                     "id": "private-item-0-0",
                     "adjudicated_label": "critical",
+                    "adjudicated_task_score": 0,
                     "rationale_code": "expert-consensus",
                 }
             ],
@@ -87,6 +96,15 @@ def test_nominal_alpha_matches_krippendorff_published_missing_data_example():
     assert result["value"] == pytest.approx(0.743, abs=0.001)
 
 
+def test_interval_alpha_matches_hand_calculated_ordered_example():
+    result = C.interval_krippendorff_alpha([[0, 1], [1, 2]])
+
+    assert result["pairable_values"] == 4
+    assert result["observed_disagreement"] == pytest.approx(1.0)
+    assert result["expected_disagreement"] == pytest.approx(4.0 / 3.0)
+    assert result["value"] == pytest.approx(0.25)
+
+
 def test_calibration_report_recomputes_metrics_without_private_item_ids():
     report = C.build_calibration_report(_input())
     serialized = json.dumps(report, ensure_ascii=False)
@@ -97,7 +115,11 @@ def test_calibration_report_recomputes_metrics_without_private_item_ids():
     assert report["annotation"]["expert_rater_count"] == 2
     assert report["annotation"]["blinded_to_model_identity"] is True
     assert report["annotation"]["agreement"]["value"] > 0.9
+    assert report["annotation"]["task_agreement"]["value"] > 0.9
     assert report["evaluator"]["macro_f1"] == 1.0
+    assert report["evaluator"]["task_construct_validity"]["spearman"]["value"] == 1.0
+    assert report["evaluator"]["task_construct_validity"]["mean_absolute_error"] == 0.0
+    assert report["evaluator"]["task_construct_validity"]["pass_macro_f1"] == 1.0
     assert report["control_separation"]["status"] == "pass"
     assert report["control_separation"]["method"] == (
         C.CONTROL_SEPARATION_METHOD
@@ -128,6 +150,14 @@ def test_calibration_input_rejects_raw_prompt_fields():
     data["annotation"]["items"][0]["prompt"] = "must not be accepted"
 
     with pytest.raises(ValueError, match="labels-only"):
+        C.build_calibration_report(data)
+
+
+def test_calibration_requires_task_scores_for_every_applicable_item():
+    data = _input()
+    data["annotation"]["items"][0]["task_ratings"] = None
+
+    with pytest.raises(ValueError, match="task_ratings must cover the same raters"):
         C.build_calibration_report(data)
 
 

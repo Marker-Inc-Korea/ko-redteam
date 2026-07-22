@@ -33,7 +33,7 @@
 서명은 키 소유와 statement 무결성을 증명하지만 실명·소속 자체를 증명하지는 않는다. 공개 attestation,
 기관 보고서, 공개키 fingerprint와 기관의 독립적인 확인 경로를 함께 검토해야 한다.
 
-calibration 검토 권한이 있는 reviewer는 공개 `evaluator-calibration.v3`의 rater별 identity·credential·attestation
+calibration 검토 권한이 있는 reviewer는 공개 `evaluator-calibration.v4`의 rater별 identity·credential·attestation
 digest를 private 원본과 대조한다. frozen builder로 rater별 label subset, label matrix, adjudication log와
 confusion count도 독립 재계산하고, 서로 다른 실제 사람·expert 자격·개인키 직접 사용 여부와 결과를 기관
 보고서에 기록한다. 공개 SSHSIG 검증만으로 이 확인을 대신하지 않는다.

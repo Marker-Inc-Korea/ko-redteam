@@ -70,11 +70,18 @@ def test_publishable_release_builds_verifiable_static_snapshot(
     assert all(row["tier"] is not None for row in payload["ranking"]["models"])
     assert payload["split"]["official_public"] is False
     assert payload["calibration"]["sample_count"] >= 300
+    assert payload["calibration"]["task_sample_count"] >= 180
+    assert payload["calibration"]["task_krippendorff_alpha"] >= 0.80
+    assert payload["calibration"]["task_spearman_rho"] >= 0.80
+    assert payload["calibration"]["task_mean_absolute_error"] <= 15.0
+    assert payload["calibration"]["task_pass_macro_f1"] >= 0.85
     assert payload["external_review"]["reviewer_count"] >= 2
 
     html = (output / "index.html").read_text("utf-8")
     assert "PUBLICATION GATE PASSED" in html
     assert "한국어 LLM" in html
+    assert "TASK CONSTRUCT VALIDITY" in html
+    assert "업무수행 점수 검증" in html
     assert "<script" not in html.lower()
     assert "A-F" not in html
     assert "raw prompt" not in html.lower()

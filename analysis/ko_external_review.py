@@ -18,7 +18,7 @@ except ModuleNotFoundError:  # package import path
     from .ko_practice_review import ssh_ed25519_public_key, ssh_signature_bytes
 
 
-RELEASE_SCHEMA = "ko-redteam.leaderboard-release.v3"
+RELEASE_SCHEMA = "ko-redteam.leaderboard-release.v4"
 EXTERNAL_REVIEW_SCHEMA = "ko-redteam.external-review.v2"
 EXTERNAL_REVIEW_SCOPE_SCHEMA = "ko-redteam.external-review-scope.v1"
 EXTERNAL_REVIEW_STATEMENT_SCHEMA = "ko-redteam.external-review-statement.v1"

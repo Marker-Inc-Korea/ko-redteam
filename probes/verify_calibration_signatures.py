@@ -34,7 +34,7 @@ def _write(path: Path, value: dict) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("report", help="public evaluator-calibration.v3 JSON")
+    parser.add_argument("report", help="public evaluator-calibration.v4 JSON")
     parser.add_argument("--output", help="optional non-overwriting signature audit JSON")
     args = parser.parse_args()
 

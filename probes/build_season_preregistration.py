@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Freeze season-preregistration.v3 from committed aggregate evidence."""
+"""Freeze season-preregistration.v4 from committed aggregate evidence."""
 from __future__ import annotations
 
 import argparse
@@ -113,7 +113,7 @@ def main() -> None:
         required=True,
         help="timezone-aware freeze time after power evidence and before official data",
     )
-    parser.add_argument("--output", required=True, help="new season-preregistration.v3 JSON")
+    parser.add_argument("--output", required=True, help="new season-preregistration.v4 JSON")
     parser.add_argument("--audit-output", required=True, help="new pre-execution audit JSON")
     args = parser.parse_args()
 

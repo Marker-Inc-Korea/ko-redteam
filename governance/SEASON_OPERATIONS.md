@@ -36,7 +36,7 @@
 5. official prompt 작성 전에 고정 BGE-M3 snapshot과 SLURM GPU runtime을 inspect해 CLS/L2/float32 configuration
    commitment를 만든다. 통과한 다섯 선행 증거와 사람이 결정한 immutable model cohort, 실행·semantic·calibration 정책을
    `season-preregistration-spec.v1`에 결합해 commit/push한다. clean HEAD의
-   `ko-redteam-build-season-preregistration`으로만 `season-preregistration.v3`를 만들고 별도 commit/push한 뒤
+   `ko-redteam-build-season-preregistration`으로만 `season-preregistration.v4`를 만들고 별도 commit/push한 뒤
    official prompt를 작성한다. evidence commit이 pilot evaluator commit보다 뒤인 것은 정상이나, 그 사이 protocol
    구현 파일 변경은 허용하지 않는다.
 6. 모델명에 blinded된 held-out 사람 라벨로 evaluator를 calibration한다. rater별 격리 handoff와 항목별 판정,
