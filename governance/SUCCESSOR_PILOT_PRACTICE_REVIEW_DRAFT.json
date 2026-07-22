@@ -11,7 +11,7 @@
  },
  "draft_provenance": {
   "generator_path": "probes/build_successor_pilot_drafts.py",
-  "generator_sha256": "a2b9679f5a8276a7447844b16129ef2659fdd54750a3ce8fd9999eac97699ded",
+  "generator_sha256": "98416c9fff4be2e2853bdf186848b1370fd40eb83dfeff71c51411a25f7504c0",
   "reference_model_outputs_used": false,
   "human_review_required_before_registration": true
  },
@@ -35,25 +35,25 @@
  "benchmarks": {
   "paperbench": {
    "path": "benchmarks/ko_llm_paperbench_pilot_v1.json",
-   "sha256": "af5836cbecc5e6b9786e8be69da0eaa8294d101de2d6d7d8c891130245c1bd64",
+   "sha256": "633d6379ce02b90982bffb563aeba4168be155077b0fadc29d2620e5a17a99cb",
    "content_sha256": "43488a649f507bd8610ab286212d77b1013724aab1ede6cf07788958861874d6",
    "cases": 40
   },
   "mini_single": {
    "path": "benchmarks/ko_llm_mini_pilot_v1.json",
-   "sha256": "b05dc28c1fd5bdd518423b6ccacd428df69f88fee8a0e6b6cb7aeaa4f3d66121",
+   "sha256": "da5c8a87b8c930680f02b9cf1b2fb05ff073e1868bef93636ccef317d504dd7a",
    "content_sha256": "3693aed9af9806c5a84a90c8f79ee66fb18bd5ba62f10c2efa367703abb50956",
    "cases": 40
   },
   "multiturn": {
    "path": "benchmarks/ko_llm_multiturn_pilot_v1.json",
-   "sha256": "ccaf24f6ef909cde0d7a1ef7a12ad58757faab8b48b5b48e99b4aff6dd2e48a7",
+   "sha256": "4787a1e7d6f5195dc50671bf79f23c700adbc7698a912691ec05b342fbf7feb3",
    "content_sha256": "5467c2eb7672e05eb73984160ca477c1a17ceec96fd69582957325ddbc304686",
    "cases": 20
   },
   "agent_harness": {
    "path": "benchmarks/ko_llm_agent_harness_pilot_v1.json",
-   "sha256": "31bd90c1f756ec85f7c2af2a9c10c39138120724bf311a777d7d7c42276cbb66",
+   "sha256": "054e3f77763d4a560487e5cdbaf6102039a8816213de65b94e2af7a09b1589ff",
    "content_sha256": "a33501d1f298428a0881715de2ccc8cdda68720bf260fd06e78f1c696263e3d3",
    "cases": 40
   }
@@ -111,9 +111,16 @@
     "content_sha256": "47a1532df408397d215036df4bb14df306129afaa80fa40d17d2fc51a8441307",
     "schema": "ko-redteam.agent-harness.v1",
     "cases": 10
+   },
+   {
+    "path": "benchmarks/ko_llm_agent_harness_v3.json",
+    "sha256": "2240a6a93d422490348b97ce596c0f72b5bcdf30125a407439d88a72259bdfcc",
+    "content_sha256": "e5e652cc2783f48fc7fa0fc217baa91eb963ac9ac766e94aae1b9810cd52a974",
+    "schema": "ko-redteam.agent-harness.v1",
+    "cases": 13
    }
   ],
-  "historical_case_records": 93,
+  "historical_case_records": 106,
   "candidate_benchmarks": {
    "paperbench": {
     "path": "benchmarks/ko_llm_paperbench_pilot_v1.json",

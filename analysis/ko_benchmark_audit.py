@@ -24,6 +24,11 @@ except ModuleNotFoundError:  # package import path
         privacy_contract_source_errors,
     )
 
+try:
+    from ko_tool_policy import parameter_schema_errors
+except ModuleNotFoundError:  # package import path
+    from .ko_tool_policy import parameter_schema_errors
+
 EXPECTED_VALUES = {"refuse_or_redirect", "allow", "no_leak", "no_tool"}
 SUPPORTED_SCHEMAS = {
     "ko-redteam.benchmark.v1",
@@ -133,6 +138,16 @@ def _case_texts(schema: str | None, case: dict[str, Any], case_id: str, issues: 
                 issues.append(_issue(
                     "error", "tool_contract", "each tool requires a name and neutral description", case_id=case_id
                 ))
+            for tool in tools:
+                if not isinstance(tool, dict):
+                    continue
+                for message in parameter_schema_errors(tool.get("parameters")):
+                    issues.append(_issue(
+                        "error",
+                        "tool_parameter_policy",
+                        f"{tool.get('name') or 'unnamed tool'}: {message}",
+                        case_id=case_id,
+                    ))
             tool_name_list = [
                 str(tool.get("name") or "") for tool in tools if isinstance(tool, dict)
             ]

@@ -1,6 +1,6 @@
 # ko-redteam Deployment Guide
 
-이 문서는 `0.2.0rc7` 내부 운영 배포 후보의 실행 계약을 정의합니다. 이 단계는 평가기 자체의
+이 문서는 `0.2.0rc10` 내부 운영 배포 후보의 실행 계약을 정의합니다. 이 단계는 평가기 자체의
 재현성, 산출물 무결성, endpoint 오류 처리를 검증합니다. 특정 모델의 안전 인증이나 공식 순위 공개를
 의미하지 않습니다.
 
@@ -27,12 +27,12 @@ successor power pilot은 일반 배포 검증보다 강한 등록·Git publicati
 UID/GID `10001`입니다. Dockerfile의 `python:3.12-slim` base는 manifest digest로 고정합니다.
 
 ```bash
-docker build --target runtime -t ko-redteam:0.2.0rc7 .
+docker build --target runtime -t ko-redteam:0.2.0rc10 .
 docker run --rm --read-only \
   --tmpfs /tmp:rw,noexec,nosuid,size=64m \
   --cap-drop ALL \
   --security-opt no-new-privileges \
-  ko-redteam:0.2.0rc7
+  ko-redteam:0.2.0rc10
 ```
 
 이미지는 model server를 포함하지 않습니다. 실제 평가는 report 출력용 writable volume과 Slurm job 안에서
@@ -143,6 +143,23 @@ Builder는 canonical 상대경로와 symlink 금지, 모델명·run ID 전역 �
 계약을 검증합니다. v7은 multiturn report v2와 case별 task metric 적용 범위의 반복·모델 간 일치를 요구합니다.
 기존 출력 파일은 덮어쓰지 않으며 audit에는 원문 prompt·response를 넣지 않습니다. Build
 `pass`는 ranking eligibility나 모델 간 분리, 공식 게시 가능성을 판정하지 않습니다.
+
+## Post-deployment Revalidation
+
+승인된 baseline run context와 현재 context, 변경·사고 기록을
+`ko-redteam-check-revalidation`에 전달합니다. model/runtime/prompt/evaluator/generation 변경, tool·retrieval·
+guardrail 변경 이벤트 또는 조직이 정한 주기 만료가 있으면 기존 결과를 승계하지 않고 새 Slurm serving에서
+전체 repeat를 다시 실행합니다.
+
+```bash
+ko-redteam-check-revalidation revalidation_request.json \
+  --output revalidation_report.json \
+  --markdown-output revalidation_report.md
+```
+
+`current`만 종료 코드 `0`이며 `revalidation_required`와 잘못된 입력은 종료 코드 `1`입니다. 요청의
+`baseline_context_sha256`은 이전 immutable 평가 report에서 가져와야 합니다. 전체 trigger와 request schema는
+[`governance/EVALUATION_LIFECYCLE.md`](./governance/EVALUATION_LIFECYCLE.md)를 따릅니다.
 
 ## Failure Handling
 

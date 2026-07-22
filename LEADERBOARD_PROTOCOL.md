@@ -24,6 +24,8 @@
 7. **Frozen cohort**: 공식 실행 전에 정확한 모델 이름·ID·불변 revision을 사전등록한다. 오류 모델을 사후
    제외하거나 새 모델을 추가해 comparison family를 바꾸지 않는다.
 8. **Fail closed**: 필요한 증거가 없거나 검증할 수 없으면 `not_publishable`이다.
+9. **Lifecycle validity**: 모델·런타임·prompt·평가기·서비스 권한이 바뀌거나 사고·drift·주기 만료가 발생하면
+   이전 결과를 자동 승계하지 않는다.
 
 ## 2. Evidence Levels
 
@@ -170,6 +172,11 @@ ranking report의 suite별 case 수와 독립 그룹 수는 split audit의 동�
 종합 profile과 함께 치명 실패 그룹, 개인정보 실패 그룹, endpoint 오류, 판정 flip, 영역별 점수, task
 adherence, benign utility를 공개한다. 모델 크기나 일반 능력과 보안 profile을 같은 개념으로 해석하지 않는다.
 
+공개 practice를 변형한 실행은 원문과 공격 변형을 같은 독립 원형으로 묶고, 원문 대비 위반률·정책 통과율
+delta, 비위반에서 위반으로 바뀐 그룹과 worst-case policy pass를 별도 진단으로 기록한다. 이 값은 공격
+민감도를 설명하지만 protocol v2의 사전등록 composite, p-value 또는 tier 경계에 들어가지 않는다. 다음 시즌에
+추론 지표로 사용하려면 사람 calibration, 독립성 단위, estimand와 가중치를 출력 관측 전에 새로 등록해야 한다.
+
 ## 7. Reference Models And Power
 
 매 시즌 immutable revision으로 고정한 최소 두 reference model을 평가한다.
@@ -214,13 +221,19 @@ randomization power를 뜻하지 않는다. power input·report·multiplicity au
 - 외부 검토자 2명 이상과 독립 기관 1곳 이상이 benchmark construction, 판정 calibration, 통계,
   개인정보 보호를 검토한다.
 - blocking finding을 해소하지 못하면 `candidate` 상태를 유지한다.
-- 재평가는 코드·모델 revision·서비스 설정이 바뀐 경우 새 제출로 처리한다.
+- 모델·tokenizer, runtime·환경, chat/system prompt, evaluator·protocol, generation 또는 scheduler가 바뀌면
+  전체 재평가하고 새 제출로 처리한다.
+- 보안·평가기 사고, provider 변경 통지, retrieval corpus, tool 권한, guardrail, policy, traffic 분포 또는
+  material data 변경은 해결 상태와 무관하게 마지막 평가 이후 발생했다면 재평가 trigger다.
+- 주기 재평가 간격은 서비스 위험도에 맞춰 사전 정의한다. 특정 일수는 표준 요구사항인 것처럼 표현하지 않는다.
 
 위 공개 문서는 release bundle 내부의 상대경로와 SHA-256으로 결합한다. 외부 검토 artifact에는 공개에
 동의한 검토자 이름·소속·이해상충 진술·검토 시각, 실제 공개 attestation, 독립 기관명과 실제 공개 검토 보고서를
 기록한다. 모든 검토자는 같은 release artifact·governance 문서·manifest projection을 묶은 canonical statement를
 각자의 Ed25519 키로 서명한다. 단순한 검토자 수나 파일 없는 SHA-256 자체 기입은 외부 검토 증거로 인정하지 않는다.
 세부 실행 절차는 [`governance/EXTERNAL_REVIEW_WORKFLOW.md`](./governance/EXTERNAL_REVIEW_WORKFLOW.md)를 따른다.
+배포 전후 평가 시점과 metadata gate는
+[`governance/EVALUATION_LIFECYCLE.md`](./governance/EVALUATION_LIFECYCLE.md)를 따른다.
 
 공개 절차는 [`governance/README.md`](./governance/README.md), 시즌 실행 순서는
 [`governance/SEASON_OPERATIONS.md`](./governance/SEASON_OPERATIONS.md)에 둔다. 특정 시즌의 이해상충 진술,
@@ -379,6 +392,12 @@ power 동결 이전이 아니면 input 생성을 거부한다.
   공개 실행을 평가 원칙으로 둔다.
 - [MLCommons AILuminate methodology](https://mlcommons.org/ailuminate/safety-methodology/)는 공개
   practice와 비공개 official prompt를 분리하고 reference systems와 calibration된 evaluator를 사용한다.
+- [MLCommons Security Jailbreak 0.5](https://mlcommons.org/wp-content/uploads/2025/10/MLCommons___Security___Jailbreak_0_5_Paper-5.pdf)는
+  공격 전 안전성과 jailbreak 후 안전성의 변화량, 비위반에서 위반으로 바뀐 사례를 분리해 보고한다.
+- [NIST AI RMF Measure](https://airc.nist.gov/airmf-resources/playbook/measure/)는 배포 전후 측정과 정기적
+  재평가, drift·incident monitoring 및 사람 검토를 함께 다룬다.
+- [OWASP Top 10 for Agentic Applications 2026](https://genai.owasp.org/resource/owasp-top-10-for-agentic-applications-for-2026/)은
+  goal, tool, identity, supply-chain, code, memory와 agent 간 통신 위험을 구분한다.
 - [NIST AI 600-1](https://doi.org/10.6028/NIST.AI.600-1)은 metric의 construct validity, 측정 편향·분산,
   structured human feedback 및 appeal 절차의 문서화를 요구한다.
 - [STREAM](https://streamevals.com/)은 위협 관련성, 시험 구성·채점, elicitation, 성능, baseline,

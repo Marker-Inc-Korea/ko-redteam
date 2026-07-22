@@ -13,14 +13,23 @@ bundle에 이 문서와 함께 SHA-256으로 결합해야 한다. 현재 공개 
 - 개인정보 및 내부 지시의 재노출
 - 정상 요청에 대한 과잉거부와 과업 충실도
 - 멀티턴 판정 변화와 반복 실행 안정성
-- agent/tool gateway에서의 무단 action 시도
+- agent/tool gateway에서의 무단 action·허용 범위 밖 argument 시도
+- 원문 대비 난독화·프레이밍 공격 변형의 위반 변화
 
 Evidence-eligible tier는 이 프로토콜 안에서 통계적으로 분리된 결과만 뜻한다. 일반 지능, 모든 공격에 대한
 안전성, 제품 전체의 법률 준수 또는 실제 배포 인증을 뜻하지 않는다.
+OWASP 위험별 실제 측정 경계는
+[`benchmarks/RISK_COVERAGE_MATRIX.md`](../benchmarks/RISK_COVERAGE_MATRIX.md)에 둔다.
 
 ## Known Limits
 
 - 비공개 문항도 위협 공간 전체를 대표하지 못하며 새로운 공격·도메인 변화에 뒤처질 수 있다.
+- Agent v3는 mock gateway에서 tool 이름과 제한된 argument schema를 판정한다. 실제 IAM, tool side effect,
+  persistent memory, multi-agent cascade, sandbox escape, 공급망 무결성과 사람의 과신을 재현하지 않는다.
+- gateway가 위험 호출을 차단한 것은 containment 증거다. 모델이 위험 호출을 시도한 사실을 모델 안전으로
+  바꾸지 않으며, `argument_policy_blocks`를 안전 점수로 해석해서는 안 된다.
+- 공격 변형 delta는 공개 seed와 현재 변형 생성기에 조건부다. 원형과 변형을 독립 표본처럼 세지 않고,
+  사전등록·사람 calibration 전에는 종합점수나 모델 tier에 포함하지 않는다.
 - 자동 판정기는 사람 라벨 calibration을 통과하더라도 은어, 풍자, 장문 맥락과 새로운 한국어 표현을
   오판할 수 있다.
 - calibration의 서로 다른 Ed25519 키와 signed commitment는 key holder와 bytes를 결합하지만 서로 다른 실제
@@ -53,6 +62,8 @@ Evidence-eligible tier는 이 프로토콜 안에서 통계적으로 분리된 �
   확률과 무관하게 영역별 confusion gate와 외부 검토를 통과할 수 없다.
 - 모델 단독 평가 결과는 검색기, system prompt, 권한 설계, 후처리와 모니터링이 포함된 실제 서비스 결과와
   다를 수 있다.
+- 재검증 CLI는 제공된 metadata와 baseline commitment의 정합성을 검사하지만 원격 serving 상태나 입력 기록의
+  진위를 attest하지 않는다. baseline과 commitment를 함께 조작하는 공격은 별도 서명·변경관리 통제가 필요하다.
 
 ## Required Interpretation
 

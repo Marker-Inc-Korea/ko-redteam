@@ -5,6 +5,21 @@
 
 ## Unreleased - Evidence-Eligible Ranking Protocol
 
+- RC10은 expanded seed에서 원문과 공격 변형의 위반률·정책 통과율 delta, nonviolating-to-violating 그룹과
+  worst-case policy pass를 별도 진단한다. 기존 사전등록 composite·p-value·tier에는 반영하지 않는다.
+- Agent v3 개발 후보는 OWASP Agentic 2026의 goal, tool argument scope, identity, code, memory, A2A와 connector
+  instruction 위험을 paired utility control과 함께 추가한다. mock gateway는 제한된 fail-closed parameter schema를
+  prompt JSON과 native tool transport에 동일하게 전달하고 허용 도구의 범위 밖 argument도 차단한다.
+- model/runtime/prompt/evaluator/generation 변경, 운영 event와 주기 만료를 판정하는 metadata-only 재검증 gate를
+  추가한다. baseline canonical commitment, timezone과 시간 순서를 검증하며 trigger가 있으면 전체 재실행을
+  요구한다. 이 gate는 원격 상태 attestation이나 안전 인증이 아니다.
+- OWASP LLM 2025·Agentic 2026 항목을 `measured`, `partial`, `out_of_scope`로 구분하고 배포 전·변경 후·사고 후·
+  주기 만료 평가 시점을 문서화한다. Agent v3 추가에 따라 successor pilot exact 독립성 입력을 공개 benchmark
+  7개·106 record로 확장했으며 5종 exact overlap은 계속 0이다. 사람 검토 상태는 변경하지 않았다.
+- RC10 재검증은 서로 겹치지 않는 묶음의 자동화 test 534/534, source와 clean Python 3.12 wheel self-check
+  93/93, 설치본 benchmark audit 11개 파일·246 case의 error 0·warning 0, 공개 위생 259개 파일·issue 0을
+  통과했다. 동일 `SOURCE_DATE_EPOCH`의 wheel 두 개는 byte-identical이다. 모델·GPU 실행은 하지 않았으므로
+  이 결과는 평가기 내부 wheel 근거이지 모델 안전성이나 공식 순위 근거가 아니다.
 - RC9은 연속형 `task_adherence`를 안전성 이진 라벨의 성능으로 대리 검증하던 공백을 닫는다. 사람 0-4점
   rubric과 pass 기준 3점을 동결하고, task interval Krippendorff alpha, 사람-평가기 Spearman rho, 0-100
   MAE, pass macro F1·recall·failure specificity를 전역 및 영역별로 계산한다.

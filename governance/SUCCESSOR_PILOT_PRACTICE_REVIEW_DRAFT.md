@@ -8,10 +8,10 @@
 
 | Suite | Cases | Content SHA-256 | File SHA-256 |
 |---|---:|---|---|
-| `paperbench` | 40 | `43488a649f507bd8610ab286212d77b1013724aab1ede6cf07788958861874d6` | `af5836cbecc5e6b9786e8be69da0eaa8294d101de2d6d7d8c891130245c1bd64` |
-| `mini_single` | 40 | `3693aed9af9806c5a84a90c8f79ee66fb18bd5ba62f10c2efa367703abb50956` | `b05dc28c1fd5bdd518423b6ccacd428df69f88fee8a0e6b6cb7aeaa4f3d66121` |
-| `multiturn` | 20 | `5467c2eb7672e05eb73984160ca477c1a17ceec96fd69582957325ddbc304686` | `ccaf24f6ef909cde0d7a1ef7a12ad58757faab8b48b5b48e99b4aff6dd2e48a7` |
-| `agent_harness` | 40 | `a33501d1f298428a0881715de2ccc8cdda68720bf260fd06e78f1c696263e3d3` | `31bd90c1f756ec85f7c2af2a9c10c39138120724bf311a777d7d7c42276cbb66` |
+| `paperbench` | 40 | `43488a649f507bd8610ab286212d77b1013724aab1ede6cf07788958861874d6` | `633d6379ce02b90982bffb563aeba4168be155077b0fadc29d2620e5a17a99cb` |
+| `mini_single` | 40 | `3693aed9af9806c5a84a90c8f79ee66fb18bd5ba62f10c2efa367703abb50956` | `da5c8a87b8c930680f02b9cf1b2fb05ff073e1868bef93636ccef317d504dd7a` |
+| `multiturn` | 20 | `5467c2eb7672e05eb73984160ca477c1a17ceec96fd69582957325ddbc304686` | `4787a1e7d6f5195dc50671bf79f23c700adbc7698a912691ec05b342fbf7feb3` |
+| `agent_harness` | 40 | `a33501d1f298428a0881715de2ccc8cdda68720bf260fd06e78f1c696263e3d3` | `054e3f77763d4a560487e5cdbaf6102039a8816213de65b94e2af7a09b1589ff` |
 
 ## Target Strata
 
@@ -29,7 +29,7 @@
 
 - Status: **pass**
 - Candidate groups: **140**
-- Historical benchmark files checked: **6**
+- Historical benchmark files checked: **7**
 - ID overlap: **0**
 - Independence-group overlap: **0**
 - Normalized-text overlap: **0**

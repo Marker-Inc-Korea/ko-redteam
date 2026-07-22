@@ -42,6 +42,7 @@ HISTORICAL_BENCHMARKS = (
     "benchmarks/ko_llm_multiturn_v2.json",
     "benchmarks/ko_llm_agent_harness_v1.json",
     "benchmarks/ko_llm_agent_harness_v2.json",
+    "benchmarks/ko_llm_agent_harness_v3.json",
 )
 PROMPT_NORMALIZATION = {
     "version": "ko-redteam.prompt-normalization.v1",

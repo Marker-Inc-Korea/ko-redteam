@@ -61,3 +61,41 @@ def test_markdown_report_contains_endpoint_error_categories():
     md = R.render_markdown(report)
     assert "Endpoint Errors" in md
     assert "timeout" in md
+
+
+def test_markdown_report_labels_attack_transform_metrics_as_diagnostic():
+    report = {
+        "schema": "ko-redteam.benchmark-report.v1",
+        "model": "dummy",
+        "benchmark": {"name": "expanded-unit"},
+        "scorecard": {
+            "overall": 80.0,
+            "domain_scores": {},
+            "outcome_counts": {},
+            "error_categories": {},
+            "attack_transform_summary": {
+                "status": "measured",
+                "eligible_groups": 2,
+                "attack_variants": 4,
+                "violation_delta_pp": 25.0,
+                "nonviolating_to_violating_groups": 1,
+                "worst_case_policy_pass_rate": 50.0,
+                "by_variant_type": {
+                    "obfuscation": {
+                        "variants": 2,
+                        "violation_rate": 50.0,
+                        "policy_pass_rate": 50.0,
+                        "mean_policy_score": 50.0,
+                    },
+                },
+            },
+        },
+        "findings": [],
+        "detail": [],
+    }
+
+    md = R.render_markdown(report)
+
+    assert "Attack Transform Diagnostic" in md
+    assert "사전등록 종합점수에는 반영하지 않는다" in md
+    assert "25.0 pp" in md

@@ -9,12 +9,15 @@
 | 영역 | 상태 | 현재 증거 | 판정 |
 |---|---|---|---|
 | 평가기 실행 | 준비 | 독립 Slurm serving 3회, endpoint error hard-fail, artifact digest, hardened container | 내부 RC 허용 |
-| Python package | 준비 | RC9 518개 test, clean wheel self-check 88/88, wheel 2회 byte-identical; sdist tar metadata 비결정적 | 내부 wheel 허용, sdist release evidence 금지 |
+| Python package | 준비 | RC10 534/534 test, source·clean wheel self-check 93/93, wheel 2회 byte-identical, 설치본 audit 246 case; sdist tar metadata 비결정적 | 내부 wheel 허용, sdist release evidence 금지 |
 | 과거 6모델 증거 호환성 | 실패 | multiturn report v1 18개, task metric availability 불일치 66건 | 순위·등급·tier 재사용 금지 |
 | 공개 image 승격 | 미완료 | nonroot·read-only 실행 통과, base digest 고정; CVE scan·SBOM 보존·서명 증거 없음 | registry production channel 금지 |
 | 공개 practice 데이터 | 준비 | schema·coverage·privacy audit 통과 | 개발·연구 진단만 허용 |
 | 거부 판정 개발 회귀 | 준비 | 합성 개발 세트 2종에서 recall 100%, FPR 0%; 규칙 개선에 사용된 세트 | 독립 성능 또는 공식 calibration 주장 금지 |
 | 유해 혼합 응답 판정 | 준비 | 거부 문구가 PII·무단 tool call·강한 절차형 유해 출력을 숨기지 못하도록 failure-first 회귀 추가 | 사람 calibration 전 내부 진단만 허용 |
+| 공격 변형 강건성 | 부분 준비 | 원문 대비 위반·정책 delta, 유발 실패와 worst-case 진단 구현 | 사람 calibration·사전등록 전 composite·tier 사용 금지 |
+| Agentic 위험 후보 | 부분 준비 | 13개 v3 개발 case, tool argument schema와 OWASP Agentic 2026 일부 proxy | 사람 검토·실제 IAM/side effect/system test 전 v2 대체 금지 |
+| 평가 수명주기 | 준비 | context commitment, 구성 변경·사고·주기 만료를 fail-closed 판정하는 metadata gate | 원격 상태 attestation이나 재실행 자체의 증거로 해석 금지 |
 | task-adherence 구성타당도 | 부분 준비 | v4 수집·서명·검증기는 사람 0-4점, task alpha·rho·MAE·pass 지표를 fail-closed로 요구; 실제 signed 사람 evidence는 없음 | 실제 v4 calibration 통과 전 연속형 task 점수를 공식 composite에 사용 금지 |
 | 후속 practice 사람 검토 | 미완료 | 7개 층 x 20개 전량 신규 초안, exact 5종 중복 0·BGE-M3 0.85 이상 0쌍, 등록·GPU Slurm preflight gate 구현; reviewer 0명 | pilot 등록·anchor 실행 금지 |
 | 파일럿 분산 정밀도 | 실패 | 이전 실행은 층별 5그룹; 새 층별 20그룹 초안은 미검토·미실행이라 분산 증거 없음 | 공식 split 설계 금지 |
@@ -36,6 +39,9 @@ BGE-M3 진단도 이미 초안 개선에 사용된 설계 단계 screen이다. �
 [`DEPLOYMENT_REVALIDATION_2026Q3.md`](./DEPLOYMENT_REVALIDATION_2026Q3.md)에 기록한다.
 RC9 task 구성타당성 계약과 현재 증거 경계는
 [`TASK_CONSTRUCT_VALIDITY_GATE_2026Q3.md`](./TASK_CONSTRUCT_VALIDITY_GATE_2026Q3.md)에 기록한다.
+RC10은 공격 변형 delta와 Agent argument policy를 개발 진단으로 추가하고, OWASP 위험별 측정 경계와
+[`EVALUATION_LIFECYCLE.md`](./EVALUATION_LIFECYCLE.md)의 재검증 시점을 명시한다. 전체 자동화 통과는 evaluator
+software의 회귀 근거이며 새 모델 실행, 사람 calibration 또는 official evidence를 생성한 것이 아니다.
 
 ## Evidence Required Before Publication
 

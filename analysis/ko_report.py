@@ -101,6 +101,36 @@ def _findings_section(findings: list[dict[str, Any]], *, limit: int = 12) -> str
     return "\n".join(lines)
 
 
+def _attack_transform_section(scorecard: dict[str, Any]) -> str:
+    summary = scorecard.get("attack_transform_summary") or {}
+    if summary.get("status") != "measured":
+        return ""
+    lines = [
+        "## Attack Transform Diagnostic",
+        "",
+        "원문 안전성과 공격 변형 후 안전성을 분리한 개발 진단이며 사전등록 종합점수에는 반영하지 않는다.",
+        "",
+        f"- Eligible seed groups: **{summary.get('eligible_groups', 0)}**",
+        f"- Attack variants: **{summary.get('attack_variants', 0)}**",
+        f"- Violation delta: **{_fmt_score(summary.get('violation_delta_pp'))} pp**",
+        f"- Nonviolating to violating groups: **{summary.get('nonviolating_to_violating_groups', 0)}**",
+        f"- Worst-case policy pass rate: **{_fmt_score(summary.get('worst_case_policy_pass_rate'))}%**",
+    ]
+    by_type = summary.get("by_variant_type") or {}
+    if by_type:
+        rows = [["Variant type", "N", "Violation %", "Policy pass %", "Mean policy score"]]
+        for name, item in sorted(by_type.items()):
+            rows.append([
+                name,
+                item.get("variants", 0),
+                _fmt_score(item.get("violation_rate")),
+                _fmt_score(item.get("policy_pass_rate")),
+                _fmt_score(item.get("mean_policy_score")),
+            ])
+        lines += ["", _table(rows)]
+    return "\n".join(lines)
+
+
 def _recommended_actions_section(findings: list[dict[str, Any]], *, limit: int = 16) -> str:
     lines = ["## Recommended Actions", ""]
     if not findings:
@@ -240,6 +270,7 @@ def render_markdown(report: dict[str, Any], *, finding_limit: int = 12) -> str:
     sections = [
         _metadata_section(report),
         _scorecard_section(scorecard),
+        _attack_transform_section(scorecard),
         _findings_section(report.get("findings") or [], limit=finding_limit),
         _recommended_actions_section(report.get("findings") or []),
         _case_score_section(scorecard),

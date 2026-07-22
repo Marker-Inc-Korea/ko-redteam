@@ -11,6 +11,7 @@
 | [`CONFLICTS.md`](./CONFLICTS.md) | 이해상충 공개와 회피 절차 |
 | [`APPEALS.md`](./APPEALS.md) | 결과 이의제기와 정정 절차 |
 | [`INCIDENT_RESPONSE.md`](./INCIDENT_RESPONSE.md) | 문항 유출·개인정보·무결성 사고 대응 |
+| [`EVALUATION_LIFECYCLE.md`](./EVALUATION_LIFECYCLE.md) | 배포 전·변경·사고·drift·주기 만료에 따른 재평가 시점과 metadata gate |
 | [`CHANGELOG.md`](./CHANGELOG.md) | 프로토콜 및 시즌 변경 이력 |
 | [`SEASON_OPERATIONS.md`](./SEASON_OPERATIONS.md) | 시즌 준비부터 게시까지의 실행 순서 |
 | [`EVIDENCE_INPUTS.md`](./EVIDENCE_INPUTS.md) | 비공개 evidence JSON 입력 계약 |

@@ -13,7 +13,7 @@
   "historical_case_reuse_observed": false,
   "historical_independence_audit_schema": "ko-redteam.historical-exact-independence-audit.v1",
   "generator_path": "probes/build_successor_pilot_drafts.py",
-  "generator_sha256": "a2b9679f5a8276a7447844b16129ef2659fdd54750a3ce8fd9999eac97699ded",
+  "generator_sha256": "98416c9fff4be2e2853bdf186848b1370fd40eb83dfeff71c51411a25f7504c0",
   "source_benchmark_path": "benchmarks/ko_llm_agent_harness_v2.json",
   "historical_source_overwritten": false
  },
