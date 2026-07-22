@@ -1,6 +1,6 @@
 # Official Leaderboard Publication Readiness
 
-기준일은 2026-07-20 KST다. 현재 `ko-redteam` 평가 도구는 **내부 운영 RC**로 실행할 수 있지만, 현재
+기준일은 2026-07-21 KST다. 현재 `ko-redteam` 평가 도구는 **내부 운영 RC**로 실행할 수 있지만, 현재
 모델 결과와 공개 practice seed를 **공식 모델 리더보드**로 게시할 수는 없다. 이 문서는 코드 기능과 실제
 증거의 존재를 구분한다.
 
@@ -9,9 +9,13 @@
 | 영역 | 상태 | 현재 증거 | 판정 |
 |---|---|---|---|
 | 평가기 실행 | 준비 | 독립 Slurm serving 3회, endpoint error hard-fail, artifact digest, hardened container | 내부 RC 허용 |
+| Python package | 부분 준비 | 514개 test, clean wheel self-check 88/88, wheel 2회 byte-identical; sdist tar metadata 비결정적 | 내부 wheel 허용, sdist release evidence 금지 |
 | 과거 6모델 증거 호환성 | 실패 | multiturn report v1 18개, task metric availability 불일치 66건 | 순위·등급·tier 재사용 금지 |
 | 공개 image 승격 | 미완료 | nonroot·read-only 실행 통과, base digest 고정; CVE scan·SBOM 보존·서명 증거 없음 | registry production channel 금지 |
 | 공개 practice 데이터 | 준비 | schema·coverage·privacy audit 통과 | 개발·연구 진단만 허용 |
+| 거부 판정 개발 회귀 | 준비 | 합성 개발 세트 2종에서 recall 100%, FPR 0%; 규칙 개선에 사용된 세트 | 독립 성능 또는 공식 calibration 주장 금지 |
+| 유해 혼합 응답 판정 | 준비 | 거부 문구가 PII·무단 tool call·강한 절차형 유해 출력을 숨기지 못하도록 failure-first 회귀 추가 | 사람 calibration 전 내부 진단만 허용 |
+| task-adherence 구성타당도 | 실패 | 문자열·구조 기반 response contract이며 현재 사람 calibration은 `critical/benign` 이진 label만 수집 | 연속형 task 점수를 공식 composite에 사용 금지 |
 | 후속 practice 사람 검토 | 미완료 | 7개 층 x 20개 전량 신규 초안, exact 5종 중복 0·BGE-M3 0.85 이상 0쌍, 등록·GPU Slurm preflight gate 구현; reviewer 0명 | pilot 등록·anchor 실행 금지 |
 | 파일럿 분산 정밀도 | 실패 | 이전 실행은 층별 5그룹; 새 층별 20그룹 초안은 미검토·미실행이라 분산 증거 없음 | 공식 split 설계 금지 |
 | 다중비교 검정력 | 실패 | 현재 보수적 설계에서 최소 2모델 비교 필요량 796그룹, 기존 324그룹 | tier 주장 금지 |
@@ -28,7 +32,8 @@ BGE-M3 진단도 이미 초안 개선에 사용된 설계 단계 screen이다. �
 기반의 과거 진단이며, rc7 재감사에서 멀티턴 report 계약과 task metric 적용 범위가 현재 방식에 맞지 않아
 `not_ready`로 강등됐다. 자세한 근거는
 [`INTERNAL_SIX_MODEL_EVIDENCE_COMPATIBILITY_2026Q3.md`](./INTERNAL_SIX_MODEL_EVIDENCE_COMPATIBILITY_2026Q3.md)에
-기록한다.
+기록한다. RC8 전체 재검증 판정과 packaging 제한은
+[`DEPLOYMENT_REVALIDATION_2026Q3.md`](./DEPLOYMENT_REVALIDATION_2026Q3.md)에 기록한다.
 
 ## Evidence Required Before Publication
 
@@ -42,6 +47,8 @@ BGE-M3 진단도 이미 초안 개선에 사용된 설계 단계 screen이다. �
 5. 통과한 power-derived allocation과 immutable model cohort를 공식 prompt 작성 전에 사전등록한다.
 6. 공개 practice와 exact·semantic 중복이 0인 hidden official split을 만들고 두 독립 GPU embedding replay로 감사한다.
 7. 최소 300개 held-out 응답을 3명 이상이 blind labeling하고, expert 2명 이상이 불일치를 독립 adjudication한다.
+   안전 판정뿐 아니라 response contract의 task pass/score가 사람의 업무수행 판정과 일치하는지도 별도 구성타당도
+   지표와 허용 기준으로 검증한다.
 8. 동결 cohort를 모델별 최소 3개 독립 Slurm serving에서 실행하고 canonical builder로 v7 ranking manifest를 결합한다.
 9. 두 외부 검토자와 한 독립 기관이 calibration, split, 통계, 개인정보 보호와 이해상충을 검토·서명한다.
 10. 최종 validator가 `publishable`을 반환한 manifest만 `ko-redteam-publish-leaderboard`로 공개 snapshot을 만들고,
@@ -49,6 +56,11 @@ BGE-M3 진단도 이미 초안 개선에 사용된 설계 단계 screen이다. �
 
 새 파일럿의 분산이 달라지면 최종 필요 표본도 바뀐다. `796`은 현재 precision audit의 보수적 관측값이지
 사후에 고정할 공식 표본 수가 아니다.
+
+현재 `evaluator-calibration.v3` 경로는 안전·무해성의 `critical/benign` 혼동행렬과 영역별 F1을 검증하지만,
+`response_contract`의 연속형 점수에 대한 사람 판정 합치도를 표현하지 않는다. 따라서 나머지 증거가 채워져도
+이 calibration 계약을 확장하거나 official composite에서 `task_adherence` 가중치를 제거하기 전에는 공식
+publication gate를 충분한 구성타당도 근거로 간주하지 않는다.
 
 ## Publication Command
 

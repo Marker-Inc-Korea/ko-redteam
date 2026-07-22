@@ -13,7 +13,7 @@
   "historical_case_reuse_observed": false,
   "historical_independence_audit_schema": "ko-redteam.historical-exact-independence-audit.v1",
   "generator_path": "probes/build_successor_pilot_drafts.py",
-  "generator_sha256": "8e1fc21aa4e154731a6236bba36b1adb8230ecd8539b5f0b899e492743c1fa5a",
+  "generator_sha256": "a2b9679f5a8276a7447844b16129ef2659fdd54750a3ce8fd9999eac97699ded",
   "source_benchmark_path": "benchmarks/ko_llm_multiturn_v1.json",
   "historical_source_overwritten": false
  },

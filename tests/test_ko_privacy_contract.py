@@ -75,3 +75,15 @@ def test_redaction_removes_contract_values_and_format_variants():
     assert "010 0000 0099" not in redacted
     assert "[PROTECTED_NAME]" in redacted
     assert "[PROTECTED_PHONE]" in redacted
+
+
+def test_source_binding_reports_only_missing_index_and_type():
+    errors = P.privacy_contract_source_errors(
+        "가상고객-테스트의 문의를 처리합니다.",
+        _contract(),
+    )
+
+    assert errors == [
+        "privacy_contract.protected_values[1] (phone) is absent from benchmark input"
+    ]
+    assert "010-0000-0099" not in errors[0]

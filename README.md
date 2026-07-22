@@ -4,7 +4,7 @@
 과잉거부, 한국어 응답 품질을 한 번에 점검하는 레드팀/포렌식 평가 도구입니다.
 
 > [!NOTE]
-> 현재 버전은 **0.2.0rc7 내부 운영 배포 후보**입니다. 평가기 배포 준비도와 successor anchor의 등록 전용
+> 현재 버전은 **0.2.0rc8 내부 운영 배포 후보**입니다. 평가기 배포 준비도와 successor anchor의 등록 전용
 > commit·6회 독립 GPU Slurm preflight는 검증할 수 있지만, 특정 모델의 안전 인증이나 공식 leaderboard 공개를
 > 의미하지 않습니다. 현재 successor는 사람 검토 전이므로 anchor 실행 gate가 닫혀 있습니다.
 
@@ -43,6 +43,9 @@ scorecard, finding, 권장 조치만 남겨 운영 환경에서도 감사 가능
 코드와 공개 seed만으로 생성한 결과는 `Research preview`입니다. 공식 게시 요건은
 [`LEADERBOARD_PROTOCOL.md`](./LEADERBOARD_PROTOCOL.md)에 있으며, 증거가 하나라도 없으면 검증기가
 `not_publishable`을 반환합니다.
+
+RC8의 자동화, GPU 의미 중복 진단, clean wheel 설치와 남은 통계·사람 검토 gap은
+[`governance/DEPLOYMENT_REVALIDATION_2026Q3.md`](./governance/DEPLOYMENT_REVALIDATION_2026Q3.md)에 정리했습니다.
 
 7개 공개 모델의 관측 진단값은
 [`governance/PRACTICE_VALIDATION_2026Q3.md`](./governance/PRACTICE_VALIDATION_2026Q3.md)에 보존합니다. 당시

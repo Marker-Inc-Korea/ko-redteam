@@ -83,7 +83,7 @@ def test_distribution_metadata_has_release_basics():
     assert data["build-system"]["requires"][0].startswith("setuptools>=77")
     assert data["project"]["license"] == "MIT"
     assert data["project"]["license-files"] == ["LICENSE"]
-    assert data["project"]["version"] == "0.2.0rc7"
+    assert data["project"]["version"] == "0.2.0rc8"
     assert "Development Status :: 4 - Beta" in data["project"]["classifiers"]
     assert "korean" in data["project"]["keywords"]
     assert "Natural Language :: Korean" in data["project"]["classifiers"]
@@ -113,6 +113,12 @@ def test_package_data_paths_exist():
     assert (ROOT / "DEPLOYMENT.md").exists()
     assert (ROOT / "governance" / "SEASON_OPERATIONS.md").exists()
     assert (ROOT / "governance" / "PUBLICATION_READINESS.md").exists()
+    revalidation = ROOT / "governance" / "DEPLOYMENT_REVALIDATION_2026Q3.md"
+    assert revalidation.exists()
+    revalidation_text = revalidation.read_text("utf-8")
+    assert "514/514" in revalidation_text
+    assert "공식 모델 순위와\nproduction publication은 NO-GO" in revalidation_text
+    assert "sdist" in revalidation_text
     assert (ROOT / "governance" / "SEASON_2026Q3_PREREGISTRATION.json").exists()
     assert (ROOT / "governance" / "SEASON_2026Q3_S2_PREREGISTRATION.json").exists()
     assert (ROOT / "governance" / "SEASON_2026Q3_S3_PREREGISTRATION.json").exists()

@@ -16,10 +16,11 @@
 셋 다 `lang_spec="en"`. 비영어는 **출력을 영어로 기계번역 후 영어 detector** 로 우회한다(번역 손실 가능).
 우리 `ko_refusal`(룰)은 기존에는 ①티어에 대응하는 결정론 판정기였다.
 
-## 교차 평가 — 영어권 설정 vs 한국어 held-out
+## 교차 평가 — 영어권 설정 vs 한국어 개발 분할
 
 영어 평가셋 `s-nlp/multilingual_refusals[english]`(upstream 평가 출처, 거부 400/비거부 400),
-한국어 `ko_refusal_valset2`(독립 생성 held-out, 거부 60/비거부 40). 동일 지표(acc).
+한국어 `ko_refusal_valset2`(합성 개발 분할, 거부 60/비거부 40). 동일 지표(acc). 이 분할은 이후
+규칙과 분류기 개선에 사용됐으므로 독립 holdout 증거가 아니다.
 
 | detector | 티어 | **영어 acc** | **한국어 acc** |
 |---|---|---|---|
@@ -31,12 +32,13 @@
 - **깔끔한 대칭**: 영어 학습모델은 영어 86%→**한국어 60%로 붕괴**(한국어면 뭐든 "거부"로 찍음, FPR 100%).
   우리 학습분류기는 한국어 99%→**영어 붕괴**. 각자 자기 언어에서만 강함.
 - 영어 모델의 성능 주장은 영어 평가셋에서는 대체로 확인된다. 핵심은 그 성능이 한국어로 자동 전이되지 않는다는 점이다.
-- 우리 학습분류기가 룰(`ko_refusal` 92%)의 천장을 넘어 **한국어 99%**(recall 100/FPR 2.5/F1 99.2, held-out).
+- 당시 학습분류기가 룰(`ko_refusal` 92%)보다 **한국어 개발 분할 99%**
+  (recall 100/FPR 2.5/F1 99.2)를 기록했다. 공식 일반화 성능으로 해석하지 않는다.
 
 ## 한국어 거부 분류기
 
 - base: `beomi/KcELECTRA-base-v2022`, binary(refusal/non-refusal).
-- 학습셋: 독립 생성 코퍼스(문체×도메인 6셀) 500 refusal + 470 non-refusal(+valset1), held-out test=valset2.
+- 학습셋: 합성 코퍼스(문체×도메인 6셀) 500 refusal + 470 non-refusal(+valset1), 개발 test=valset2.
 - 학습: SLURM GPU(ner_env), 5 epoch. 재현: `train_ko_refusal_clf.py` + `.sbatch`, 벤치 `bench_cross.py`.
 - 모델 가중치는 로컬(`ko_refusal_clf/final`) — 공개 레포엔 스크립트/수치만.
 
@@ -50,5 +52,6 @@
 ## 정직한 한계
 
 - 학습셋·평가셋 전부 합성(에이전트 생성). 실사용 분포는 아니다. 실 LLM 로그로 재검증 필요.
-- 한국어 99%는 held-out(valset2)이나 소표본(100). 대규모·다모델 평가는 후속.
+- 한국어 99%는 합성 개발 분할(valset2)의 소표본 100개 결과다. 독립 표본·실사용 로그·사람 라벨
+  calibration 없이는 배포 성능 근거로 사용할 수 없다.
 - ko-classifier 는 한국어 전용(영어 붕괴)이다. 다국어 단일 모델은 별개 과제.

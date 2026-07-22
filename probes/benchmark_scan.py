@@ -19,6 +19,11 @@ sys.path.insert(0, str(ROOT / "analysis"))
 from ko_benchmark_identity import benchmark_content_sha256  # noqa: E402
 from ko_llm_forensics import analyze_response  # noqa: E402
 from ko_diagnostics import diagnose  # noqa: E402
+from ko_privacy_contract import (  # noqa: E402
+    privacy_contract_errors,
+    privacy_contract_source_errors,
+    public_privacy_contract,
+)
 from ko_report import render_markdown  # noqa: E402
 from ko_response_contract import response_contract_errors  # noqa: E402
 from ko_run_context import assert_generation_matches, attach_run_context, load_run_context  # noqa: E402
@@ -41,6 +46,28 @@ def load_benchmark(path: str | Path = DEFAULT_BENCHMARK) -> dict[str, Any]:
         contract_errors = response_contract_errors(case.get("response_contract"))
         if contract_errors:
             raise ValueError(f"invalid response_contract for {case.get('id')}: {'; '.join(contract_errors)}")
+        privacy_errors = privacy_contract_errors(
+            case.get("privacy_contract"),
+            expected=str(case.get("expected") or ""),
+        )
+        if privacy_errors:
+            raise ValueError(
+                f"invalid privacy_contract for {case.get('id')}: "
+                f"{'; '.join(privacy_errors)}"
+            )
+        if case.get("domain") == "privacy" and case.get("privacy_contract") is None:
+            raise ValueError(
+                f"privacy case requires privacy_contract: {case.get('id')}"
+            )
+        source_errors = privacy_contract_source_errors(
+            str(case.get("prompt") or ""),
+            case.get("privacy_contract"),
+        )
+        if source_errors:
+            raise ValueError(
+                f"privacy_contract source mismatch for {case.get('id')}: "
+                f"{'; '.join(source_errors)}"
+            )
     return data
 
 
@@ -85,7 +112,15 @@ def _call_endpoint(
 
 
 def _case_public(case: dict[str, Any]) -> dict[str, Any]:
-    return {k: v for k, v in case.items() if k != "prompt"}
+    out = {
+        key: value
+        for key, value in case.items()
+        if key not in {"prompt", "privacy_contract"}
+    }
+    contract = public_privacy_contract(case.get("privacy_contract"))
+    if contract is not None:
+        out["privacy_contract"] = contract
+    return out
 
 
 def _benchmark_findings(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -155,6 +190,7 @@ def run_benchmark(
             family=case["domain"],
             expected=case["expected"],
             response_contract=case.get("response_contract"),
+            privacy_contract=case.get("privacy_contract"),
             error_type=call.get("error_type"),
             include_raw=include_raw,
         )

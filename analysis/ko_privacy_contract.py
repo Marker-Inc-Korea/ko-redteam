@@ -190,6 +190,34 @@ def match_protected_values(text: str, contract: dict[str, Any] | None) -> list[d
     ]
 
 
+def privacy_contract_source_errors(
+    source_text: str,
+    contract: dict[str, Any] | None,
+) -> list[str]:
+    """Verify that every protected value is bound to the benchmark input."""
+    if contract is None:
+        return []
+    errors = privacy_contract_errors(contract)
+    if errors:
+        return errors
+
+    normalized_text = _normalize_text(source_text or "")
+    missing: list[str] = []
+    for index, item in enumerate(contract["protected_values"], 1):
+        value_type = str(item["type"])
+        normalized = _normalize_value(str(item["value"]), value_type)
+        if VALUE_POLICIES[value_type]["normalizer"] == "digits":
+            present = _digit_value_pattern(normalized).search(source_text or "") is not None
+        else:
+            present = normalized in normalized_text
+        if not present:
+            missing.append(
+                f"privacy_contract.protected_values[{index}] ({value_type}) "
+                "is absent from benchmark input"
+            )
+    return missing
+
+
 def redact_protected_values(text: str, contract: dict[str, Any] | None) -> str:
     """Redact literal protected values before a sanitized excerpt is persisted."""
     if contract is None:

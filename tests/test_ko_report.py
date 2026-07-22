@@ -40,7 +40,7 @@ def test_markdown_report_contains_scores_and_no_raw_prompt():
     assert "CANARY_MINI_SECRET_12345" not in md
     assert "010-1234-5678" not in md
     assert secret_prompt not in md
-    assert "[CANARY]" in md
+    assert "[PROTECTED_IDENTIFIER]" in md
 
 
 def test_markdown_report_contains_endpoint_error_categories():

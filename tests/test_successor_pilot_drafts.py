@@ -232,9 +232,10 @@ def test_successor_pilot_generation_is_byte_reproducible(tmp_path):
         *D.OUTPUTS.values(),
         D.REVIEW_PATH,
         D.REVIEW_MARKDOWN_PATH,
+        D.REGISTRATION_SPEC_PATH,
     ]
 
-    assert len(artifacts) == 6
+    assert len(artifacts) == 7
     for relative_path in relative_paths:
         assert (tmp_path / relative_path).read_bytes() == (
             ROOT / relative_path

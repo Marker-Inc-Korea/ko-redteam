@@ -11,7 +11,7 @@
  },
  "draft_provenance": {
   "generator_path": "probes/build_successor_pilot_drafts.py",
-  "generator_sha256": "8e1fc21aa4e154731a6236bba36b1adb8230ecd8539b5f0b899e492743c1fa5a",
+  "generator_sha256": "a2b9679f5a8276a7447844b16129ef2659fdd54750a3ce8fd9999eac97699ded",
   "reference_model_outputs_used": false,
   "human_review_required_before_registration": true
  },
@@ -35,25 +35,25 @@
  "benchmarks": {
   "paperbench": {
    "path": "benchmarks/ko_llm_paperbench_pilot_v1.json",
-   "sha256": "c4d42468404e38caec2a2c4b20e0e79f6aa66621a63da340287e188e25cee3fb",
-   "content_sha256": "966a291bf292490dbf06fb38f54c6045ce89b006eccf27ef0f34229f7d4618be",
+   "sha256": "af5836cbecc5e6b9786e8be69da0eaa8294d101de2d6d7d8c891130245c1bd64",
+   "content_sha256": "43488a649f507bd8610ab286212d77b1013724aab1ede6cf07788958861874d6",
    "cases": 40
   },
   "mini_single": {
    "path": "benchmarks/ko_llm_mini_pilot_v1.json",
-   "sha256": "2af731a83bba1fdb891541888ded145720b716f4c8091bbb6100ea270d1a5755",
+   "sha256": "b05dc28c1fd5bdd518423b6ccacd428df69f88fee8a0e6b6cb7aeaa4f3d66121",
    "content_sha256": "3693aed9af9806c5a84a90c8f79ee66fb18bd5ba62f10c2efa367703abb50956",
    "cases": 40
   },
   "multiturn": {
    "path": "benchmarks/ko_llm_multiturn_pilot_v1.json",
-   "sha256": "9005b56519995d38ba3f7e3079bde8c8f7bef0302ad2f2d2f1180f175e166628",
+   "sha256": "ccaf24f6ef909cde0d7a1ef7a12ad58757faab8b48b5b48e99b4aff6dd2e48a7",
    "content_sha256": "5467c2eb7672e05eb73984160ca477c1a17ceec96fd69582957325ddbc304686",
    "cases": 20
   },
   "agent_harness": {
    "path": "benchmarks/ko_llm_agent_harness_pilot_v1.json",
-   "sha256": "6a7c7e4d6edca3de0b4da0f0256594719036e3716a9c0a10acea1d414e09aff6",
+   "sha256": "31bd90c1f756ec85f7c2af2a9c10c39138120724bf311a777d7d7c42276cbb66",
    "content_sha256": "a33501d1f298428a0881715de2ccc8cdda68720bf260fd06e78f1c696263e3d3",
    "cases": 40
   }
@@ -72,22 +72,22 @@
   "historical_benchmarks": [
    {
     "path": "benchmarks/ko_llm_paperbench_v1.json",
-    "sha256": "1da3abc0bdd80a2fae472c60a33a81bb4d027b98837211be70a8126441b4e4b8",
-    "content_sha256": "35fb13997644af6d77b46e089948b53064a5bfc531564aceeb2f0dd2d8cd571f",
+    "sha256": "ca169a6486d2b232243b7c36a2b5be1ffb7ed3b2bf1dcf4d500f241aef5b9d93",
+    "content_sha256": "10494f3422f582afebd3bcc510b6a88787d8f0df7d3ba4b6ea912a3808425849",
     "schema": "ko-redteam.benchmark.v1",
     "cases": 20
    },
    {
     "path": "benchmarks/ko_llm_mini_v1.json",
-    "sha256": "f4038e3bda7769856ab22cbbdcf1bb026a088633d9c17b2d56bc5dc34b8b325b",
-    "content_sha256": "972550f415d5b71971dc0b2e65820d30ab45d6528f0556c7f4daf6b79ff1b984",
+    "sha256": "83bffd9005059f0dc3a2486f42487e557df10303ed184d61932854d40fcdc299",
+    "content_sha256": "dc97e543b9567b5290305a5a7507fd32f6da37da9b2921384ca7a4fb3175761e",
     "schema": "ko-redteam.benchmark.v1",
     "cases": 17
    },
    {
     "path": "benchmarks/ko_llm_multiturn_v1.json",
-    "sha256": "d036d2331fa244687d95db813b5064dcf2db645005ee870ad0c1cc521bb111db",
-    "content_sha256": "d690b162758c141eaafbd445b6150c76d687c2502f3daa8a7bc43b48880ec448",
+    "sha256": "b94b4b8fd36c6da0a72c2f782f77eb357927d086b5e01058d978bf12e82ae905",
+    "content_sha256": "2cf6ec395a17e472221c9dba1e5255fee941e2418a552e9a382f527c84430966",
     "schema": "ko-redteam.multiturn-benchmark.v1",
     "cases": 17
    },
@@ -117,7 +117,7 @@
   "candidate_benchmarks": {
    "paperbench": {
     "path": "benchmarks/ko_llm_paperbench_pilot_v1.json",
-    "content_sha256": "966a291bf292490dbf06fb38f54c6045ce89b006eccf27ef0f34229f7d4618be",
+    "content_sha256": "43488a649f507bd8610ab286212d77b1013724aab1ede6cf07788958861874d6",
     "cases": 40
    },
    "mini_single": {

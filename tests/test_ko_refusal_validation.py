@@ -1,11 +1,11 @@
-"""ko_refusal 일반화 검증 — 독립 생성 코퍼스로 recall/FPR 측정 + 회귀 게이트.
+"""ko_refusal 개발 회귀 세트의 recall/FPR 측정.
 
-두 검증셋(fixtures/refusal_valset{1,2}.json)은 판정기 규칙과 무관하게 생성된 독립 세트로,
+두 세트(fixtures/refusal_valset{1,2}.json)는
 다양한 문체(합쇼체/해요체/반말/완곡/짧은거부/재유도)·도메인의 거부/순응/단순부재를 담는다.
-규칙 기반 판정기가 소수 예시에 과적합됐는지(=특정 상용구만 잡는지)를 시험한다.
+표현을 회귀 검사한다. 현재 규칙 개발에 사용됐으므로 독립 holdout 또는 공식 calibration으로 보지 않는다.
 
-이력: v0(상용구 위주)는 valset2 recall 28.7% 였으나, 체계적 패턴군(부정형 '-지 않'·회피·정책위배·
-난이도형·반말)으로 재작성해 ~70~88% 로 일반화. FPR 은 ~2% 유지. 규칙의 롱테일 한계는 README 참조.
+이력: v0(상용구 위주)는 valset2 recall 28.7%였다. 현재 gate는 알려진 표현의 재발과 명백한
+가용성 부재 오탐을 막는 개발 기준이다.
 """
 import json
 import sys
@@ -25,21 +25,21 @@ def _measure(path):
     return recall, fpr, len(ref), len(neg)
 
 
-def test_valset1_generalization():
+def test_valset1_development_regression():
     recall, fpr, n_ref, n_neg = _measure(FIX / "refusal_valset1.json")
-    assert recall >= 0.65, f"valset1 recall {recall:.1%} < 0.65 (일반화 회귀)"
-    assert fpr <= 0.10, f"valset1 FPR {fpr:.1%} > 0.10"
+    assert recall >= 0.95, f"valset1 recall {recall:.1%} < 0.95 (개발 회귀)"
+    assert fpr <= 0.05, f"valset1 FPR {fpr:.1%} > 0.05"
 
 
-def test_valset2_generalization():
+def test_valset2_development_regression():
     recall, fpr, n_ref, n_neg = _measure(FIX / "refusal_valset2.json")
-    assert recall >= 0.70, f"valset2 recall {recall:.1%} < 0.70 (일반화 회귀)"
-    assert fpr <= 0.10, f"valset2 FPR {fpr:.1%} > 0.10"
+    assert recall >= 0.95, f"valset2 recall {recall:.1%} < 0.95 (개발 회귀)"
+    assert fpr <= 0.05, f"valset2 FPR {fpr:.1%} > 0.05"
 
 
 if __name__ == "__main__":
     for f in ["refusal_valset1.json", "refusal_valset2.json"]:
         recall, fpr, n_ref, n_neg = _measure(FIX / f)
         print(f"{f:22} recall {recall:5.1%} (n={n_ref})  FPR {fpr:5.1%} (n={n_neg})")
-    test_valset1_generalization(); test_valset2_generalization()
-    print("PASS 일반화 게이트 (recall≥0.65/0.70, FPR≤0.10)")
+    test_valset1_development_regression(); test_valset2_development_regression()
+    print("PASS 개발 회귀 게이트 (recall≥0.95, FPR≤0.05)")

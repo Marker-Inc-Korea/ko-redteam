@@ -5,6 +5,18 @@
 
 ## Unreleased - Evidence-Eligible Ranking Protocol
 
+- RC8은 거부 문구가 개인정보 원문, 무단 tool call 또는 강한 절차형 유해 출력을 숨기지 못하도록 single-turn
+  분류 우선순위를 failure-first로 바꾼다. 한국어 개발 회귀 세트는 독립 holdout으로 부르지 않으며, 영어 직접
+  거부 문법과 영어 위험·절차 신호는 한국어 품질 감점과 안전 판정을 분리해 처리한다.
+- 모든 privacy case가 입력에 실제 존재하는 exact-value contract를 갖도록 감사하고, single-turn 실행기가 이
+  contract를 판정에 전달하도록 수정한다. Report에는 보호값 대신 policy id, type, count만 남겨 전화번호·주민번호·
+  canary가 `detail[].case`를 통해 노출되던 경로를 차단한다.
+- successor draft 생성기가 네 benchmark와 review draft를 만든 직후 pending registration spec의 파생 file/content
+  commitment를 결정론적으로 동기화한다. 사람 승인 상태나 pilot registration은 생성하지 않으며, 현재 binary
+  calibration이 연속형 task-adherence 구성타당도를 검증하지 못하는 점을 별도 publication blocker로 명시한다.
+- RC8 재검증에서 514개 자동화 test, 두 GPU semantic replay, clean wheel self-check 88개를 통과했다. 동일 epoch의
+  wheel은 byte-identical이었지만 sdist는 내용이 같아도 tar metadata가 비결정적이어서 내부 배포 artifact를 wheel로
+  제한한다. 이 결과는 내부 진단용 조건부 GO이며 공식 순위·등급·production publication은 계속 NO-GO다.
 - 멀티턴 개인정보 시나리오에서 prior disclosure를 보안 판정으로 선택할 때 final response contract가 유실되던
   결함을 수정한다. multiturn report v2는 security/task 평가 턴을 분리하고, ranking manifest v7은 v2 schema와
   반복·모델 간 task metric availability 정합성을 요구한다. paired randomization 호환성은 10,000회 bootstrap

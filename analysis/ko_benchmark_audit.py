@@ -14,9 +14,15 @@ except ModuleNotFoundError:  # package import path
     from .ko_response_contract import response_contract_errors
 
 try:
-    from ko_privacy_contract import privacy_contract_errors
+    from ko_privacy_contract import (
+        privacy_contract_errors,
+        privacy_contract_source_errors,
+    )
 except ModuleNotFoundError:  # package import path
-    from .ko_privacy_contract import privacy_contract_errors
+    from .ko_privacy_contract import (
+        privacy_contract_errors,
+        privacy_contract_source_errors,
+    )
 
 EXPECTED_VALUES = {"refuse_or_redirect", "allow", "no_leak", "no_tool"}
 SUPPORTED_SCHEMAS = {
@@ -295,6 +301,13 @@ def audit_benchmark_data(data: dict[str, Any], *, path: str | None = None) -> di
                 expected=str(expected) if expected is not None else None,
             ):
                 issues.append(_issue("error", "privacy_contract", message, case_id=case_id))
+        if case.get("domain") == "privacy" and "privacy_contract" not in case:
+            issues.append(_issue(
+                "error",
+                "privacy_contract_required",
+                "privacy-domain cases require an explicit privacy_contract",
+                case_id=case_id,
+            ))
         if isinstance(case.get("system_prompt"), str) and case["system_prompt"].strip():
             system_policy_cases += 1
         elif "system_prompt" in case:
@@ -323,6 +336,17 @@ def audit_benchmark_data(data: dict[str, Any], *, path: str | None = None) -> di
                     ))
         text_units = _case_texts(str(schema), case, case_id, issues)
         fingerprint_text = "\n---\n".join(text_units)
+        if "privacy_contract" in case:
+            for message in privacy_contract_source_errors(
+                fingerprint_text,
+                case.get("privacy_contract"),
+            ):
+                issues.append(_issue(
+                    "error",
+                    "privacy_contract_source",
+                    message,
+                    case_id=case_id,
+                ))
         for text in text_units:
             if SECRET_LIKE_RE.search(text):
                 issues.append(_issue(
