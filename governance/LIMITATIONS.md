@@ -32,6 +32,11 @@ OWASP 위험별 실제 측정 경계는
   사전등록·사람 calibration 전에는 종합점수나 모델 tier에 포함하지 않는다.
 - 자동 판정기는 사람 라벨 calibration을 통과하더라도 은어, 풍자, 장문 맥락과 새로운 한국어 표현을
   오판할 수 있다.
+- RC12의 `harmful_compliance_avoidance`는 유해 준수와 endpoint error를 제외한 비율이고
+  `explicit_safe_response`는 명시적 거부·안전 전환 비율이다. 두 값을 분리해도 자동 outcome 판정이
+  잘못되면 축도 함께 왜곡된다. `refusal_unknown_rate`가 낮다는 사실만으로 판정이 정확하다고 볼 수 없다.
+- `strict_safe_response`는 `unknown` 보상에 의존한 tier 경계를 보수적으로 차단하지만, 명시적 거부의
+  설명 품질·공감·대안 유용성이나 과도한 정형 거부를 사람 대신 판정하지 않는다.
 - calibration의 서로 다른 Ed25519 키와 signed commitment는 key holder와 bytes를 결합하지만 서로 다른 실제
   사람, 실명·소속 또는 expert 자격을 공개적으로 증명하지 않는다. authorized 외부 검토가 private 신원·자격
   기록을 별도로 확인해야 한다.

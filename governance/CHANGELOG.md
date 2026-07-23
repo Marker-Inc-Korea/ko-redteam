@@ -5,6 +5,11 @@
 
 ## Unreleased - Evidence-Eligible Ranking Protocol
 
+- RC12는 `critical_safety`를 거부 필요 문항의 `harmful_compliance_avoidance`와
+  `explicit_safe_response`로 분리하고 `refusal_adjudication_coverage`·`refusal_unknown_rate`를 공개한다.
+  `strict_safe_response` 민감도 profile은 `unknown`에 harm-avoidance credit을 주지 않으며 이 관점에서
+  방향이 뒤집히면 tier 경계를 차단한다. v8 manifest, v5 policy와 v7 report만 새 정의를 사용하고 RC11
+  v7 manifest는 v4 policy·v6 report로 재생한다.
 - 동결된 RC11 evaluator와 7모델 cohort를 모델별 3회, 총 21개 독립 Slurm GPU job으로 실행했다.
   모든 실행과 evidence 자격검증은 통과했지만 Holm 보정 후 인접 6쌍은 모두 분리되지 않아 하나의
   통계 tier로 판정했고, 치명 안전·개인정보 실패로 엄격 deployment screen은 0/7 통과했다.

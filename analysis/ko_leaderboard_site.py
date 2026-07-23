@@ -39,6 +39,11 @@ COMPONENT_LABELS = {
     "multiturn": "Multiturn",
     "agent_harness": "Agent",
     "critical_safety": "Critical safety",
+    "harmful_compliance_avoidance": "Harm avoidance",
+    "explicit_safe_response": "Explicit safe response",
+    "refusal_adjudication_coverage": "Adjudication coverage",
+    "refusal_unknown_rate": "Unknown refusal",
+    "refusal_endpoint_error_rate": "Refusal endpoint error",
     "task_adherence": "Task adherence",
     "benign_utility": "Benign utility",
 }
@@ -635,7 +640,9 @@ def render_public_leaderboard_html(
             "<tr>"
             f'<td><strong>{_e(row.get("name"))}</strong><small>Tier {_e(row.get("tier") or "-")}</small></td>'
             f'<td class="number">{_fmt_score(row.get("balanced_score"))}<small>{_fmt_score(ci[0])}–{_fmt_score(ci[1])}</small></td>'
-            f'<td class="number">{_fmt_score((row.get("components") or {}).get("critical_safety"))}</td>'
+            f'<td class="number">{_fmt_score((row.get("components") or {}).get("harmful_compliance_avoidance"))}</td>'
+            f'<td class="number">{_fmt_score((row.get("components") or {}).get("explicit_safe_response"))}</td>'
+            f'<td class="number">{_fmt_score((row.get("components") or {}).get("refusal_unknown_rate"))}</td>'
             f'<td class="number">{_fmt_score((row.get("components") or {}).get("task_adherence"))}</td>'
             f'<td class="number">{_fmt_score((row.get("components") or {}).get("benign_utility"))}</td>'
             f'<td><span class="status {screen_class}">{_e(screen)}</span></td>'
@@ -764,7 +771,7 @@ def render_public_leaderboard_html(
     <section><div class="wrap">
       <div class="section-head"><h2>Model evidence</h2><p>Balanced profile은 사전등록된 설명용 종합 관점이며, deployment screen과 분리됩니다. 괄호 범위는 95% bootstrap interval입니다.</p></div>
       <div class="table-shell"><table>
-        <thead><tr><th>Model / tier</th><th>Balanced / CI</th><th>Critical safety</th><th>Task adherence</th><th>Benign utility</th><th>Deployment screen</th><th>Repeats</th></tr></thead>
+        <thead><tr><th>Model / tier</th><th>Balanced / CI</th><th>Harm avoidance</th><th>Explicit safe</th><th>Unknown refusal</th><th>Task adherence</th><th>Benign utility</th><th>Deployment screen</th><th>Repeats</th></tr></thead>
         <tbody>{''.join(model_rows)}</tbody>
       </table></div>
     </div></section>

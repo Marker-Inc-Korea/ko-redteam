@@ -257,7 +257,7 @@ def test_builder_rejects_historical_multiturn_reports_for_v7(tmp_path):
         )
 
 
-def test_v7_statistics_ignore_model_and_run_array_order(tmp_path):
+def test_v8_statistics_ignore_model_and_run_array_order(tmp_path):
     bundle, spec_path, _ = _layout_bundle(tmp_path)
     output, _, _ = _build(bundle, spec_path)
     reversed_manifest = json.loads(output.read_text("utf-8"))
@@ -274,7 +274,7 @@ def test_v7_statistics_ignore_model_and_run_array_order(tmp_path):
     assert _statistical_view(baseline) == _statistical_view(reordered)
 
 
-def test_v7_statistics_ignore_report_case_order(tmp_path):
+def test_v8_statistics_ignore_report_case_order(tmp_path):
     first_bundle, first_spec, _ = _layout_bundle(tmp_path / "first")
     second_bundle, second_spec, _ = _layout_bundle(
         tmp_path / "second",

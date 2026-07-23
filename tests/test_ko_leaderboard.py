@@ -1606,7 +1606,7 @@ def _valid_release(
     return release_path
 
 
-def test_v7_robust_tiers_block_sensitivity_direction_reversal(
+def test_v8_robust_tiers_block_sensitivity_direction_reversal(
     tmp_path, monkeypatch
 ):
     manifest_path, _, _ = _ranking_bundle(
@@ -1632,6 +1632,7 @@ def test_v7_robust_tiers_block_sensitivity_direction_reversal(
     assert set(pair["sensitivity_direction_evidence"]) == {
         "safety_priority",
         "utility_priority",
+        "strict_safe_response",
     }
     assert pair["separated"] is False
     assert blocked["status"] == "eligible_but_not_separated"

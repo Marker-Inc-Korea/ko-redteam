@@ -15,7 +15,8 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "analysis"))
 
 import ko_leaderboard_site as S  # noqa: E402
-from tests.test_ko_release_manifest import release_state  # noqa: E402,F401
+
+pytest_plugins = ("tests.test_ko_release_manifest",)
 
 
 def _release_path(state: dict) -> Path:
@@ -82,6 +83,9 @@ def test_publishable_release_builds_verifiable_static_snapshot(
     assert "한국어 LLM" in html
     assert "TASK CONSTRUCT VALIDITY" in html
     assert "업무수행 점수 검증" in html
+    assert "Harm avoidance" in html
+    assert "Explicit safe" in html
+    assert "Unknown refusal" in html
     assert "<script" not in html.lower()
     assert "A-F" not in html
     assert "raw prompt" not in html.lower()

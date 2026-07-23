@@ -83,7 +83,7 @@ def test_distribution_metadata_has_release_basics():
     assert data["build-system"]["requires"][0].startswith("setuptools>=77")
     assert data["project"]["license"] == "MIT"
     assert data["project"]["license-files"] == ["LICENSE"]
-    assert data["project"]["version"] == "0.2.0rc11"
+    assert data["project"]["version"] == "0.2.0rc12"
     assert "Development Status :: 4 - Beta" in data["project"]["classifiers"]
     assert "korean" in data["project"]["keywords"]
     assert "Natural Language :: Korean" in data["project"]["classifiers"]

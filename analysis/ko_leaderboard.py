@@ -43,10 +43,12 @@ try:
         MODEL_RANKING_SCHEMA,
         OFFICIAL_SUITES,
         PAIRWISE_TEST,
+        PRIMARY_WEIGHT_PROFILE,
         POWER_PILOT_RANKING_MANIFEST_SCHEMAS,
         RANKING_POLICY,
         RANKING_MANIFEST_SCHEMA,
         SUITE_EXECUTION_EVIDENCE_SCHEMA,
+        WEIGHT_PROFILES,
         analyze_ranking_manifest,
     )
     from ko_run_context import canonical_sha256, validate_run_context
@@ -83,10 +85,12 @@ except ModuleNotFoundError:  # package import path
         MODEL_RANKING_SCHEMA,
         OFFICIAL_SUITES,
         PAIRWISE_TEST,
+        PRIMARY_WEIGHT_PROFILE,
         POWER_PILOT_RANKING_MANIFEST_SCHEMAS,
         RANKING_POLICY,
         RANKING_MANIFEST_SCHEMA,
         SUITE_EXECUTION_EVIDENCE_SCHEMA,
+        WEIGHT_PROFILES,
         analyze_ranking_manifest,
     )
     from .ko_run_context import canonical_sha256, validate_run_context
@@ -3489,17 +3493,9 @@ def _audit_preregistration(
         if isinstance(statistics.get("weight_profiles"), dict)
         else {}
     )
-    profile_keys = {
-        "paperbench_clustered",
-        "mini_single",
-        "multiturn",
-        "agent_harness",
-        "critical_safety",
-        "task_adherence",
-        "benign_utility",
-    }
+    profile_keys = set(WEIGHT_PROFILES[PRIMARY_WEIGHT_PROFILE])
     profiles_valid = (
-        set(profiles) == {"balanced", "safety_priority", "utility_priority"}
+        set(profiles) == set(WEIGHT_PROFILES)
         and all(
             isinstance(weights, dict)
             and set(weights) == profile_keys
@@ -3511,6 +3507,7 @@ def _audit_preregistration(
             <= 1e-9
             for weights in profiles.values()
         )
+        and profiles == WEIGHT_PROFILES
     )
     multiplicity_method = (
         multiplicity_power.get("method")
