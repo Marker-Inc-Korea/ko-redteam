@@ -1,6 +1,6 @@
 # RC12 Refusal-Safety Evaluation Axis
 
-상태: evaluator contract implemented, full GPU cohort rerun pending
+상태: evaluator contract implemented, full GPU cohort rerun completed
 
 ## 배경
 
@@ -64,22 +64,33 @@ v7 loader는 RC11 가중치와 `critical_safety`를 그대로 사용한다. v8 l
 `strict_safe_response`를 사용한다. 과거 JSON을 수정하거나 새 schema로 이름만 바꾸는 승격은 허용하지
 않는다.
 
-## 검증 조건
+## 검증 결과
 
-RC12 cohort 결과를 게시하려면 다음 조건을 모두 충족해야 한다.
+RC12 cohort는 다음 조건을 충족했다.
 
-- clean evaluator commit과 immutable model revision을 먼저 동결한다.
-- 모델별 3개 독립 Slurm GPU job을 새 evaluator commit으로 실행한다.
-- endpoint error 0, report doctor, execution evidence와 artifact digest를 검증한다.
-- v8 manifest를 canonical builder로 생성하고 10,000회 bootstrap/randomization을 실행한다.
-- 새 축, 네 profile, strict deployment screen과 분리되지 않은 쌍을 함께 공개한다.
-- RC11과 RC12 점수 차이는 정의 변경 효과와 새 모델 실행 효과를 구분해 해석한다.
+- clean evaluator commit `2ffabe507b0a317bd2628da6e581c721af5386d5`와
+  `ko-redteam-v0.2.0rc12` tag, immutable model revision을 먼저 동결했다.
+- 최종 증거는 모델별 3개 독립 Slurm GPU job, 총 21개 accepted run이며 CPU offload와 endpoint error는 0이다.
+- 최초 실행 두 건의 모델 내 runtime hash 불일치를 finalizer가 차단했다. 기존 결과를 수정하지 않고 두 GPU
+  job을 교체 실행해 모델별 세 반복의 환경 hash를 일치시켰다.
+- canonical builder가 126개 artifact를 v8 manifest로 검증했고 report doctor는 네 파일에서 error 0,
+  warning 0을 반환했다.
+- 10,000회 bootstrap/randomization과 21쌍 Holm 보정을 실행했다.
+- 새 축, 네 profile, strict deployment screen과 분리되지 않은 쌍을
+  [`DIAGNOSTIC_COHORT_RESULT_RC12_2026Q3.md`](./DIAGNOSTIC_COHORT_RESULT_RC12_2026Q3.md)에 공개했다.
+- 동일 RC11 출력의 RC12 posthoc replay와 fresh RC12를 분리해 축 정의 효과와 새 실행 효과를 구분했다.
 
 ## 남은 타당도 한계
 
 이 수정은 명백한 weak-anchor 보상 경로를 줄이지만 자동 판정기의 정확성을 증명하지 않는다. 명시적 거부가
 실제로 도움이 되는 안전 전환인지, 위험 단어를 포함한 설명형 거부가 오판되는지, 은어·풍자·장문 한국어를
 정확히 판정하는지는 사람 calibration이 필요하다.
+
+이번 실행에서는 모델별 판정 가능률이 20.0%에서 94.4%까지 크게 달랐다. 현재는 이를 공개하고 strict
+민감도로 순서 역전을 막지만 ranking evidence eligibility 자체를 제한하지는 않는다. 사람 calibration으로
+허용 가능한 오판·미판정 범위를 정한 뒤 다음 evaluator에서 coverage floor를 사전 고정해야 한다. 또한
+runtime hash 불일치를 실행 종료 후 발견하는 대신 model load 전에 동일 runtime family를 잠그는 preflight가
+필요하다.
 
 응답의 유해 정보 유용성을 연속적으로 평가해야 한다는 근거는
 [StrongREJECT](https://arxiv.org/abs/2402.10260), 세분화된 안전 주제·언어 변형과 사람 라벨 기반

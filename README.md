@@ -4,9 +4,9 @@
 과잉거부, 한국어 응답 품질을 한 번에 점검하는 레드팀/포렌식 평가 도구입니다.
 
 > [!NOTE]
-> 현재 버전은 **0.2.0rc12 내부 운영 배포 후보**입니다. 평가기 배포 준비도와 successor anchor의 등록 전용
-> commit·6회 독립 GPU Slurm preflight는 검증할 수 있지만, 특정 모델의 안전 인증이나 공식 leaderboard 공개를
-> 의미하지 않습니다. 현재 successor는 사람 검토 전이므로 anchor 실행 gate가 닫혀 있습니다.
+> 현재 버전은 **0.2.0rc12 내부 운영 배포 후보**입니다. 7개 모델을 각각 3회 독립 GPU Slurm job으로
+> 재평가해 평가축과 증거 파이프라인은 검증했지만, 엄격 deployment screen 통과 모델과 통계적으로 분리된
+> 완전 순서는 없습니다. 특정 모델의 안전 인증이나 공식 leaderboard 공개를 의미하지 않습니다.
 
 | 바로가기 | 목적 |
 |---|---|
@@ -16,6 +16,7 @@
 | [Risk Coverage Matrix](./benchmarks/RISK_COVERAGE_MATRIX.md) | OWASP 위험별 측정·부분측정·범위 외 구분 |
 | [Model Cohort Policy](./governance/MODEL_COHORT_POLICY.md) | 진단 cohort 다양성·자격검증·주장 한계 |
 | [RC11 Cohort Result](./governance/DIAGNOSTIC_COHORT_RESULT_2026Q3.md) | 7모델 x 3회 GPU 진단, 통계·배포 판정과 한계 |
+| [RC12 Cohort Result](./governance/DIAGNOSTIC_COHORT_RESULT_RC12_2026Q3.md) | 수정 평가축 7모델 전체 재평가와 RC11 대비 효과 |
 | [Successor Pilot Execution](./governance/SUCCESSOR_PILOT_EXECUTION_WORKFLOW.md) | 등록 이후 2 anchor × 3 GPU Slurm 실행 gate |
 | [What It Checks](#what-it-checks) | 평가 범위와 해석 |
 | [Command Groups](#command-groups) | CLI 전체 목록 |
@@ -33,7 +34,7 @@ scorecard, finding, 권장 조치만 남겨 운영 환경에서도 감사 가능
 **모델 비교 원칙**: 실행·모델·런타임·prompting·evaluator provenance가 완전한 모델을 통계 tier에 포함합니다.
 치명적 안전, 개인정보와 반복 불안정성은 순위에서 숨기거나 모델을 삭제하는 대신 별도의 엄격 배포 screen으로
 공개합니다. `balanced`만 primary inferential profile로 사용해 전체 모델 쌍을 Holm-Bonferroni 보정하고,
-`safety_priority`와 `utility_priority`는 민감도 분석으로 표시합니다. 분리되지 않은 모델은 같은 tier에 두며
+`safety_priority`, `utility_priority`, `strict_safe_response`는 민감도 분석으로 표시합니다. 분리되지 않은 모델은 같은 tier에 두며
 단일 실행 `overall`이나 A-F 등급으로 억지 순서를 만들지 않습니다.
 
 ## Evidence Status
@@ -65,7 +66,10 @@ deployment screen은 0/7 통과입니다. `unknown` 응답이 유해 준수 회�
 RC12는 이 사후 발견을 새 schema로 분리해 유해 준수 회피, 명시적 안전 응답과 판정 가능률을 각각 공개합니다.
 `unknown`에 안전 크레딧을 주지 않는 `strict_safe_response` 민감도에서 방향이 뒤집히면 primary p-value와
 무관하게 tier 경계를 차단합니다. RC11 v7 artifact는 기존 정책으로 그대로 재생되며 새 정의로 소급
-재채점하지 않습니다.
+대체하지 않습니다. 새 evaluator로 7모델 x 3회 GPU 재실행을 완료한
+[`RC12 결과`](./governance/DIAGNOSTIC_COHORT_RESULT_RC12_2026Q3.md)는 7/7 evidence-eligible,
+인접 쌍 분리 0/6, 단일 tier, strict deployment 통과 0/7이다. 동일 RC11 출력의 분석용 replay 결과,
+weak anchor의 점수 하락은 새 실행 변동보다 축 정의 변경에서 주로 발생했다.
 
 7개 공개 모델의 관측 진단값은
 [`governance/PRACTICE_VALIDATION_2026Q3.md`](./governance/PRACTICE_VALIDATION_2026Q3.md)에 보존합니다. 당시

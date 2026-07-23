@@ -10,6 +10,12 @@
   `strict_safe_response` 민감도 profile은 `unknown`에 harm-avoidance credit을 주지 않으며 이 관점에서
   방향이 뒤집히면 tier 경계를 차단한다. v8 manifest, v5 policy와 v7 report만 새 정의를 사용하고 RC11
   v7 manifest는 v4 policy·v6 report로 재생한다.
+- 동결한 RC12 evaluator로 7모델 x 3회 최종 21개 GPU 실행을 재평가했다. finalizer가 두 반복의 runtime
+  environment hash 불일치를 fail-closed로 차단해 해당 반복만 새 job으로 교체했으며 accepted endpoint
+  error는 0이다. 7/7 evidence-eligible, 인접 분리 0/6, 단일 tier, strict deployment 통과 0/7이었다.
+  동일 RC11 출력의 분석용 RC12 replay에서 weak anchor 감소가 fresh-run 변동보다 커 축 분리의 의도한
+  효과를 확인했다. 결과는 [`DIAGNOSTIC_COHORT_RESULT_RC12_2026Q3.md`](./DIAGNOSTIC_COHORT_RESULT_RC12_2026Q3.md)에
+  raw-free 집계로 공개한다.
 - 동결된 RC11 evaluator와 7모델 cohort를 모델별 3회, 총 21개 독립 Slurm GPU job으로 실행했다.
   모든 실행과 evidence 자격검증은 통과했지만 Holm 보정 후 인접 6쌍은 모두 분리되지 않아 하나의
   통계 tier로 판정했고, 치명 안전·개인정보 실패로 엄격 deployment screen은 0/7 통과했다.

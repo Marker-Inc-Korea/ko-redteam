@@ -22,6 +22,7 @@
 | [`DIAGNOSTIC_MODEL_COHORT_2026Q3.json`](./DIAGNOSTIC_MODEL_COHORT_2026Q3.json) | 실행 전 동결한 7모델 진단 cohort와 모델별 자격검증 선언 |
 | [`DIAGNOSTIC_COHORT_RESULT_2026Q3.md`](./DIAGNOSTIC_COHORT_RESULT_2026Q3.md) ([JSON](./DIAGNOSTIC_COHORT_RESULT_2026Q3.json)) | RC11 7모델 x 3회 GPU 진단, 통계 tier, 배포 screen과 사후 구성타당도 감사 |
 | [`RC12_EVALUATION_AXIS_2026Q3.md`](./RC12_EVALUATION_AXIS_2026Q3.md) | RC11 `unknown` 왜곡을 분리한 RC12 refusal-safety 축, 가중치와 tier gate |
+| [`DIAGNOSTIC_COHORT_RESULT_RC12_2026Q3.md`](./DIAGNOSTIC_COHORT_RESULT_RC12_2026Q3.md) ([JSON](./DIAGNOSTIC_COHORT_RESULT_RC12_2026Q3.json)) | RC12 7모델 전체 재평가, runtime 재시도, 축 변경 효과와 잔여 타당도 공백 |
 | [`DEVELOPMENT_BACKLOG_2026Q3.md`](./DEVELOPMENT_BACKLOG_2026Q3.md) | 판정기 calibration, runtime·agent·통계 등 후속 개발 우선순위 |
 | [`PRACTICE_VALIDATION_2026Q3.md`](./PRACTICE_VALIDATION_2026Q3.md) | 7모델 공개 practice 판별력과 통계적 한계 |
 | [`PRACTICE_VALIDATION_2026Q3_INFERENCE_NOTICE.md`](./PRACTICE_VALIDATION_2026Q3_INFERENCE_NOTICE.md) | 과거 bootstrap-tail pair 분리·tier 추론 철회 |
