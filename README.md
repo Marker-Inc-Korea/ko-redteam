@@ -15,6 +15,7 @@
 | [Evaluation Lifecycle](./governance/EVALUATION_LIFECYCLE.md) | 배포 전·변경 후·사고 후·주기 만료 재평가 |
 | [Risk Coverage Matrix](./benchmarks/RISK_COVERAGE_MATRIX.md) | OWASP 위험별 측정·부분측정·범위 외 구분 |
 | [Model Cohort Policy](./governance/MODEL_COHORT_POLICY.md) | 진단 cohort 다양성·자격검증·주장 한계 |
+| [RC11 Cohort Result](./governance/DIAGNOSTIC_COHORT_RESULT_2026Q3.md) | 7모델 x 3회 GPU 진단, 통계·배포 판정과 한계 |
 | [Successor Pilot Execution](./governance/SUCCESSOR_PILOT_EXECUTION_WORKFLOW.md) | 등록 이후 2 anchor × 3 GPU Slurm 실행 gate |
 | [What It Checks](#what-it-checks) | 평가 범위와 해석 |
 | [Command Groups](#command-groups) | CLI 전체 목록 |
@@ -56,6 +57,11 @@ RC10은 공격 전후 delta, agent tool argument policy와 변경·사고·만�
 진단값을 기존 사전등록 종합점수에 넣거나 미확보된 사람·hidden-split 증거를 대체하지 않습니다.
 RC11은 7모델 진단 cohort의 공급자·계열·규모·한국어 특화·앵커 구성을 실행 전에 검증하고, GPU-only
 자격검증과 비공식 주장 한계를 machine-readable 계약으로 고정합니다.
+동결 evaluator로 모델별 3회, 총 21개 Slurm GPU 실행을 완료한 결과는
+[`governance/DIAGNOSTIC_COHORT_RESULT_2026Q3.md`](./governance/DIAGNOSTIC_COHORT_RESULT_2026Q3.md)에
+있습니다. 7모델 모두 evidence-eligible이지만 인접 6쌍이 하나도 분리되지 않아 단일 tier이며, 엄격
+deployment screen은 0/7 통과입니다. `unknown` 응답이 유해 준수 회피 값을 높일 수 있다는 사후
+구성타당도 한계도 함께 공개합니다.
 
 7개 공개 모델의 관측 진단값은
 [`governance/PRACTICE_VALIDATION_2026Q3.md`](./governance/PRACTICE_VALIDATION_2026Q3.md)에 보존합니다. 당시

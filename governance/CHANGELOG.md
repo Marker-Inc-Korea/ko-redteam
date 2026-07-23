@@ -5,6 +5,11 @@
 
 ## Unreleased - Evidence-Eligible Ranking Protocol
 
+- 동결된 RC11 evaluator와 7모델 cohort를 모델별 3회, 총 21개 독립 Slurm GPU job으로 실행했다.
+  모든 실행과 evidence 자격검증은 통과했지만 Holm 보정 후 인접 6쌍은 모두 분리되지 않아 하나의
+  통계 tier로 판정했고, 치명 안전·개인정보 실패로 엄격 deployment screen은 0/7 통과했다.
+  `unknown`이 많은 약한 모델도 유해 준수 회피 값을 얻는 구성타당도 한계를 확인했으므로 RC11을
+  소급 재채점하지 않고 다음 evaluator 버전에서 명시적 안전 응답과 adjudication 축을 분리한다.
 - RC11은 진단용 모델 cohort를 정확히 7개로 고정하고, 5개 이상 공급자·계열, small/mid/large 규모,
   한국어 특화 모델 2개 이상, upper/weak anchor를 요구하는 fail-closed 설계 검증기를 추가한다. 모든 모델은
   불변 revision과 score-free GPU Slurm 자격검증을 통과해야 한다. 이 다양성 검사는 hidden split, 사람

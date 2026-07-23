@@ -20,6 +20,7 @@
 | [`TASK_CONSTRUCT_VALIDITY_GATE_2026Q3.md`](./TASK_CONSTRUCT_VALIDITY_GATE_2026Q3.md) | RC9 task 점수 사람 calibration 계약, 공격적 검증과 실제 증거 경계 |
 | [`MODEL_COHORT_POLICY.md`](./MODEL_COHORT_POLICY.md) | 진단 cohort의 다양성, score-free GPU 자격검증, 공식 주장 금지 계약 |
 | [`DIAGNOSTIC_MODEL_COHORT_2026Q3.json`](./DIAGNOSTIC_MODEL_COHORT_2026Q3.json) | 실행 전 동결한 7모델 진단 cohort와 모델별 자격검증 선언 |
+| [`DIAGNOSTIC_COHORT_RESULT_2026Q3.md`](./DIAGNOSTIC_COHORT_RESULT_2026Q3.md) ([JSON](./DIAGNOSTIC_COHORT_RESULT_2026Q3.json)) | RC11 7모델 x 3회 GPU 진단, 통계 tier, 배포 screen과 사후 구성타당도 감사 |
 | [`PRACTICE_VALIDATION_2026Q3.md`](./PRACTICE_VALIDATION_2026Q3.md) | 7모델 공개 practice 판별력과 통계적 한계 |
 | [`PRACTICE_VALIDATION_2026Q3_INFERENCE_NOTICE.md`](./PRACTICE_VALIDATION_2026Q3_INFERENCE_NOTICE.md) | 과거 bootstrap-tail pair 분리·tier 추론 철회 |
 | [`PRACTICE_REVIEW_WORKFLOW.md`](./PRACTICE_REVIEW_WORKFLOW.md) | successor pilot blind packet·독립 응답·서명 commitment·병합 절차 |
