@@ -25,6 +25,7 @@ DEFAULT_PAPER_BENCHMARK = ROOT / "benchmarks" / "ko_llm_paperbench_v1.json"
 DEFAULT_MULTITURN_BENCHMARK = ROOT / "benchmarks" / "ko_llm_multiturn_v2.json"
 DEFAULT_AGENT_BENCHMARK = ROOT / "benchmarks" / "ko_llm_agent_harness_v2.json"
 DEFAULT_AGENTIC_BENCHMARK = ROOT / "benchmarks" / "ko_llm_agent_harness_v3.json"
+DEFAULT_COHORT_DESIGN = ROOT / "governance" / "DIAGNOSTIC_MODEL_COHORT_2026Q3.json"
 DEFAULT_REQUIRED_SOURCE_FAMILIES = [
     "agentdojo",
     "raccoon",
@@ -53,6 +54,7 @@ REQUIRED_MODULES = [
     "build_leaderboard_site",
     "build_season_preregistration",
     "check_endpoint",
+    "check_cohort_design",
     "check_revalidation",
     "check_regression",
     "compare_reports",
@@ -64,6 +66,7 @@ REQUIRED_MODULES = [
     "ko_calibration",
     "ko_calibration_evidence",
     "ko_calibration_collection",
+    "ko_cohort_design",
     "ko_deployment_readiness",
     "ko_external_review",
     "ko_llm_forensics",
@@ -296,6 +299,11 @@ def run_self_check(
         DEFAULT_AGENTIC_BENCHMARK.exists(),
         path=str(DEFAULT_AGENTIC_BENCHMARK),
     ))
+    checks.append(_check(
+        "diagnostic_cohort_design_exists",
+        DEFAULT_COHORT_DESIGN.exists(),
+        path=str(DEFAULT_COHORT_DESIGN),
+    ))
     if any(c["status"] == "fail" for c in checks):
         return _result(checks)
 
@@ -308,6 +316,22 @@ def run_self_check(
     hygiene_mod = modules["ko_public_hygiene"]
     leaderboard_mod = modules["ko_leaderboard"]
     forensics_mod = modules["ko_llm_forensics"]
+    cohort_mod = modules["ko_cohort_design"]
+
+    try:
+        cohort_audit = cohort_mod.load_and_validate_cohort_design(DEFAULT_COHORT_DESIGN)
+    except (OSError, json.JSONDecodeError, ValueError) as exc:
+        checks.append(_check("diagnostic_cohort_design", False, error=str(exc)))
+    else:
+        cohort_summary = cohort_audit["summary"]
+        checks.append(_check(
+            "diagnostic_cohort_design",
+            cohort_audit["status"] == "pass"
+            and cohort_summary["official_ranking_eligible"] is False,
+            models=cohort_summary["models"],
+            providers=cohort_summary["providers"],
+            families=cohort_summary["families"],
+        ))
 
     hygiene_reports = [hygiene_mod.scan_public_hygiene(path) for path in _public_hygiene_roots()]
     hygiene_issues = sum(report["summary"]["issues"] for report in hygiene_reports)
@@ -550,6 +574,7 @@ def render_text(result: dict[str, Any]) -> str:
         for key in (
             "actual", "expected", "cases", "overall", "multiturn_overall", "agent_overall",
             "failed", "smoke_status", "files_scanned", "issues", "error", "path",
+            "models", "providers", "families",
         ):
             if key in check:
                 detail.append(f"{key}={check[key]}")

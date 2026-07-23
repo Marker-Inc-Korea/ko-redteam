@@ -4,7 +4,7 @@
 과잉거부, 한국어 응답 품질을 한 번에 점검하는 레드팀/포렌식 평가 도구입니다.
 
 > [!NOTE]
-> 현재 버전은 **0.2.0rc10 내부 운영 배포 후보**입니다. 평가기 배포 준비도와 successor anchor의 등록 전용
+> 현재 버전은 **0.2.0rc11 내부 운영 배포 후보**입니다. 평가기 배포 준비도와 successor anchor의 등록 전용
 > commit·6회 독립 GPU Slurm preflight는 검증할 수 있지만, 특정 모델의 안전 인증이나 공식 leaderboard 공개를
 > 의미하지 않습니다. 현재 successor는 사람 검토 전이므로 anchor 실행 gate가 닫혀 있습니다.
 
@@ -14,6 +14,7 @@
 | [Deployment Guide](./DEPLOYMENT.md) | Slurm, run context v2, container, 3-repeat gate |
 | [Evaluation Lifecycle](./governance/EVALUATION_LIFECYCLE.md) | 배포 전·변경 후·사고 후·주기 만료 재평가 |
 | [Risk Coverage Matrix](./benchmarks/RISK_COVERAGE_MATRIX.md) | OWASP 위험별 측정·부분측정·범위 외 구분 |
+| [Model Cohort Policy](./governance/MODEL_COHORT_POLICY.md) | 진단 cohort 다양성·자격검증·주장 한계 |
 | [Successor Pilot Execution](./governance/SUCCESSOR_PILOT_EXECUTION_WORKFLOW.md) | 등록 이후 2 anchor × 3 GPU Slurm 실행 gate |
 | [What It Checks](#what-it-checks) | 평가 범위와 해석 |
 | [Command Groups](#command-groups) | CLI 전체 목록 |
@@ -53,6 +54,8 @@ RC9의 task 점수 사람 calibration 계약과 아직 확보되지 않은 실�
 구분해 기록했습니다.
 RC10은 공격 전후 delta, agent tool argument policy와 변경·사고·만료 기반 재검증 gate를 추가했지만, 이
 진단값을 기존 사전등록 종합점수에 넣거나 미확보된 사람·hidden-split 증거를 대체하지 않습니다.
+RC11은 7모델 진단 cohort의 공급자·계열·규모·한국어 특화·앵커 구성을 실행 전에 검증하고, GPU-only
+자격검증과 비공식 주장 한계를 machine-readable 계약으로 고정합니다.
 
 7개 공개 모델의 관측 진단값은
 [`governance/PRACTICE_VALIDATION_2026Q3.md`](./governance/PRACTICE_VALIDATION_2026Q3.md)에 보존합니다. 당시
@@ -141,6 +144,7 @@ ko-redteam-suite \
 | 통합 실행 | `ko-redteam-suite` | audit, coverage, endpoint smoke, 단일턴/멀티턴/agent 평가, doctor, gate |
 | 배포 준비도 | `ko-redteam-validate-deployment` | 독립 Slurm 반복, provenance, benchmark fingerprint, artifact hash 검증 |
 | 재평가 시점 | `ko-redteam-check-revalidation` | model/runtime/prompt/tool·data 변경, 사고와 주기 만료를 fail-closed 판정 |
+| cohort 설계 | `ko-redteam-check-cohort-design` | 7모델 다양성, 불변 revision, score-free GPU 자격검증과 비공식 주장 한계 검증 |
 | 연결 확인 | `ko-redteam-check-endpoint` | OpenAI-compatible endpoint와 한국어 응답 신호 확인 |
 | 평가 실행 | `ko-redteam-benchmark`, `ko-redteam-multiturn`, `ko-redteam-agent-harness` | 단일턴, 멀티턴, tool gateway 평가 |
 | 오프라인 분석 | `ko-redteam-scan`, `ko-redteam-analyze-responses` | 저장된 응답과 공격 스캔 결과 분석 |

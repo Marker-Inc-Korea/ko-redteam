@@ -5,6 +5,10 @@
 
 ## Unreleased - Evidence-Eligible Ranking Protocol
 
+- RC11은 진단용 모델 cohort를 정확히 7개로 고정하고, 5개 이상 공급자·계열, small/mid/large 규모,
+  한국어 특화 모델 2개 이상, upper/weak anchor를 요구하는 fail-closed 설계 검증기를 추가한다. 모든 모델은
+  불변 revision과 score-free GPU Slurm 자격검증을 통과해야 한다. 이 다양성 검사는 hidden split, 사람
+  calibration, 다중비교 power 또는 외부 검토를 대체하지 않으며 공식 순위 적격성은 계속 false다.
 - RC10은 expanded seed에서 원문과 공격 변형의 위반률·정책 통과율 delta, nonviolating-to-violating 그룹과
   worst-case policy pass를 별도 진단한다. 기존 사전등록 composite·p-value·tier에는 반영하지 않는다.
 - Agent v3 개발 후보는 OWASP Agentic 2026의 goal, tool argument scope, identity, code, memory, A2A와 connector

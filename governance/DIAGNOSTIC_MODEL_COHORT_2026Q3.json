@@ -1,0 +1,177 @@
+{
+  "schema": "ko-redteam.model-cohort-design.v1",
+  "status": "frozen_diagnostic_cohort",
+  "cohort_id": "ko-diagnostic-2026q3-seven-model-v1",
+  "frozen_at": "2026-07-23T11:11:29+09:00",
+  "selection_policy": {
+    "purpose": "Internal Korean LLM safety, privacy, prompt-security, agent, over-refusal, and language-quality diagnosis.",
+    "selection_rule": "Freeze provider, family, parameter band, Korean specialization, and anchor strata before any current-protocol scored run.",
+    "exclusion_rule": "Exclude only immutable snapshot, GPU-only serving, endpoint readiness, or Korean response qualification failures.",
+    "historical_diagnostic_outputs_known": true,
+    "current_protocol_scores_observed_before_freeze": false,
+    "qualification_used_scores": false
+  },
+  "models": [
+    {
+      "name": "gemma4_31b",
+      "model_id": "google/gemma-4-31B-it",
+      "revision": "439edf5652646a0d1bd8b46bfdc1d3645761a445",
+      "provider": "Google",
+      "family": "Gemma",
+      "parameter_billions": 31.0,
+      "korean_specialized": false,
+      "role": "upper_anchor",
+      "license": "Gemma",
+      "selection_rationale": "Large multilingual instruction model used as a predeclared upper capability anchor.",
+      "qualification": {
+        "status": "pass",
+        "scheduler": "slurm",
+        "gpu_only": true,
+        "cpu_offload_gb": 0,
+        "immutable_snapshot": true,
+        "chat_endpoint_ready": true,
+        "score_observed": false,
+        "raw_response_retained": false
+      }
+    },
+    {
+      "name": "qwen3_32b",
+      "model_id": "Qwen/Qwen3-32B",
+      "revision": "9216db5781bf21249d130ec9da846c4624c16137",
+      "provider": "Alibaba Cloud",
+      "family": "Qwen",
+      "parameter_billions": 32.0,
+      "korean_specialized": false,
+      "role": "general_large",
+      "license": "Apache-2.0",
+      "selection_rationale": "Independent large-family comparator for capability and policy-behavior separation.",
+      "qualification": {
+        "status": "pass",
+        "scheduler": "slurm",
+        "gpu_only": true,
+        "cpu_offload_gb": 0,
+        "immutable_snapshot": true,
+        "chat_endpoint_ready": true,
+        "score_observed": false,
+        "raw_response_retained": false
+      }
+    },
+    {
+      "name": "exaone_3_5_7_8b_instruct",
+      "model_id": "LGAI-EXAONE/EXAONE-3.5-7.8B-Instruct",
+      "revision": "553ea250b9a5317231459279d5847d6cf955b9aa",
+      "provider": "LG AI Research",
+      "family": "EXAONE",
+      "parameter_billions": 7.8,
+      "korean_specialized": true,
+      "role": "korean_specialist",
+      "license": "EXAONE AI Model License 1.1-NC",
+      "selection_rationale": "Korean-English mid-size specialist representing a domestic model family.",
+      "qualification": {
+        "status": "pass",
+        "scheduler": "slurm",
+        "gpu_only": true,
+        "cpu_offload_gb": 0,
+        "immutable_snapshot": true,
+        "chat_endpoint_ready": true,
+        "score_observed": false,
+        "raw_response_retained": false
+      }
+    },
+    {
+      "name": "eeve_10_8b_instruct",
+      "model_id": "yanolja/YanoljaNEXT-EEVE-Instruct-10.8B",
+      "revision": "b0c26460bf14cd825a3c4df2363cdfd63c47fb96",
+      "provider": "Yanolja",
+      "family": "EEVE",
+      "parameter_billions": 10.8,
+      "korean_specialized": true,
+      "role": "korean_specialist",
+      "license": "Apache-2.0",
+      "selection_rationale": "Second Korean-specialized mid-size family used to avoid a single domestic anchor.",
+      "qualification": {
+        "status": "pass",
+        "scheduler": "slurm",
+        "gpu_only": true,
+        "cpu_offload_gb": 0,
+        "immutable_snapshot": true,
+        "chat_endpoint_ready": true,
+        "score_observed": false,
+        "raw_response_retained": false
+      }
+    },
+    {
+      "name": "qwen2_5_7b_instruct",
+      "model_id": "Qwen/Qwen2.5-7B-Instruct",
+      "revision": "a09a35458c702b33eeacc393d103063234e8bc28",
+      "provider": "Alibaba Cloud",
+      "family": "Qwen",
+      "parameter_billions": 7.0,
+      "korean_specialized": false,
+      "role": "general_mid",
+      "license": "Apache-2.0",
+      "selection_rationale": "Mid-size within-family control for separating scale effects from provider effects.",
+      "qualification": {
+        "status": "pass",
+        "scheduler": "slurm",
+        "gpu_only": true,
+        "cpu_offload_gb": 0,
+        "immutable_snapshot": true,
+        "chat_endpoint_ready": true,
+        "score_observed": false,
+        "raw_response_retained": false
+      }
+    },
+    {
+      "name": "phi3_5_mini_instruct",
+      "model_id": "microsoft/Phi-3.5-mini-instruct",
+      "revision": "2fe192450127e6a83f7441aef6e3ca586c338b77",
+      "provider": "Microsoft",
+      "family": "Phi",
+      "parameter_billions": 3.8,
+      "korean_specialized": false,
+      "role": "general_small",
+      "license": "MIT",
+      "selection_rationale": "Small instruction-tuned family control above the deliberately weak lower anchor.",
+      "qualification": {
+        "status": "pass",
+        "scheduler": "slurm",
+        "gpu_only": true,
+        "cpu_offload_gb": 0,
+        "immutable_snapshot": true,
+        "chat_endpoint_ready": true,
+        "score_observed": false,
+        "raw_response_retained": false
+      }
+    },
+    {
+      "name": "tinyllama_1_1b_chat",
+      "model_id": "TinyLlama/TinyLlama-1.1B-Chat-v1.0",
+      "revision": "fe8a4ea1ffedaf415f4da2f062534de366a451e6",
+      "provider": "TinyLlama",
+      "family": "TinyLlama",
+      "parameter_billions": 1.1,
+      "korean_specialized": false,
+      "role": "weak_anchor",
+      "license": "Apache-2.0",
+      "selection_rationale": "Predeclared weak lower anchor used to test whether the evaluator separates obvious limitations.",
+      "qualification": {
+        "status": "pass",
+        "scheduler": "slurm",
+        "gpu_only": true,
+        "cpu_offload_gb": 0,
+        "immutable_snapshot": true,
+        "chat_endpoint_ready": true,
+        "score_observed": false,
+        "raw_response_retained": false
+      }
+    }
+  ],
+  "claim_limits": {
+    "hidden_split_validated": false,
+    "human_calibration_validated": false,
+    "statistical_power_validated": false,
+    "external_review_validated": false,
+    "official_ranking_eligible": false
+  }
+}

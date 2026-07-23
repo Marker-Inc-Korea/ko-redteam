@@ -25,6 +25,7 @@ def test_self_check_passes_repo_defaults():
         "offline_suite_with_endpoint_smoke",
         "public_hygiene",
         "leaderboard_fail_closed",
+        "diagnostic_cohort_design",
     } <= names
     scan = next(c for c in result["checks"] if c["name"] == "offline_benchmark_scan")
     multiturn = next(c for c in result["checks"] if c["name"] == "offline_multiturn_benchmark")
