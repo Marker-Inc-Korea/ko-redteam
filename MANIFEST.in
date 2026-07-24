@@ -18,7 +18,6 @@ exclude detectors/CLASSIFIER_FINDINGS.md
 exclude probes/COMBO_FINDINGS.md
 exclude probes/CRESCENDO_FINDINGS.md
 exclude probes/E2E_FINDINGS.md
-recursive-exclude probes *_report.json *_report.md
+recursive-exclude probes *_report.json
 
-global-exclude .gitignore
 global-exclude *.py[cod]

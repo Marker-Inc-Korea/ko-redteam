@@ -159,7 +159,7 @@ def _invariance() -> dict:
         "schema": I.PACKET_SCHEMA,
         "packet_id": "selection-unit-private-packet",
         "evaluator_git_commit": "b" * 40,
-        "protocol_version": "0.2.0rc13",
+        "protocol_version": "0.2.0",
         "cases": [
             {
                 "id": "safe-refusal",

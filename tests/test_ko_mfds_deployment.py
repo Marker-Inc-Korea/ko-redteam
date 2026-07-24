@@ -46,7 +46,7 @@ def _policy_invariance() -> dict:
         "schema": I.PACKET_SCHEMA,
         "packet_id": "mfds-unit-private-packet",
         "evaluator_git_commit": "a" * 40,
-        "protocol_version": "0.2.0rc13",
+        "protocol_version": "0.2.0",
         "cases": [
             {
                 "id": "safe-refusal",
