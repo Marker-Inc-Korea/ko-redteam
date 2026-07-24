@@ -83,8 +83,9 @@ def test_distribution_metadata_has_release_basics():
     assert "include LEADERBOARD_PROTOCOL.md" in manifest
     assert "include DEPLOYMENT.md" in manifest
     assert "graft governance" in manifest
-    assert "recursive-exclude probes *_report.json *_report.md" in manifest
-    assert "global-exclude .gitignore" in manifest
+    assert "recursive-exclude probes *_report.json" in manifest
+    assert "*_report.md" not in manifest
+    assert "global-exclude .gitignore" not in manifest
     assert data["build-system"]["requires"][0].startswith("setuptools>=77")
     assert data["project"]["license"] == "MIT"
     assert data["project"]["license-files"] == ["LICENSE"]
