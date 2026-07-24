@@ -71,6 +71,21 @@ def valid_deployment_context(
     return context
 
 
+def valid_locked_context() -> dict:
+    context = valid_deployment_context()
+    context["schema"] = C.LOCKED_DEPLOYMENT_SCHEMA
+    context["runtime"].update(
+        {
+            "quantization": "none",
+            "runtime_family_sha256": "b" * 64,
+            "serving_contract_sha256": "c" * 64,
+        }
+    )
+    context["execution"]["runtime_preflight_sha256"] = "d" * 64
+    context["generation"]["top_p"] = 1.0
+    return context
+
+
 def test_valid_context_is_attached_and_fingerprinted():
     context = valid_context()
     attached = C.attach_run_context(context, served_model="served-model")
@@ -123,6 +138,35 @@ def test_deployment_context_requires_execution_generation_and_matches_requests()
 
     context["generation"]["seed"] = -1
     assert any("seed" in error for error in C.validate_run_context(context))
+
+
+def test_locked_context_requires_runtime_and_sampling_bindings():
+    context = valid_locked_context()
+    assert C.validate_run_context(context) == []
+    C.assert_generation_matches(
+        context,
+        temperature=0.0,
+        top_p=1.0,
+        max_tokens=512,
+        seed=20260715,
+    )
+
+    del context["runtime"]["quantization"]
+    errors = C.validate_run_context(context)
+    assert any("quantization" in error for error in errors)
+
+
+def test_deployment_context_rejects_nonfinite_sampling_values():
+    for value in (float("nan"), float("inf"), float("-inf")):
+        context = valid_deployment_context()
+        context["generation"]["temperature"] = value
+        errors = C.validate_run_context(context)
+        assert any("temperature must be finite" in error for error in errors)
+
+        context = valid_locked_context()
+        context["generation"]["top_p"] = value
+        errors = C.validate_run_context(context)
+        assert any("top_p" in error for error in errors)
 
 
 def test_independent_deployment_contexts_require_unique_slurm_jobs_and_sessions():

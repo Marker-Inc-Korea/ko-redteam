@@ -38,7 +38,13 @@ from ko_benchmark_coverage import (  # noqa: E402
 from ko_gate import evaluate_reports, parse_thresholds as parse_score_thresholds, render_gate_markdown  # noqa: E402
 from ko_report import render_markdown  # noqa: E402
 from ko_report_doctor import doctor_reports, render_doctor_markdown  # noqa: E402
-from ko_run_context import canonical_sha256, load_run_context, validate_run_context  # noqa: E402
+from ko_run_context import (  # noqa: E402
+    DEPLOYMENT_SCHEMA,
+    LOCKED_DEPLOYMENT_SCHEMA,
+    canonical_sha256,
+    load_run_context,
+    validate_run_context,
+)
 from multiturn_benchmark import DEFAULT_BENCHMARK as DEFAULT_MULTITURN_BENCHMARK  # noqa: E402
 from multiturn_benchmark import run_multiturn_benchmark  # noqa: E402
 
@@ -273,6 +279,8 @@ def _new_manifest(
     timeout: int,
     max_tokens: int,
     seed: int,
+    temperature: float = 0.0,
+    top_p: float = 1.0,
     obfuscations: list[str] | None,
     framings: list[str] | None,
     framing_per_family: bool,
@@ -320,6 +328,8 @@ def _new_manifest(
             "timeout": timeout,
             "max_tokens": max_tokens,
             "seed": seed,
+            "temperature": temperature,
+            "top_p": top_p,
             "obfuscations": obfuscations,
             "framings": framings,
             "framing_per_family": framing_per_family,
@@ -391,6 +401,8 @@ def _deployment_profile_errors(
     include_raw: bool,
     max_tokens: int,
     seed: int,
+    temperature: float = 0.0,
+    top_p: float = 1.0,
     coverage_enabled: bool,
     coverage_min_total: int,
     endpoint_smoke_enabled: bool,
@@ -416,8 +428,11 @@ def _deployment_profile_errors(
         errors.append("deployment profiles require endpoint smoke")
     if not doctor_enabled or not doctor_warnings_fail or doctor_allow_raw:
         errors.append("deployment profiles require strict report doctor with raw fields forbidden")
-    if run_context is None or run_context.get("schema") != "ko-redteam.run-context.v2":
-        errors.append("deployment profiles require ko-redteam.run-context.v2")
+    if run_context is None or run_context.get("schema") not in {
+        DEPLOYMENT_SCHEMA,
+        LOCKED_DEPLOYMENT_SCHEMA,
+    }:
+        errors.append("deployment profiles require ko-redteam.run-context.v2 or v3")
     else:
         context_errors = validate_run_context(run_context)
         if context_errors:
@@ -434,7 +449,18 @@ def _deployment_profile_errors(
             )
         if model.get("access") == "open_weights" and execution.get("scheduler") != "slurm":
             errors.append("open-weight deployment evaluation requires scheduler=slurm")
-        if generation != {"temperature": 0.0, "max_tokens": max_tokens, "seed": seed}:
+        expected_generation = {
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+            "seed": seed,
+        }
+        if run_context.get("schema") == LOCKED_DEPLOYMENT_SCHEMA:
+            expected_generation["top_p"] = top_p
+        elif temperature != 0.0 or top_p != 1.0:
+            errors.append(
+                "run-context.v2 deployment profiles require temperature=0 and top_p=1"
+            )
+        if generation != expected_generation:
             errors.append("deployment run context generation must match suite settings")
 
     benchmark = _benchmark_header(benchmark_path)
@@ -533,6 +559,8 @@ def _build_execution_evidence(
             "timeout": config.get("timeout"),
             "max_tokens": config.get("max_tokens"),
             "seed": config.get("seed"),
+            "temperature": config.get("temperature"),
+            "top_p": config.get("top_p"),
             "coverage": config.get("coverage"),
             "endpoint_smoke": {
                 "enabled": endpoint_smoke.get("enabled"),
@@ -798,6 +826,8 @@ def run_suite(
     timeout: int = 120,
     max_tokens: int = 512,
     seed: int = 0,
+    temperature: float = 0.0,
+    top_p: float = 1.0,
     obfuscations: list[str] | None = None,
     framings: list[str] | None = None,
     framing_per_family: bool = True,
@@ -864,6 +894,8 @@ def run_suite(
         include_raw=include_raw,
         max_tokens=max_tokens,
         seed=seed,
+        temperature=temperature,
+        top_p=top_p,
         coverage_enabled=coverage_enabled,
         coverage_min_total=coverage_min_total,
         endpoint_smoke_enabled=endpoint_smoke_enabled,
@@ -890,6 +922,8 @@ def run_suite(
         timeout=timeout,
         max_tokens=max_tokens,
         seed=seed,
+        temperature=temperature,
+        top_p=top_p,
         obfuscations=obfuscations,
         framings=framings,
         framing_per_family=framing_per_family,
@@ -1083,6 +1117,8 @@ def run_suite(
             timeout=timeout,
             max_tokens=max_tokens,
             seed=seed,
+            temperature=temperature,
+            top_p=top_p,
             call_fn=call_fn,
             run_context=run_context,
         )
@@ -1112,6 +1148,8 @@ def run_suite(
                 timeout=timeout,
                 max_tokens=max_tokens,
                 seed=seed,
+                temperature=temperature,
+                top_p=top_p,
                 call_fn=multiturn_call_fn,
                 run_context=run_context,
             )
@@ -1142,6 +1180,8 @@ def run_suite(
                 timeout=timeout,
                 max_tokens=max_tokens,
                 seed=seed,
+                temperature=temperature,
+                top_p=top_p,
                 tool_call_mode=agent_tool_call_mode,
                 call_fn=agent_call_fn,
                 run_context=run_context,
@@ -1249,6 +1289,8 @@ def main() -> None:
     ap.add_argument("--max-tokens", type=int, default=512)
     ap.add_argument("--seed", type=int, default=0,
                     help="OpenAI-compatible generation seed; deployment runs must record this in run context")
+    ap.add_argument("--temperature", type=float, default=0.0)
+    ap.add_argument("--top-p", type=float, default=1.0)
     ap.add_argument("--include-raw", action="store_true",
                     help="raw prompt/response 를 benchmark report에 포함한다. 기본은 sanitized only.")
     ap.add_argument("--run-context",
@@ -1323,6 +1365,8 @@ def main() -> None:
         timeout=args.timeout,
         max_tokens=args.max_tokens,
         seed=args.seed,
+        temperature=args.temperature,
+        top_p=args.top_p,
         obfuscations=args.obfuscation,
         framings=args.framing,
         framing_per_family=not args.no_framing,

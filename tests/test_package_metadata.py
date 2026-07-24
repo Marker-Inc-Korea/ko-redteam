@@ -61,6 +61,11 @@ def test_console_script_targets_are_importable():
         "ko-redteam-compare-reports",
         "ko-redteam-check-regression",
         "ko-redteam-validate-deployment",
+        "ko-redteam-check-policy-invariance",
+        "ko-redteam-validate-model-selection",
+        "ko-redteam-runtime-lock",
+        "ko-redteam-analyze-deployment-matrix",
+        "ko-redteam-validate-mfds-deployment",
     } <= set(scripts)
 
     for target in scripts.values():
@@ -83,7 +88,7 @@ def test_distribution_metadata_has_release_basics():
     assert data["build-system"]["requires"][0].startswith("setuptools>=77")
     assert data["project"]["license"] == "MIT"
     assert data["project"]["license-files"] == ["LICENSE"]
-    assert data["project"]["version"] == "0.2.0rc12"
+    assert data["project"]["version"] == "0.2.0rc13"
     assert "Development Status :: 4 - Beta" in data["project"]["classifiers"]
     assert "korean" in data["project"]["keywords"]
     assert "Natural Language :: Korean" in data["project"]["classifiers"]
@@ -175,6 +180,21 @@ def test_package_data_paths_exist():
     ).exists()
     assert (ROOT / "governance" / "REVIEWER_RESPONSE_TOOL.md").exists()
     assert (ROOT / "governance" / "CALIBRATION_REVIEW_WORKFLOW.md").exists()
+    assert (ROOT / "governance" / "MFDS_DEPLOYMENT_HARNESS.md").exists()
+    assert (
+        ROOT / "governance" / "MFDS_DEPLOYMENT_PACKAGE_TEMPLATE.json"
+    ).exists()
+    assert (
+        ROOT / "governance" / "MFDS_CYBERSECURITY_EVIDENCE_TEMPLATE.json"
+    ).exists()
+    assert (
+        ROOT / "governance" / "MFDS_ANALYTICAL_PERFORMANCE_TEMPLATE.json"
+    ).exists()
+    assert (ROOT / "governance" / "MFDS_SBOM_TEMPLATE.json").exists()
+    assert (ROOT / "governance" / "SERVING_CONTRACT_TEMPLATE.json").exists()
+    assert (
+        ROOT / "governance" / "RC13_MACHINE_DEPLOYMENT_GATES_2026Q3.md"
+    ).exists()
     assert (
         ROOT / "governance" / "TASK_CONSTRUCT_VALIDITY_GATE_2026Q3.md"
     ).exists()

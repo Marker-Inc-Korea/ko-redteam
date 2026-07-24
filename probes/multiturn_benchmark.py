@@ -80,11 +80,14 @@ def chat_multi(
     timeout: int = 120,
     max_tokens: int = 512,
     seed: int = 0,
+    temperature: float = 0.0,
+    top_p: float = 1.0,
 ) -> str:
     body = json.dumps({
         "model": model,
         "messages": messages,
-        "temperature": 0.0,
+        "temperature": temperature,
+        "top_p": top_p,
         "max_tokens": max_tokens,
         "seed": seed,
     }).encode()
@@ -105,6 +108,8 @@ def _call_endpoint(
     timeout: int,
     max_tokens: int,
     seed: int,
+    temperature: float,
+    top_p: float,
 ) -> dict[str, Any]:
     try:
         return {
@@ -115,6 +120,8 @@ def _call_endpoint(
                 timeout=timeout,
                 max_tokens=max_tokens,
                 seed=seed,
+                temperature=temperature,
+                top_p=top_p,
             ),
             "error_type": None,
         }
@@ -200,13 +207,16 @@ def run_multiturn_benchmark(
     timeout: int = 120,
     max_tokens: int = 512,
     seed: int = 0,
+    temperature: float = 0.0,
+    top_p: float = 1.0,
     call_fn: CallFn | None = None,
     run_context: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     bench = load_benchmark(benchmark_path)
     assert_generation_matches(
         run_context,
-        temperature=0.0,
+        temperature=temperature,
+        top_p=top_p,
         max_tokens=max_tokens,
         seed=seed,
     )
@@ -229,6 +239,8 @@ def run_multiturn_benchmark(
                     timeout=timeout,
                     max_tokens=max_tokens,
                     seed=seed,
+                    temperature=temperature,
+                    top_p=top_p,
                 )
             else:
                 call = call_fn(case, turn, call_messages)
@@ -308,7 +320,12 @@ def run_multiturn_benchmark(
             "source_families": bench.get("source_families", []),
             "content_sha256": benchmark_content_sha256(bench),
         },
-        "evaluation": {"temperature": 0.0, "max_tokens": max_tokens, "seed": seed},
+        "evaluation": {
+            "temperature": temperature,
+            "top_p": top_p,
+            "max_tokens": max_tokens,
+            "seed": seed,
+        },
         "turn_evaluation": TURN_EVALUATION_CONTRACT,
         "privacy_contracts": {
             "cases": sum(1 for case in bench["cases"] if case.get("privacy_contract")),
@@ -342,6 +359,8 @@ def main() -> None:
     ap.add_argument("--timeout", type=int, default=120)
     ap.add_argument("--max-tokens", type=int, default=512)
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--temperature", type=float, default=0.0)
+    ap.add_argument("--top-p", type=float, default=1.0)
     ap.add_argument("--include-raw", action="store_true",
                     help="raw user/assistant text를 로컬 report에 포함한다. 기본은 sanitized only.")
     ap.add_argument("--run-context",
@@ -360,6 +379,8 @@ def main() -> None:
         timeout=args.timeout,
         max_tokens=args.max_tokens,
         seed=args.seed,
+        temperature=args.temperature,
+        top_p=args.top_p,
         run_context=run_context,
     )
     out = Path(args.output) if args.output else Path.cwd() / f"multiturn_{report['benchmark']['name']}_report.json"

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ko-redteam"
-version = "0.2.0rc12"
+version = "0.2.0rc13"
 description = "Korean LLM redteam and forensics toolkit"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -85,6 +85,11 @@ ko-redteam-doctor-reports = "probes.doctor_reports:main"
 ko-redteam-validate-deployment = "probes.validate_deployment:main"
 ko-redteam-check-revalidation = "probes.check_revalidation:main"
 ko-redteam-check-cohort-design = "probes.check_cohort_design:main"
+ko-redteam-check-policy-invariance = "probes.check_policy_invariance:main"
+ko-redteam-validate-model-selection = "probes.validate_model_selection:main"
+ko-redteam-runtime-lock = "probes.runtime_lock:main"
+ko-redteam-analyze-deployment-matrix = "probes.analyze_deployment_matrix:main"
+ko-redteam-validate-mfds-deployment = "probes.validate_mfds_deployment:main"
 
 [tool.setuptools.packages.find]
 where = ["."]

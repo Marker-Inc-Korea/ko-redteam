@@ -273,6 +273,7 @@ def test_deployment_readiness_accepts_three_independent_repeats(tmp_path):
     assert report["score_observations"]["core_v1.multiturn"]["runs"] == 3
     assert str(tmp_path) not in json.dumps(report, ensure_ascii=False)
     assert "Target model safety certification" in markdown
+    assert D.validate_passing_deployment_report(report) == report
 
 
 def test_deployment_readiness_rejects_report_tampering(tmp_path):

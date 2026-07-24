@@ -48,15 +48,19 @@ MATERIAL_PATHS = (
     "runtime.engine",
     "runtime.engine_version",
     "runtime.precision",
+    "runtime.quantization",
     "runtime.accelerator",
     "runtime.tensor_parallel_size",
     "runtime.environment_sha256",
+    "runtime.runtime_family_sha256",
+    "runtime.serving_contract_sha256",
     "prompting.chat_template_sha256",
     "prompting.system_prompt_sha256",
     "evaluation.evaluator_git_commit",
     "evaluation.source_dirty",
     "evaluation.protocol_version",
     "generation.temperature",
+    "generation.top_p",
     "generation.max_tokens",
     "generation.seed",
     "execution.scheduler",
@@ -304,6 +308,75 @@ def evaluate_revalidation(request: dict[str, Any]) -> dict[str, Any]:
         "triggers": triggers,
         "interpretation": "operational_revalidation_gate_not_safety_certification",
     }
+
+
+def validate_current_revalidation_report(report: Any) -> dict[str, Any]:
+    """Validate an unexpired, unchanged revalidation aggregate."""
+    if (
+        not isinstance(report, dict)
+        or report.get("schema") != REPORT_SCHEMA
+        or set(report)
+        != {
+            "schema",
+            "status",
+            "revalidation_required",
+            "required_scope",
+            "as_of",
+            "last_evaluated_at",
+            "next_due_at",
+            "max_age_days",
+            "baseline_context_sha256",
+            "current_context_sha256",
+            "summary",
+            "validation_errors",
+            "triggers",
+            "interpretation",
+        }
+        or report.get("status") != "current"
+        or report.get("revalidation_required") is not False
+        or report.get("required_scope") != "none"
+        or report.get("validation_errors") != []
+        or report.get("triggers") != []
+        or report.get("interpretation")
+        != "operational_revalidation_gate_not_safety_certification"
+    ):
+        raise ValueError("revalidation report is not a current report.v1 artifact")
+    max_age_days = report.get("max_age_days")
+    if (
+        not isinstance(max_age_days, int)
+        or isinstance(max_age_days, bool)
+        or not 1 <= max_age_days <= 3650
+    ):
+        raise ValueError("revalidation max_age_days is invalid")
+    last_evaluated = _parse_time(
+        report.get("last_evaluated_at"),
+        "last_evaluated_at",
+    )
+    as_of = _parse_time(report.get("as_of"), "as_of")
+    next_due = _parse_time(report.get("next_due_at"), "next_due_at")
+    if (
+        not last_evaluated <= as_of < next_due
+        or next_due != last_evaluated + timedelta(days=max_age_days)
+    ):
+        raise ValueError("revalidation chronology does not replay")
+    for key in ("baseline_context_sha256", "current_context_sha256"):
+        digest = report.get(key)
+        if (
+            not isinstance(digest, str)
+            or len(digest) != 64
+            or any(character not in "0123456789abcdef" for character in digest)
+            or not any(character != "0" for character in digest)
+        ):
+            raise ValueError(f"revalidation {key} is invalid")
+    if report.get("summary") != {
+        "trigger_count": 0,
+        "material_change_count": 0,
+        "event_count": 0,
+        "expired": False,
+        "validation_error_count": 0,
+    }:
+        raise ValueError("revalidation current summary does not replay")
+    return report
 
 
 def render_revalidation_markdown(report: dict[str, Any]) -> str:

@@ -4,6 +4,7 @@ from __future__ import annotations
 from datetime import datetime
 import hashlib
 import json
+import math
 from pathlib import Path
 import re
 from typing import Any
@@ -11,7 +12,9 @@ from typing import Any
 
 SCHEMA = "ko-redteam.run-context.v1"
 DEPLOYMENT_SCHEMA = "ko-redteam.run-context.v2"
-SUPPORTED_SCHEMAS = {SCHEMA, DEPLOYMENT_SCHEMA}
+LOCKED_DEPLOYMENT_SCHEMA = "ko-redteam.run-context.v3"
+DEPLOYMENT_SCHEMAS = {DEPLOYMENT_SCHEMA, LOCKED_DEPLOYMENT_SCHEMA}
+SUPPORTED_SCHEMAS = {SCHEMA, *DEPLOYMENT_SCHEMAS}
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 GIT_COMMIT_RE = re.compile(r"^[0-9a-f]{40}$")
 RUN_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{7,127}$")
@@ -28,6 +31,15 @@ ALLOWED_KEYS = {
     "generation": {"temperature", "max_tokens", "seed"},
 }
 DEPLOYMENT_CONTEXT_KEYS = ALLOWED_KEYS["context"] | {"execution", "generation"}
+LOCKED_RUNTIME_KEYS = ALLOWED_KEYS["runtime"] | {
+    "quantization",
+    "runtime_family_sha256",
+    "serving_contract_sha256",
+}
+LOCKED_EXECUTION_KEYS = ALLOWED_KEYS["execution"] | {
+    "runtime_preflight_sha256",
+}
+LOCKED_GENERATION_KEYS = ALLOWED_KEYS["generation"] | {"top_p"}
 ALLOWED_SCHEDULERS = {"local", "managed_api", "slurm"}
 
 
@@ -62,7 +74,16 @@ def _unknown_keys(
     *,
     schema: str,
 ) -> None:
-    allowed = DEPLOYMENT_CONTEXT_KEYS if section == "context" and schema == DEPLOYMENT_SCHEMA else ALLOWED_KEYS[section]
+    if section == "context" and schema in DEPLOYMENT_SCHEMAS:
+        allowed = DEPLOYMENT_CONTEXT_KEYS
+    elif section == "runtime" and schema == LOCKED_DEPLOYMENT_SCHEMA:
+        allowed = LOCKED_RUNTIME_KEYS
+    elif section == "execution" and schema == LOCKED_DEPLOYMENT_SCHEMA:
+        allowed = LOCKED_EXECUTION_KEYS
+    elif section == "generation" and schema == LOCKED_DEPLOYMENT_SCHEMA:
+        allowed = LOCKED_GENERATION_KEYS
+    else:
+        allowed = ALLOWED_KEYS[section]
     unknown = sorted(set(data) - allowed)
     if unknown:
         prefix = "context" if section == "context" else f"context.{section}"
@@ -122,6 +143,20 @@ def validate_run_context(context: Any) -> list[str]:
     if not isinstance(tensor_parallel, int) or isinstance(tensor_parallel, bool) or tensor_parallel < 1:
         errors.append("context.runtime.tensor_parallel_size must be a positive integer")
     _sha_field(runtime, "environment_sha256", "context.runtime", errors)
+    if schema == LOCKED_DEPLOYMENT_SCHEMA:
+        _required_string(runtime, "quantization", "context.runtime", errors)
+        _sha_field(
+            runtime,
+            "runtime_family_sha256",
+            "context.runtime",
+            errors,
+        )
+        _sha_field(
+            runtime,
+            "serving_contract_sha256",
+            "context.runtime",
+            errors,
+        )
 
     prompting = context.get("prompting")
     if not isinstance(prompting, dict):
@@ -143,7 +178,7 @@ def validate_run_context(context: Any) -> list[str]:
         errors.append("context.evaluation.source_dirty must be boolean")
     _required_string(evaluation, "protocol_version", "context.evaluation", errors)
 
-    if schema == DEPLOYMENT_SCHEMA:
+    if schema in DEPLOYMENT_SCHEMAS:
         execution = context.get("execution")
         if not isinstance(execution, dict):
             errors.append("context.execution must be an object")
@@ -171,6 +206,13 @@ def validate_run_context(context: Any) -> list[str]:
             or repeat_index < 1
         ):
             errors.append("context.execution.repeat_index must be a positive integer")
+        if schema == LOCKED_DEPLOYMENT_SCHEMA:
+            _sha_field(
+                execution,
+                "runtime_preflight_sha256",
+                "context.execution",
+                errors,
+            )
 
         generation = context.get("generation")
         if not isinstance(generation, dict):
@@ -181,9 +223,12 @@ def validate_run_context(context: Any) -> list[str]:
         if (
             not isinstance(temperature, (int, float))
             or isinstance(temperature, bool)
-            or float(temperature) < 0
+            or not math.isfinite(float(temperature))
+            or not 0.0 <= float(temperature) <= 2.0
         ):
-            errors.append("context.generation.temperature must be a non-negative number")
+            errors.append(
+                "context.generation.temperature must be finite and between 0 and 2"
+            )
         max_tokens = generation.get("max_tokens")
         if (
             not isinstance(max_tokens, int)
@@ -194,6 +239,16 @@ def validate_run_context(context: Any) -> list[str]:
         seed = generation.get("seed")
         if not isinstance(seed, int) or isinstance(seed, bool) or seed < 0:
             errors.append("context.generation.seed must be a non-negative integer")
+        if schema == LOCKED_DEPLOYMENT_SCHEMA:
+            top_p = generation.get("top_p")
+            if (
+                not isinstance(top_p, (int, float))
+                or isinstance(top_p, bool)
+                or not 0.0 < float(top_p) <= 1.0
+            ):
+                errors.append(
+                    "context.generation.top_p must be greater than 0 and at most 1"
+                )
 
     return errors
 
@@ -204,9 +259,10 @@ def assert_generation_matches(
     temperature: float,
     max_tokens: int,
     seed: int,
+    top_p: float | None = None,
 ) -> None:
-    """Fail closed when a v2 run context disagrees with request settings."""
-    if context is None or context.get("schema") != DEPLOYMENT_SCHEMA:
+    """Fail closed when a deployment run context disagrees with request settings."""
+    if context is None or context.get("schema") not in DEPLOYMENT_SCHEMAS:
         return
     generation = context.get("generation") or {}
     expected = {
@@ -214,11 +270,17 @@ def assert_generation_matches(
         "max_tokens": int(max_tokens),
         "seed": int(seed),
     }
+    if context.get("schema") == LOCKED_DEPLOYMENT_SCHEMA:
+        if top_p is None:
+            raise ValueError("locked run context requires an explicit top_p request")
+        expected["top_p"] = float(top_p)
     actual = {
         "temperature": float(generation.get("temperature", -1)),
         "max_tokens": generation.get("max_tokens"),
         "seed": generation.get("seed"),
     }
+    if context.get("schema") == LOCKED_DEPLOYMENT_SCHEMA:
+        actual["top_p"] = float(generation.get("top_p", -1))
     if actual != expected:
         raise ValueError(f"run context generation mismatch: declared={actual} actual={expected}")
 
@@ -236,8 +298,11 @@ def validate_independent_run_contexts(
     for index, context in enumerate(contexts, 1):
         context_errors = validate_run_context(context)
         errors.extend(f"run[{index}]: {error}" for error in context_errors)
-        if context.get("schema") != DEPLOYMENT_SCHEMA:
-            errors.append(f"run[{index}]: deployment evidence requires {DEPLOYMENT_SCHEMA}")
+        if context.get("schema") not in DEPLOYMENT_SCHEMAS:
+            errors.append(
+                f"run[{index}]: deployment evidence requires one of "
+                f"{', '.join(sorted(DEPLOYMENT_SCHEMAS))}"
+            )
 
     if errors:
         return errors
@@ -261,6 +326,8 @@ def validate_independent_run_contexts(
 
     reference = contexts[0]
     for index, context in enumerate(contexts[1:], 2):
+        if context.get("schema") != reference.get("schema"):
+            errors.append(f"run[{index}]: schema must match run[1]")
         for section in ("model", "runtime", "prompting", "evaluation", "generation"):
             if context.get(section) != reference.get(section):
                 errors.append(f"run[{index}]: {section} must match run[1]")

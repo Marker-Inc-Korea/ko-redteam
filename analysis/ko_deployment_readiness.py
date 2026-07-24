@@ -4,7 +4,9 @@ from __future__ import annotations
 from datetime import datetime, timezone
 import hashlib
 import json
+import math
 from pathlib import Path
+import re
 from typing import Any, Iterable
 
 try:
@@ -34,6 +36,7 @@ except ModuleNotFoundError:  # package import path
 SCHEMA = "ko-redteam.deployment-readiness.v1"
 MIN_REPEATS = 3
 PROTOCOL_PREFIX = "internal-deployment-v6-"
+SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 
 PROFILE_SPECS = {
     "core_v1": {
@@ -304,6 +307,8 @@ def _expected_evidence_config(config: dict[str, Any]) -> dict[str, Any]:
         "timeout": config.get("timeout"),
         "max_tokens": config.get("max_tokens"),
         "seed": config.get("seed"),
+        "temperature": config.get("temperature"),
+        "top_p": config.get("top_p"),
         "coverage": config.get("coverage"),
         "endpoint_smoke": {
             "enabled": endpoint_smoke.get("enabled"),
@@ -345,6 +350,10 @@ def _validate_profile_config(
         "raw output policy": config.get("include_raw") is False,
         "generation max_tokens": config.get("max_tokens") == generation.get("max_tokens"),
         "generation seed": config.get("seed") == generation.get("seed"),
+        "generation temperature": config.get("temperature", 0.0)
+        == generation.get("temperature"),
+        "generation top_p": config.get("top_p", 1.0)
+        == generation.get("top_p", 1.0),
         "served model": config.get("model") == (context.get("model") or {}).get("served_model"),
         "run context reference": manifest.get("run_context") == expected_context_ref,
     }
@@ -748,6 +757,231 @@ def evaluate_deployment_repeats(
         "score_observations": _score_summary(repeat_results),
         "repeats": repeat_results,
     }
+
+
+def validate_passing_deployment_report(
+    report: Any,
+    *,
+    require_top_p: bool = False,
+) -> dict[str, Any]:
+    """Replay a passing aggregate without reopening private response reports."""
+    if (
+        not isinstance(report, dict)
+        or report.get("schema") != SCHEMA
+        or set(report)
+        != {
+            "schema",
+            "generated_at",
+            "status",
+            "evidence_status",
+            "scope",
+            "model",
+            "generation",
+            "repeat_count",
+            "validated_context_count",
+            "issue_summary",
+            "issues",
+            "benchmark_identities",
+            "score_observations",
+            "repeats",
+        }
+    ):
+        raise ValueError("deployment-readiness report fields do not match the contract")
+    try:
+        generated_at = datetime.fromisoformat(
+            str(report.get("generated_at") or "").replace("Z", "+00:00")
+        )
+    except ValueError as exc:
+        raise ValueError("deployment-readiness generated_at is invalid") from exc
+    if generated_at.tzinfo is None:
+        raise ValueError("deployment-readiness generated_at needs a timezone")
+    if (
+        report.get("status") != "pass"
+        or report.get("evidence_status") != "internal_operational_candidate"
+        or report.get("scope")
+        != {
+            "external_review": "excluded_by_request",
+            "official_publication": "not_evaluated",
+            "target_model_safety_certification": "not_granted",
+        }
+        or report.get("issues") != []
+        or report.get("issue_summary")
+        != {
+            "total": 0,
+            "context": 0,
+            "profile": 0,
+            "artifact": 0,
+            "benchmark": 0,
+            "measurement": 0,
+        }
+    ):
+        raise ValueError("deployment-readiness report did not pass the frozen policy")
+    model = report.get("model")
+    if (
+        not isinstance(model, dict)
+        or set(model) != {"model_id", "served_model", "revision"}
+        or any(
+            not isinstance(model.get(key), str) or not model[key].strip()
+            for key in ("model_id", "served_model")
+        )
+        or not isinstance(model.get("revision"), str)
+        or not re.fullmatch(r"[0-9a-f]{40,64}", model["revision"])
+        or not any(character != "0" for character in model["revision"])
+    ):
+        raise ValueError("deployment-readiness model identity is invalid")
+    generation = report.get("generation")
+    expected_generation_keys = {
+        "temperature",
+        "max_tokens",
+        "seed",
+        *(("top_p",) if require_top_p else ()),
+    }
+    if (
+        not isinstance(generation, dict)
+        or not expected_generation_keys <= set(generation)
+        or set(generation)
+        not in (
+            {"temperature", "max_tokens", "seed"},
+            {"temperature", "top_p", "max_tokens", "seed"},
+        )
+        or not isinstance(generation.get("temperature"), (int, float))
+        or isinstance(generation.get("temperature"), bool)
+        or not math.isfinite(float(generation["temperature"]))
+        or not 0.0 <= float(generation["temperature"]) <= 2.0
+        or not isinstance(generation.get("max_tokens"), int)
+        or isinstance(generation.get("max_tokens"), bool)
+        or generation["max_tokens"] < 1
+        or not isinstance(generation.get("seed"), int)
+        or isinstance(generation.get("seed"), bool)
+        or generation["seed"] < 0
+    ):
+        raise ValueError("deployment-readiness generation settings are invalid")
+    if "top_p" in generation and (
+        not isinstance(generation["top_p"], (int, float))
+        or isinstance(generation["top_p"], bool)
+        or not math.isfinite(float(generation["top_p"]))
+        or not 0.0 < float(generation["top_p"]) <= 1.0
+    ):
+        raise ValueError("deployment-readiness top_p is invalid")
+
+    repeats = report.get("repeats")
+    repeat_count = report.get("repeat_count")
+    validated_count = report.get("validated_context_count")
+    if (
+        not isinstance(repeats, list)
+        or not isinstance(repeat_count, int)
+        or isinstance(repeat_count, bool)
+        or not isinstance(validated_count, int)
+        or isinstance(validated_count, bool)
+        or repeat_count < MIN_REPEATS
+        or validated_count != repeat_count
+        or len(repeats) != repeat_count
+    ):
+        raise ValueError("deployment-readiness repeat counts are invalid")
+    identities = report.get("benchmark_identities")
+    expected_identity_keys = {
+        f"{profile}.{report_name}"
+        for profile, profile_spec in PROFILE_SPECS.items()
+        for report_name in profile_spec["reports"]
+    }
+    if (
+        not isinstance(identities, dict)
+        or set(identities) != expected_identity_keys
+        or any(
+            not isinstance(value, str)
+            or not SHA256_RE.fullmatch(value)
+            or not any(character != "0" for character in value)
+            for value in identities.values()
+        )
+    ):
+        raise ValueError("deployment-readiness benchmark identities are invalid")
+
+    unique_fields = {
+        "run_id": [],
+        "job_id": [],
+        "serving_session_id": [],
+        "context_sha256": [],
+    }
+    repeat_indexes = []
+    for repeat in repeats:
+        if not isinstance(repeat, dict) or set(repeat) != {
+            "repeat_index",
+            "run_id",
+            "job_id",
+            "serving_session_id",
+            "context_sha256",
+            "profiles",
+        }:
+            raise ValueError("deployment-readiness repeat row is malformed")
+        repeat_index = repeat.get("repeat_index")
+        if (
+            not isinstance(repeat_index, int)
+            or isinstance(repeat_index, bool)
+            or repeat_index < 1
+        ):
+            raise ValueError("deployment-readiness repeat index is invalid")
+        repeat_indexes.append(repeat_index)
+        for key in ("run_id", "job_id", "serving_session_id"):
+            value = repeat.get(key)
+            if not isinstance(value, str) or not value:
+                raise ValueError(f"deployment-readiness {key} is invalid")
+            unique_fields[key].append(value)
+        context_sha256 = repeat.get("context_sha256")
+        if (
+            not isinstance(context_sha256, str)
+            or not SHA256_RE.fullmatch(context_sha256)
+            or not any(character != "0" for character in context_sha256)
+        ):
+            raise ValueError("deployment-readiness context digest is invalid")
+        unique_fields["context_sha256"].append(context_sha256)
+        profiles = repeat.get("profiles")
+        if not isinstance(profiles, dict) or set(profiles) != set(PROFILE_SPECS):
+            raise ValueError("deployment-readiness profile set is incomplete")
+        endpoints = set()
+        for profile, profile_spec in PROFILE_SPECS.items():
+            profile_result = profiles[profile]
+            if (
+                not isinstance(profile_result, dict)
+                or set(profile_result) != {"endpoint", "reports"}
+                or not isinstance(profile_result.get("endpoint"), str)
+                or not profile_result["endpoint"]
+                or not isinstance(profile_result.get("reports"), dict)
+                or set(profile_result["reports"]) != set(profile_spec["reports"])
+            ):
+                raise ValueError("deployment-readiness profile result is malformed")
+            endpoints.add(profile_result["endpoint"])
+            for report_name, observation in profile_result["reports"].items():
+                identity_key = f"{profile}.{report_name}"
+                if (
+                    not isinstance(observation, dict)
+                    or set(observation)
+                    != {"benchmark", "content_sha256", "overall", "grade"}
+                    or observation.get("benchmark")
+                    != profile_spec["reports"][report_name][2]
+                    or observation.get("content_sha256") != identities[identity_key]
+                    or not isinstance(observation.get("overall"), (int, float))
+                    or isinstance(observation.get("overall"), bool)
+                    or not math.isfinite(float(observation["overall"]))
+                    or not 0.0 <= float(observation["overall"]) <= 100.0
+                    or not isinstance(observation.get("grade"), str)
+                    or not observation["grade"]
+                ):
+                    raise ValueError(
+                        "deployment-readiness report observation is invalid"
+                    )
+        if len(endpoints) != 1:
+            raise ValueError("deployment-readiness paired endpoints differ")
+    if (
+        sorted(repeat_indexes) != list(range(1, repeat_count + 1))
+        or any(
+            len(values) != len(set(values))
+            for values in unique_fields.values()
+        )
+    ):
+        raise ValueError("deployment-readiness repeats are not independent")
+    if report.get("score_observations") != _score_summary(repeats):
+        raise ValueError("deployment-readiness score summary does not replay")
+    return report
 
 
 def render_deployment_markdown(report: dict[str, Any]) -> str:

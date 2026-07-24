@@ -1,0 +1,37 @@
+{
+  "schema": "ko-redteam.mfds-cybersecurity-evidence.v1",
+  "status": "pending",
+  "controls": [
+    {
+      "id": "api_credential_exposure",
+      "status": "pending",
+      "evidence_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "id": "audit_logging",
+      "status": "pending",
+      "evidence_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "id": "incident_response",
+      "status": "pending",
+      "evidence_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "id": "network_transport",
+      "status": "pending",
+      "evidence_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "id": "patient_data_leakage",
+      "status": "pending",
+      "evidence_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "id": "plugin_extension_boundary",
+      "status": "pending",
+      "evidence_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    }
+  ],
+  "raw_prompt_or_response_used": false
+}

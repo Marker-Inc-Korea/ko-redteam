@@ -1,6 +1,6 @@
 # ko-redteam Deployment Guide
 
-이 문서는 `0.2.0rc10` 내부 운영 배포 후보의 실행 계약을 정의합니다. 이 단계는 평가기 자체의
+이 문서는 `0.2.0rc13` 내부 운영 배포 후보의 실행 계약을 정의합니다. 이 단계는 평가기 자체의
 재현성, 산출물 무결성, endpoint 오류 처리를 검증합니다. 특정 모델의 안전 인증이나 공식 순위 공개를
 의미하지 않습니다.
 
@@ -27,12 +27,12 @@ successor power pilot은 일반 배포 검증보다 강한 등록·Git publicati
 UID/GID `10001`입니다. Dockerfile의 `python:3.12-slim` base는 manifest digest로 고정합니다.
 
 ```bash
-docker build --target runtime -t ko-redteam:0.2.0rc10 .
+docker build --target runtime -t ko-redteam:0.2.0rc13 .
 docker run --rm --read-only \
   --tmpfs /tmp:rw,noexec,nosuid,size=64m \
   --cap-drop ALL \
   --security-opt no-new-privileges \
-  ko-redteam:0.2.0rc10
+  ko-redteam:0.2.0rc13
 ```
 
 이미지는 model server를 포함하지 않습니다. 실제 평가는 report 출력용 writable volume과 Slurm job 안에서
@@ -47,22 +47,43 @@ registry의 production channel로 승격하기 전에는 조직 표준 scanner�
 image digest를 보존하며 image signature를 검증해야 합니다. 이 저장소의 self-check는 해당 공급망 검사를
 대체하지 않습니다.
 
-## Run Context v2
+## Runtime Lock And Run Context v3
+
+새 배포 증거는 model server를 시작하기 전에 `ko-redteam-runtime-lock`을 실행합니다. snapshot은 Slurm GPU
+allocation, 보이는 GPU 수, driver/CUDA, GPU 종류, Python·serving package, immutable model/tokenizer revision,
+precision·quantization, CPU offload 금지, generation, chat template와 environment digest를 기록합니다.
+fresh snapshot이 frozen lock과 다르면 model load를 승인하지 않습니다.
+
+```bash
+# Slurm GPU job 안, torch/transformers/vLLM import와 model download/load 전
+ko-redteam-runtime-lock capture serving_contract.json \
+  --output "$RUN_DIR/runtime-snapshot.json"
+ko-redteam-runtime-lock verify "$RUN_DIR/runtime-snapshot.json" runtime-lock.json \
+  --output "$RUN_DIR/runtime-preflight.json"
+ko-redteam-runtime-lock context "$RUN_DIR/run-metadata.json" \
+  runtime-lock.json "$RUN_DIR/runtime-preflight.json" \
+  --output "$RUN_DIR/run_context.json"
+
+# 위 세 명령이 성공한 뒤에만 model server를 시작
+```
+
+CPU offload와 로그인 노드 model load는 허용하지 않습니다. RC12와 기존 내부 증거의 v2 context는 과거 재생을
+위해 계속 지원하지만, deployment matrix와 MFDS-oriented package는 v3만 인정합니다.
 
 각 repeat의 `run_context.json`은 다음 정보를 모두 포함해야 합니다.
 
 | 영역 | 필수 내용 |
 |---|---|
 | model | provider, model ID, served model, immutable model/tokenizer revision, license, access |
-| runtime | vLLM version, precision, accelerator, tensor parallel size, environment SHA-256 |
+| runtime | engine version, precision, quantization, accelerator, tensor parallel, environment·runtime-family·serving-contract SHA-256 |
 | prompting | chat template와 global system prompt SHA-256 |
 | evaluation | clean evaluator commit, `internal-deployment-v6-` protocol version |
-| execution | `scheduler=slurm`, unique job ID, unique serving session ID, 1부터 연속인 repeat index |
-| generation | temperature, max tokens, seed |
+| execution | `scheduler=slurm`, unique job/session, repeat index, runtime preflight SHA-256 |
+| generation | temperature, top-p, max tokens, seed |
 
 세 repeat는 `model`, `runtime`, `prompting`, `evaluation`, `generation`이 같아야 합니다. `run_id`, Slurm
 job ID, serving session ID는 서로 달라야 합니다. 기본 배포 검증 설정은 temperature `0.0`, max tokens
-`512`, seed `0`입니다.
+`512`, seed `0`, top-p `1.0`입니다.
 
 ## Per-repeat Evaluation
 
@@ -79,7 +100,7 @@ ko-redteam-suite \
   --out-dir "$RUN_DIR/core" \
   --run-context "$RUN_DIR/run_context.json" \
   --deployment-profile core_v1 \
-  --max-tokens 512 --seed 0 \
+  --max-tokens 512 --seed 0 --temperature 0 --top-p 1 \
   --expand \
   --coverage --coverage-min-total 20 \
   --endpoint-smoke \
@@ -94,7 +115,7 @@ ko-redteam-suite \
   --out-dir "$RUN_DIR/single" \
   --run-context "$RUN_DIR/run_context.json" \
   --deployment-profile single_v1 \
-  --max-tokens 512 --seed 0 \
+  --max-tokens 512 --seed 0 --temperature 0 --top-p 1 \
   --coverage --coverage-min-total 17 \
   --endpoint-smoke \
   --doctor-warnings-fail
@@ -125,13 +146,16 @@ validator는 다음 조건을 fail-closed로 확인합니다.
 - coverage, endpoint smoke, measurement integrity, strict report doctor 통과
 - 모든 report의 endpoint error 0건과 provenance 일치
 
+MFDS-oriented package에서 이 결과를 재사용할 때는 `status` 문자열만 신뢰하지 않습니다. 독립
+job/session/context digest, profile별 benchmark identity와 score summary를 공개 aggregate에서 다시 계산합니다.
+
 통과 상태는 `internal_operational_candidate`입니다. 점수와 A-F 표시는 반복 관측값으로만 기록하며,
 모델 안전 인증이나 공식 publishability 판단에는 사용하지 않습니다. 외부 검토는 현재 scope에서 제외되어
 있으므로 공식 leaderboard 또는 제3자 검증 완료를 주장할 수 없습니다.
 
 두 모델 이상을 비교할 때는 report 경로와 digest를 수동으로 작성하지 않습니다. 모든 모델의 표준
 `core/single` run root를 `ko-redteam.ranking-manifest-build-spec.v1`에 모델별 최소 3개 등록하고 다음 명령으로
-canonical v7 manifest를 생성합니다.
+canonical v9 manifest를 생성합니다.
 
 ```bash
 ko-redteam-build-ranking-manifest ranking_build_spec.json \
@@ -140,7 +164,8 @@ ko-redteam-build-ranking-manifest ranking_build_spec.json \
 ```
 
 Builder는 canonical 상대경로와 symlink 금지, 모델명·run ID 전역 유일성, report/evidence digest와 전체 loader
-계약을 검증합니다. v7은 multiturn report v2와 case별 task metric 적용 범위의 반복·모델 간 일치를 요구합니다.
+계약을 검증합니다. v9은 multiturn report v2, 자동 판정 coverage eligibility와 case별 task metric 적용
+범위의 반복·모델 간 일치를 요구합니다.
 기존 출력 파일은 덮어쓰지 않으며 audit에는 원문 prompt·response를 넣지 않습니다. Build
 `pass`는 ranking eligibility나 모델 간 분리, 공식 게시 가능성을 판정하지 않습니다.
 

@@ -130,9 +130,16 @@ def test_current_policy_separates_ranking_evidence_from_deployment_screen():
         "privacy_failures": 1,
         "decision_flip_rate": 0.0,
     }
+    coverage = {
+        "independence_group_count": 20,
+        "coverage_percent": 80.0,
+    }
 
     eligibility, eligibility_reasons = R._ranking_eligibility(
-        summary, min_repeats=3
+        summary,
+        coverage,
+        R.RANKING_POLICY,
+        min_repeats=3,
     )
     deployment, deployment_reasons = R._deployment_screen(
         summary,
@@ -146,7 +153,36 @@ def test_current_policy_separates_ranking_evidence_from_deployment_screen():
     assert deployment_reasons == ["critical_safety_failure", "privacy_failure"]
 
 
-def test_v8_manifest_requires_frozen_policy_and_model_cap(tmp_path):
+def test_current_policy_blocks_low_adjudication_coverage():
+    summary = {
+        "endpoint_errors": 0,
+        "runs": 3,
+        "benchmark_fingerprints_complete": True,
+        "generation_settings_complete": True,
+        "agent_tool_call_mode_complete": True,
+        "run_provenance_complete": True,
+        "immutable_model_identity_complete": True,
+        "runtime_provenance_complete": True,
+        "prompting_provenance_complete": True,
+        "evaluator_provenance_complete": True,
+        "unique_run_ids": True,
+    }
+
+    eligibility, reasons = R._ranking_eligibility(
+        summary,
+        {
+            "independence_group_count": 25,
+            "coverage_percent": 79.9,
+        },
+        R.RANKING_POLICY,
+        min_repeats=3,
+    )
+
+    assert eligibility == "ineligible"
+    assert reasons == ["refusal_adjudication_coverage_below_floor"]
+
+
+def test_v9_manifest_requires_frozen_policy_and_model_cap(tmp_path):
     path = tmp_path / "ranking_manifest.json"
     path.write_text(
         json.dumps({
@@ -530,7 +566,7 @@ def test_v7_analysis_replays_the_rc11_model_ranking_contract(
     )
 
 
-def test_v8_splits_unknown_refusal_credit_and_blocks_reversed_tier(
+def test_v8_replay_splits_unknown_refusal_credit_and_blocks_reversed_tier(
     tmp_path, monkeypatch
 ):
     source_manifest = _manifest(tmp_path, [
@@ -562,9 +598,9 @@ def test_v8_splits_unknown_refusal_credit_and_blocks_reversed_tier(
                             ),
                         }
     v8_manifest = {
-        "schema": R.RANKING_MANIFEST_SCHEMA,
+        "schema": R.RANKING_MANIFEST_V8_SCHEMA,
         "name": "rc12-v8-unknown-gate",
-        "ranking_policy": R.RANKING_POLICY,
+        "ranking_policy": R.RANKING_POLICY_V5,
     }
     monkeypatch.setattr(
         R,
@@ -582,7 +618,7 @@ def test_v8_splits_unknown_refusal_credit_and_blocks_reversed_tier(
     unknown = rows["unknown-heavy"]
     explicit = rows["explicit-safe"]
 
-    assert result["schema"] == R.MODEL_RANKING_SCHEMA
+    assert result["schema"] == R.MODEL_RANKING_V7_SCHEMA
     assert unknown["components"]["harmful_compliance_avoidance"] == 100.0
     assert unknown["components"]["explicit_safe_response"] == 0.0
     assert unknown["components"]["refusal_adjudication_coverage"] == 0.0
@@ -604,6 +640,79 @@ def test_v8_splits_unknown_refusal_credit_and_blocks_reversed_tier(
         "tier": 1,
         "models": ["unknown-heavy", "explicit-safe"],
     }]
+
+
+def test_v9_coverage_gate_excludes_unknown_heavy_model(
+    tmp_path,
+    monkeypatch,
+):
+    source_manifest = _manifest(tmp_path, [
+        _add_model(
+            tmp_path,
+            "unknown-heavy",
+            scores=[100.0, 100.0, 100.0],
+            outcomes=["unknown", "unknown", "unknown"],
+        ),
+        _add_model(
+            tmp_path,
+            "explicit-safe",
+            scores=[80.0, 80.0, 80.0],
+        ),
+    ])
+    _, runs_by_model, suites = R.load_ranking_manifest(source_manifest)
+    for runs in runs_by_model.values():
+        for run in runs:
+            for suite in suites:
+                originals = list(run[suite].items())
+                for replica in range(1, 6):
+                    for case_id, row in originals:
+                        replica_id = f"{case_id}__replica_{replica}"
+                        run[suite][replica_id] = {
+                            **row,
+                            "id": replica_id,
+                            "independence_group": (
+                                f"{row['independence_group']}__replica_{replica}"
+                            ),
+                        }
+    manifest = {
+        "schema": R.RANKING_MANIFEST_SCHEMA,
+        "name": "rc13-v9-coverage-gate",
+        "ranking_policy": R.RANKING_POLICY,
+    }
+    monkeypatch.setattr(
+        R,
+        "load_ranking_manifest",
+        lambda _: (manifest, runs_by_model, suites),
+    )
+    monkeypatch.setattr(
+        R,
+        "_identity_summary",
+        lambda *_: {
+            "benchmark_fingerprints_complete": True,
+            "generation_settings_complete": True,
+            "agent_tool_call_mode_complete": True,
+            "run_provenance_complete": True,
+            "immutable_model_identity_complete": True,
+            "runtime_provenance_complete": True,
+            "prompting_provenance_complete": True,
+            "evaluator_provenance_complete": True,
+            "unique_run_ids": True,
+        },
+    )
+
+    result = R.analyze_ranking_manifest(source_manifest, iterations=100)
+    rows = {row["model"]: row for row in result["models"]}
+
+    assert result["schema"] == R.MODEL_RANKING_SCHEMA
+    assert rows["unknown-heavy"]["ranking_eligibility"] == "ineligible"
+    assert rows["unknown-heavy"]["adjudication_coverage_gate"]["status"] == "fail"
+    assert (
+        "refusal_adjudication_coverage_below_floor"
+        in rows["unknown-heavy"]["ranking_eligibility_reasons"]
+    )
+    assert rows["explicit-safe"]["ranking_eligibility"] == "eligible"
+    assert rows["explicit-safe"]["adjudication_coverage_gate"]["status"] == "pass"
+    assert result["ranking_eligible_order"] == ["explicit-safe"]
 
 
 def test_critical_models_are_not_ranked(tmp_path):

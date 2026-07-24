@@ -1,0 +1,205 @@
+{
+  "schema": "ko-redteam.mfds-deployment-package.v1",
+  "name": "REPLACE_WITH_PRODUCT_RELEASE_EVIDENCE",
+  "generated_at": "2026-07-24T12:00:00+09:00",
+  "product": {
+    "product_id": "REPLACE_WITH_PRODUCT_ID",
+    "product_name": "REPLACE_WITH_PRODUCT_NAME",
+    "release_version": "REPLACE_WITH_RELEASE_VERSION",
+    "release_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "jurisdiction": "KR-MFDS",
+    "evidence_scope": "engineering_machine_evidence_only"
+  },
+  "intended_use": {
+    "intended_purpose": "REPLACE_WITH_INTENDED_PURPOSE",
+    "medical_function": "REPLACE_WITH_MEDICAL_FUNCTION",
+    "intended_users": ["REPLACE_WITH_INTENDED_USER"],
+    "patient_population": "REPLACE_WITH_PATIENT_POPULATION",
+    "use_environments": ["REPLACE_WITH_USE_ENVIRONMENT"],
+    "input_description": "REPLACE_WITH_INPUT_DESCRIPTION",
+    "output_description": "REPLACE_WITH_OUTPUT_DESCRIPTION",
+    "clinical_decision_role": "decision_support",
+    "autonomous_final_decision_allowed": false,
+    "professional_output_review_required": true,
+    "evaluated_scope": ["REPLACE_WITH_EVALUATED_SCOPE"],
+    "excluded_scope": ["REPLACE_WITH_EXCLUDED_SCOPE"]
+  },
+  "model_system": {
+    "model_id": "REPLACE_WITH_MODEL_ID",
+    "revision": "0000000000000000000000000000000000000000",
+    "tokenizer_revision": "0000000000000000000000000000000000000000",
+    "foundation_model_id": "REPLACE_WITH_FOUNDATION_MODEL_ID",
+    "foundation_model_revision": "0000000000000000000000000000000000000000",
+    "model_card_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "training_method_document_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "training_data_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "data_update_cadence": "release_locked",
+    "third_party_model": true,
+    "third_party_provider": "REPLACE_WITH_PROVIDER",
+    "third_party_version_monitoring": true,
+    "cloud_deployment_type": "private_cloud",
+    "cloud_configuration_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "cloud_region": "KR"
+  },
+  "risk_management": {
+    "standard_alignment": "ISO-14971-aligned",
+    "risk_management_file_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "learning_mode": "locked_release",
+    "hazards": [
+      {
+        "id": "adaptive_or_continuous_learning",
+        "control_ids": ["REPLACE_CONTROL_01"],
+        "evidence_ids": ["revalidation"],
+        "engineering_control_status": "verified"
+      },
+      {
+        "id": "api_credential_exposure",
+        "control_ids": ["REPLACE_CONTROL_02"],
+        "evidence_ids": ["cybersecurity"],
+        "engineering_control_status": "verified"
+      },
+      {
+        "id": "automation_trust",
+        "control_ids": ["REPLACE_CONTROL_03"],
+        "evidence_ids": ["analytical_performance"],
+        "engineering_control_status": "verified"
+      },
+      {
+        "id": "bias_and_subgroup_performance",
+        "control_ids": ["REPLACE_CONTROL_04"],
+        "evidence_ids": ["analytical_performance"],
+        "engineering_control_status": "verified"
+      },
+      {
+        "id": "data_quality_and_fragmentation",
+        "control_ids": ["REPLACE_CONTROL_05"],
+        "evidence_ids": ["model_selection"],
+        "engineering_control_status": "verified"
+      },
+      {
+        "id": "domain_shift_and_data_drift",
+        "control_ids": ["REPLACE_CONTROL_06"],
+        "evidence_ids": ["revalidation"],
+        "engineering_control_status": "verified"
+      },
+      {
+        "id": "irrelevant_or_out_of_distribution_output",
+        "control_ids": ["REPLACE_CONTROL_07"],
+        "evidence_ids": ["analytical_performance"],
+        "engineering_control_status": "verified"
+      },
+      {
+        "id": "missing_uncertainty_or_source_attribution",
+        "control_ids": ["REPLACE_CONTROL_08"],
+        "evidence_ids": ["analytical_performance"],
+        "engineering_control_status": "verified"
+      },
+      {
+        "id": "output_inconsistency",
+        "control_ids": ["REPLACE_CONTROL_09"],
+        "evidence_ids": ["deployment_matrix"],
+        "engineering_control_status": "verified"
+      },
+      {
+        "id": "patient_data_leakage",
+        "control_ids": ["REPLACE_CONTROL_10"],
+        "evidence_ids": ["cybersecurity", "benchmark_gate"],
+        "engineering_control_status": "verified"
+      },
+      {
+        "id": "persuasive_hallucination",
+        "control_ids": ["REPLACE_CONTROL_11"],
+        "evidence_ids": ["analytical_performance"],
+        "engineering_control_status": "verified"
+      },
+      {
+        "id": "plugin_or_extension_boundary",
+        "control_ids": ["REPLACE_CONTROL_12"],
+        "evidence_ids": ["cybersecurity", "internal_deployment"],
+        "engineering_control_status": "verified"
+      }
+    ]
+  },
+  "user_information": {
+    "instructions_for_use_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "warnings": {
+      "autonomous_final_decision_prohibited": true,
+      "evaluated_scope_only": true,
+      "hallucination_and_drift_possible": true,
+      "professional_review_required": true,
+      "secure_network_and_credentials_required": true,
+      "third_party_model_version_disclosed": true
+    },
+    "uncertainty_indicator_disclosed": true,
+    "source_attribution_disclosed": true,
+    "limitations_disclosed": true
+  },
+  "change_management": {
+    "status": "initial_release",
+    "baseline_release_sha256": null,
+    "current_release_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "change_categories": ["initial_release"],
+    "ai_change_management_plan_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "component_impact_assessment_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "rollback_plan_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "before_after_evidence_ids": ["deployment_matrix", "revalidation"]
+  },
+  "postmarket": {
+    "monitoring_plan_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "rwd_rwe_plan_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "incident_response_plan_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "performance_metrics": ["REPLACE_WITH_PRODUCT_SPECIFIC_METRIC"],
+    "drift_trigger_ids": ["model_revision", "traffic_distribution_shift"],
+    "max_revalidation_age_days": 90,
+    "audit_log_retention_days": 365,
+    "rollback_sla_hours": 4,
+    "security_events_trigger_revalidation": true
+  },
+  "evidence": [
+    {
+      "id": "model_selection",
+      "kind": "model_selection",
+      "artifact": {"path": "evidence/model-selection.json", "sha256": "0000000000000000000000000000000000000000000000000000000000000000"}
+    },
+    {
+      "id": "policy_invariance",
+      "kind": "policy_invariance",
+      "artifact": {"path": "evidence/policy-invariance.json", "sha256": "0000000000000000000000000000000000000000000000000000000000000000"}
+    },
+    {
+      "id": "deployment_matrix",
+      "kind": "deployment_matrix",
+      "artifact": {"path": "evidence/deployment-matrix.json", "sha256": "0000000000000000000000000000000000000000000000000000000000000000"}
+    },
+    {
+      "id": "internal_deployment",
+      "kind": "internal_deployment",
+      "artifact": {"path": "evidence/internal-deployment.json", "sha256": "0000000000000000000000000000000000000000000000000000000000000000"}
+    },
+    {
+      "id": "benchmark_gate",
+      "kind": "benchmark_gate",
+      "artifact": {"path": "evidence/benchmark-gate.json", "sha256": "0000000000000000000000000000000000000000000000000000000000000000"}
+    },
+    {
+      "id": "revalidation",
+      "kind": "revalidation",
+      "artifact": {"path": "evidence/revalidation.json", "sha256": "0000000000000000000000000000000000000000000000000000000000000000"}
+    },
+    {
+      "id": "cybersecurity",
+      "kind": "cybersecurity",
+      "artifact": {"path": "evidence/cybersecurity.json", "sha256": "0000000000000000000000000000000000000000000000000000000000000000"}
+    },
+    {
+      "id": "analytical_performance",
+      "kind": "analytical_performance",
+      "artifact": {"path": "evidence/analytical-performance.json", "sha256": "0000000000000000000000000000000000000000000000000000000000000000"}
+    },
+    {
+      "id": "sbom",
+      "kind": "sbom",
+      "artifact": {"path": "evidence/sbom.cdx.json", "sha256": "0000000000000000000000000000000000000000000000000000000000000000"}
+    }
+  ]
+}

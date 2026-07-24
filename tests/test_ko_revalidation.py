@@ -78,6 +78,7 @@ def test_revalidation_gate_accepts_unchanged_current_evidence():
         "expired": False,
         "validation_error_count": 0,
     }
+    assert R.validate_current_revalidation_report(report) == report
 
 
 def test_revalidation_gate_detects_expiry_context_changes_and_hides_values():

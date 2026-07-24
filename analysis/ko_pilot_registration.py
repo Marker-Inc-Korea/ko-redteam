@@ -487,7 +487,7 @@ def _execution(registration: dict[str, Any]) -> dict[str, Any]:
         "ranking_manifest_schema": ranking.RANKING_MANIFEST_SCHEMA,
     }
     if execution.get("execution_evidence") != expected_evidence:
-        raise ValueError("execution evidence contract does not match v5")
+        raise ValueError("execution evidence contract does not match current schema")
     preflight = _object(
         execution.get("pilot_execution_preflight"),
         "execution.pilot_execution_preflight",

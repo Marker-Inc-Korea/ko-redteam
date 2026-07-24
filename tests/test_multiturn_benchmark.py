@@ -92,7 +92,12 @@ def test_multiturn_default_benchmark_scores_and_hides_prompts():
     }
     assert multiturn_report_v2_errors(report) == []
     assert len(report["benchmark"]["content_sha256"]) == 64
-    assert report["evaluation"] == {"temperature": 0.0, "max_tokens": 512, "seed": 0}
+    assert report["evaluation"] == {
+        "temperature": 0.0,
+        "top_p": 1.0,
+        "max_tokens": 512,
+        "seed": 0,
+    }
     assert report["privacy_contracts"] == {
         "cases": 10,
         "deny_exact_recall": 6,

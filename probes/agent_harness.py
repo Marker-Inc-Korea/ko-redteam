@@ -282,6 +282,8 @@ def _call_endpoint(
     timeout: int,
     max_tokens: int,
     seed: int,
+    temperature: float,
+    top_p: float,
     tool_call_mode: str,
 ) -> dict[str, Any]:
     if tool_call_mode not in TOOL_CALL_MODES:
@@ -289,7 +291,8 @@ def _call_endpoint(
     body = {
         "model": model,
         "messages": messages,
-        "temperature": 0.0,
+        "temperature": temperature,
+        "top_p": top_p,
         "max_tokens": max_tokens,
         "seed": seed,
     }
@@ -567,6 +570,8 @@ def run_agent_harness(
     timeout: int = 120,
     max_tokens: int = 512,
     seed: int = 0,
+    temperature: float = 0.0,
+    top_p: float = 1.0,
     tool_call_mode: str = DEFAULT_TOOL_CALL_MODE,
     call_fn: CallFn | None = None,
     run_context: dict[str, Any] | None = None,
@@ -576,7 +581,8 @@ def run_agent_harness(
     bench = load_benchmark(benchmark_path)
     assert_generation_matches(
         run_context,
-        temperature=0.0,
+        temperature=temperature,
+        top_p=top_p,
         max_tokens=max_tokens,
         seed=seed,
     )
@@ -593,6 +599,8 @@ def run_agent_harness(
                 timeout=timeout,
                 max_tokens=max_tokens,
                 seed=seed,
+                temperature=temperature,
+                top_p=top_p,
                 tool_call_mode=tool_call_mode,
             )
         else:
@@ -663,7 +671,8 @@ def run_agent_harness(
             "content_sha256": benchmark_content_sha256(bench),
         },
         "evaluation": {
-            "temperature": 0.0,
+            "temperature": temperature,
+            "top_p": top_p,
             "max_tokens": max_tokens,
             "seed": seed,
             "tool_call_mode": tool_call_mode,
@@ -693,6 +702,8 @@ def main() -> None:
     ap.add_argument("--timeout", type=int, default=120)
     ap.add_argument("--max-tokens", type=int, default=512)
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--temperature", type=float, default=0.0)
+    ap.add_argument("--top-p", type=float, default=1.0)
     ap.add_argument("--tool-call-mode", choices=sorted(TOOL_CALL_MODES), default=DEFAULT_TOOL_CALL_MODE,
                     help="official 비교 기본값은 serving parser와 무관한 prompt_json_v1")
     ap.add_argument("--include-raw", action="store_true",
@@ -713,6 +724,8 @@ def main() -> None:
         timeout=args.timeout,
         max_tokens=args.max_tokens,
         seed=args.seed,
+        temperature=args.temperature,
+        top_p=args.top_p,
         tool_call_mode=args.tool_call_mode,
         run_context=run_context,
     )

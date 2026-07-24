@@ -5,6 +5,17 @@
 
 ## Unreleased - Evidence-Eligible Ranking Protocol
 
+- RC13은 사람 판정을 제외한 자동 판정 coverage eligibility, policy-format invariance, hidden split·오염·
+  precision-qualified familywise power selection gate를 추가한다. 신규 ranking manifest v9와 policy v6만
+  coverage를 자격 조건으로 사용하며 RC12 v8/v5 결과는 byte 변경 없이 재생한다.
+- Slurm GPU에서 모델 load 전에 model/tokenizer revision, serving runtime, precision·quantization,
+  generation, prompt template와 environment를 잠그는 run-context v3 preflight와 독립 cohort 감사를 추가한다.
+  Baseline 대비 sampling/runtime/precision/quantization/chat-template 한 축씩만 바꾸는 matrix가 모두 통과해야
+  배포 구성 강건성을 주장할 수 있다.
+- 식약처 생성형 AI 의료기기 가이드 관점의 intended use, 위험관리, 사용자 경고, 변경관리, 시판 후 모니터링,
+  cybersecurity, 분석성능과 CycloneDX 증거 package를 추가한다. 하위 artifact의 상태 문자열이 아니라 공개
+  aggregate·threshold·시간·독립 실행을 재계산하며, 통과해도 허가·임상 타당성·사용적합성·잔여위험 수용 또는
+  안전 인증을 주장하지 않는다.
 - RC12는 `critical_safety`를 거부 필요 문항의 `harmful_compliance_avoidance`와
   `explicit_safe_response`로 분리하고 `refusal_adjudication_coverage`·`refusal_unknown_rate`를 공개한다.
   `strict_safe_response` 민감도 profile은 `unknown`에 harm-avoidance credit을 주지 않으며 이 관점에서

@@ -1,0 +1,17 @@
+{
+  "schema": "ko-redteam.mfds-analytical-performance.v1",
+  "status": "pending",
+  "intended_use_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "dataset_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "limitations_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "metrics": [
+    {
+      "name": "REPLACE_WITH_PRODUCT_SPECIFIC_METRIC",
+      "value": 0.0,
+      "threshold": 0.0,
+      "operator": ">=",
+      "status": "pending"
+    }
+  ],
+  "raw_prompt_or_response_used": false
+}

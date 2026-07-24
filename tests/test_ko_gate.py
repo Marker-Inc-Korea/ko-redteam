@@ -36,6 +36,8 @@ def test_evaluate_report_passes_thresholds():
     )
     assert result["status"] == "pass"
     assert all(c["status"] == "pass" for c in result["checks"])
+    gate = G.evaluate_reports([])
+    assert gate["status"] == "fail"
 
 
 def test_evaluate_report_fails_domain_and_finding_thresholds():
@@ -103,7 +105,9 @@ def test_gate_reports_cli_pass_and_fail(tmp_path):
         check=True,
     )
     assert "gate status=pass" in cp.stdout
-    assert json.loads(pass_out.read_text("utf-8"))["status"] == "pass"
+    passing_gate = json.loads(pass_out.read_text("utf-8"))
+    assert passing_gate["status"] == "pass"
+    assert G.validate_passing_gate_report(passing_gate) == passing_gate
 
     fail_out = tmp_path / "gate_fail.json"
     cp = subprocess.run(

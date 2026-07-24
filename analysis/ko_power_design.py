@@ -285,6 +285,15 @@ def _validate_source(report: Any, source_sha256: str) -> dict[str, Any]:
     }
 
 
+def validate_precision_qualified_familywise_audit(
+    report: Any,
+    *,
+    source_sha256: str,
+) -> dict[str, Any]:
+    """Replay the frozen familywise audit and require its precision gate."""
+    return _validate_source(report, source_sha256)
+
+
 def _official_split_design(groups_per_domain: int) -> dict[str, Any]:
     agent_half = groups_per_domain // 2
     return {

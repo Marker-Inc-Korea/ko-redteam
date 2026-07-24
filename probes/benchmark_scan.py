@@ -79,11 +79,14 @@ def chat(
     timeout: int = 120,
     max_tokens: int = 512,
     seed: int = 0,
+    temperature: float = 0.0,
+    top_p: float = 1.0,
 ) -> str:
     body = json.dumps({
         "model": model,
         "messages": [{"role": "user", "content": prompt}],
-        "temperature": 0.0,
+        "temperature": temperature,
+        "top_p": top_p,
         "max_tokens": max_tokens,
         "seed": seed,
     }).encode()
@@ -101,10 +104,21 @@ def _call_endpoint(
     timeout: int,
     max_tokens: int,
     seed: int,
+    temperature: float,
+    top_p: float,
 ) -> dict[str, Any]:
     try:
         return {
-            "text": chat(endpoint, model, prompt, timeout=timeout, max_tokens=max_tokens, seed=seed),
+            "text": chat(
+                endpoint,
+                model,
+                prompt,
+                timeout=timeout,
+                max_tokens=max_tokens,
+                seed=seed,
+                temperature=temperature,
+                top_p=top_p,
+            ),
             "error_type": None,
         }
     except Exception as e:  # noqa: BLE001
@@ -159,13 +173,16 @@ def run_benchmark(
     timeout: int = 120,
     max_tokens: int = 512,
     seed: int = 0,
+    temperature: float = 0.0,
+    top_p: float = 1.0,
     call_fn: Callable[[dict[str, Any]], dict[str, Any]] | None = None,
     run_context: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     bench = load_benchmark(benchmark_path)
     assert_generation_matches(
         run_context,
-        temperature=0.0,
+        temperature=temperature,
+        top_p=top_p,
         max_tokens=max_tokens,
         seed=seed,
     )
@@ -179,6 +196,8 @@ def run_benchmark(
                 timeout=timeout,
                 max_tokens=max_tokens,
                 seed=seed,
+                temperature=temperature,
+                top_p=top_p,
             )
         else:
             call = call_fn(case)
@@ -217,7 +236,12 @@ def run_benchmark(
             "taxonomy": bench.get("taxonomy", {}),
             "content_sha256": benchmark_content_sha256(bench),
         },
-        "evaluation": {"temperature": 0.0, "max_tokens": max_tokens, "seed": seed},
+        "evaluation": {
+            "temperature": temperature,
+            "top_p": top_p,
+            "max_tokens": max_tokens,
+            "seed": seed,
+        },
         "model": model,
         "scorecard": scorecard,
         "findings": _benchmark_findings(rows),
@@ -236,6 +260,8 @@ def main() -> None:
     ap.add_argument("--timeout", type=int, default=120)
     ap.add_argument("--max-tokens", type=int, default=512)
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--temperature", type=float, default=0.0)
+    ap.add_argument("--top-p", type=float, default=1.0)
     ap.add_argument("--include-raw", action="store_true",
                     help="raw prompt/response 를 로컬 report 에 포함한다. 기본은 sanitized only.")
     ap.add_argument("--run-context",
@@ -248,7 +274,9 @@ def main() -> None:
     run_context = load_run_context(args.run_context) if args.run_context else None
     report = run_benchmark(args.endpoint, args.model, benchmark_path=args.benchmark,
                            include_raw=args.include_raw, timeout=args.timeout,
-                           max_tokens=args.max_tokens, seed=args.seed, run_context=run_context)
+                           max_tokens=args.max_tokens, seed=args.seed,
+                           temperature=args.temperature, top_p=args.top_p,
+                           run_context=run_context)
     out = Path(args.output) if args.output else Path.cwd() / f"benchmark_{report['benchmark']['name']}_report.json"
     out.write_text(json.dumps(report, ensure_ascii=False, indent=1), "utf-8")
     sc = report["scorecard"]

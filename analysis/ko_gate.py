@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import math
 from pathlib import Path
 from typing import Any
 
@@ -23,7 +24,10 @@ def parse_thresholds(items: list[str] | None) -> dict[str, float]:
         name = name.strip()
         if not name:
             raise ValueError(f"threshold name is empty: {item}")
-        out[name] = float(value)
+        parsed = float(value)
+        if not math.isfinite(parsed):
+            raise ValueError(f"threshold must be finite: {item}")
+        out[name] = parsed
     return out
 
 
@@ -78,20 +82,47 @@ def evaluate_report(
         }
 
     overall = scorecard.get("overall")
-    _check(checks, "overall", overall, ">=", min_overall,
-           isinstance(overall, (int, float)) and overall >= min_overall)
+    _check(
+        checks,
+        "overall",
+        overall,
+        ">=",
+        min_overall,
+        isinstance(overall, (int, float))
+        and not isinstance(overall, bool)
+        and math.isfinite(float(overall))
+        and overall >= min_overall,
+    )
 
     domains = scorecard.get("domain_scores") or {}
     for domain, threshold in sorted((min_domains or {}).items()):
         actual = domains.get(domain)
-        _check(checks, f"domain:{domain}", actual, ">=", threshold,
-               isinstance(actual, (int, float)) and actual >= threshold)
+        _check(
+            checks,
+            f"domain:{domain}",
+            actual,
+            ">=",
+            threshold,
+            isinstance(actual, (int, float))
+            and not isinstance(actual, bool)
+            and math.isfinite(float(actual))
+            and actual >= threshold,
+        )
 
     rates = scorecard.get("rates") or {}
     for rate, threshold in sorted((max_rates or {}).items()):
         actual = rates.get(rate)
-        _check(checks, f"rate:{rate}", actual, "<=", threshold,
-               isinstance(actual, (int, float)) and actual <= threshold)
+        _check(
+            checks,
+            f"rate:{rate}",
+            actual,
+            "<=",
+            threshold,
+            isinstance(actual, (int, float))
+            and not isinstance(actual, bool)
+            and math.isfinite(float(actual))
+            and actual <= threshold,
+        )
 
     findings = report.get("findings") or []
     severity_counts = _severity_counts(findings if isinstance(findings, list) else [])
@@ -144,7 +175,7 @@ def evaluate_reports(
     failed = [r for r in reports if r["status"] == "fail"]
     return {
         "schema": "ko-redteam.gate.v1",
-        "status": "fail" if failed else "pass",
+        "status": "fail" if failed or not reports else "pass",
         "summary": {
             "reports": len(reports),
             "failed": len(failed),
@@ -157,6 +188,105 @@ def evaluate_reports(
         },
         "reports": reports,
     }
+
+
+def _finite(value: Any) -> bool:
+    return (
+        isinstance(value, (int, float))
+        and not isinstance(value, bool)
+        and math.isfinite(float(value))
+    )
+
+
+def validate_passing_gate_report(gate: Any) -> dict[str, Any]:
+    """Validate threshold outcomes before a gate is reused as release evidence."""
+    if (
+        not isinstance(gate, dict)
+        or gate.get("schema") != "ko-redteam.gate.v1"
+        or set(gate) != {"schema", "status", "summary", "reports"}
+        or gate.get("status") != "pass"
+    ):
+        raise ValueError("benchmark gate is not a passing gate.v1 report")
+    summary = gate.get("summary")
+    reports = gate.get("reports")
+    if (
+        not isinstance(summary, dict)
+        or set(summary)
+        != {
+            "reports",
+            "failed",
+            "passed",
+            "min_overall",
+            "min_domains",
+            "max_rates",
+            "max_findings",
+            "max_critical_high",
+        }
+        or not isinstance(reports, list)
+        or not reports
+        or summary.get("reports") != len(reports)
+        or summary.get("failed") != 0
+        or summary.get("passed") != len(reports)
+        or not _finite(summary.get("min_overall"))
+        or not isinstance(summary.get("min_domains"), dict)
+        or not isinstance(summary.get("max_rates"), dict)
+        or any(
+            not isinstance(key, str) or not key or not _finite(value)
+            for mapping in (summary["min_domains"], summary["max_rates"])
+            for key, value in mapping.items()
+        )
+        or any(
+            value is not None
+            and (
+                not isinstance(value, int)
+                or isinstance(value, bool)
+                or value < 0
+            )
+            for value in (
+                summary.get("max_findings"),
+                summary.get("max_critical_high"),
+            )
+        )
+    ):
+        raise ValueError("benchmark gate summary does not replay")
+    names = []
+    for report in reports:
+        if (
+            not isinstance(report, dict)
+            or report.get("status") != "pass"
+            or not isinstance(report.get("name"), str)
+            or not report["name"]
+            or not isinstance(report.get("checks"), list)
+            or not report["checks"]
+        ):
+            raise ValueError("benchmark gate contains a malformed passing report")
+        names.append(report["name"])
+        for check in report["checks"]:
+            if (
+                not isinstance(check, dict)
+                or set(check)
+                != {"name", "actual", "op", "threshold", "status"}
+                or not isinstance(check.get("name"), str)
+                or not check["name"]
+                or check.get("status") != "pass"
+            ):
+                raise ValueError("benchmark gate check is malformed")
+            actual = check.get("actual")
+            threshold = check.get("threshold")
+            operator = check.get("op")
+            if operator == ">=":
+                passed = _finite(actual) and _finite(threshold) and actual >= threshold
+            elif operator == "<=":
+                passed = _finite(actual) and _finite(threshold) and actual <= threshold
+            elif operator == "is":
+                passed = actual == threshold
+            else:
+                passed = False
+            if not passed:
+                raise ValueError("benchmark gate check does not replay")
+    if len(names) != len(set(names)):
+        raise ValueError("benchmark gate report names must be unique")
+    return gate
 
 
 def _fmt(value: Any) -> str:
