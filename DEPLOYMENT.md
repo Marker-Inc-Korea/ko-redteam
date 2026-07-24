@@ -28,7 +28,8 @@ successor power pilot은 일반 배포 검증보다 강한 등록·Git publicati
 ## Container
 
 프로덕션 이미지는 wheel만 포함하며 source, tests, pytest, build tool을 포함하지 않습니다. 기본 사용자는
-UID/GID `10001`입니다. Dockerfile의 `python:3.12-slim` base는 manifest digest로 고정합니다.
+UID/GID `10001`입니다. Dockerfile의 `python:3.12-alpine3.23` base는 manifest
+digest로 고정하며, 런타임 빌드에서 적용 가능한 Alpine 보안 업데이트를 반영합니다.
 
 ```bash
 docker build --target runtime -t ko-redteam:0.2.0 .

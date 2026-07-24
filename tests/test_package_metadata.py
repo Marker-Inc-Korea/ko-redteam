@@ -292,14 +292,15 @@ def test_container_uses_minimal_non_root_runtime_and_separate_test_stage():
     dockerfile = (ROOT / "Dockerfile").read_text("utf-8")
 
     pinned_base = (
-        "python:3.12-slim@sha256:"
-        "c3d81d25b3154142b0b42eb1e61300024426268edeb5b5a26dd7ddf64d9daf28"
+        "python:3.12-alpine3.23@sha256:"
+        "601d3d3797e90e2534782e69c85fafb7971b43f24c7b1b079b7e48dd435e458d"
     )
     assert f"FROM {pinned_base} AS builder" in dockerfile
     assert f"FROM {pinned_base} AS runtime-base" in dockerfile
     assert "FROM runtime-base AS test" in dockerfile
     assert "FROM runtime-base AS runtime" in dockerfile
     assert "USER 10001:10001" in dockerfile
+    assert "apk upgrade --no-cache" in dockerfile
     assert 'python -m pip install --no-cache-dir ".[dev]"' not in dockerfile
     workflow_path = ROOT.parent / ".github" / "workflows" / "tests.yml"
     if workflow_path.exists():

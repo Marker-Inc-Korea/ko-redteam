@@ -1,4 +1,4 @@
-FROM python:3.12-slim@sha256:c3d81d25b3154142b0b42eb1e61300024426268edeb5b5a26dd7ddf64d9daf28 AS builder
+FROM python:3.12-alpine3.23@sha256:601d3d3797e90e2534782e69c85fafb7971b43f24c7b1b079b7e48dd435e458d AS builder
 
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
     PIP_NO_CACHE_DIR=1
@@ -8,7 +8,7 @@ COPY . .
 RUN python -m pip wheel --no-deps --wheel-dir /wheels .
 
 
-FROM python:3.12-slim@sha256:c3d81d25b3154142b0b42eb1e61300024426268edeb5b5a26dd7ddf64d9daf28 AS runtime-base
+FROM python:3.12-alpine3.23@sha256:601d3d3797e90e2534782e69c85fafb7971b43f24c7b1b079b7e48dd435e458d AS runtime-base
 
 ARG VCS_REF
 LABEL org.opencontainers.image.title="ko-redteam" \
@@ -20,11 +20,13 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
     HOME=/home/redteam
 
-RUN groupadd --system --gid 10001 redteam \
-    && useradd --system --uid 10001 --gid 10001 \
-       --create-home --home-dir /home/redteam --shell /usr/sbin/nologin redteam \
+RUN apk upgrade --no-cache \
+    && addgroup -S -g 10001 redteam \
+    && adduser -S -D -H -u 10001 -G redteam \
+       -h /home/redteam -s /sbin/nologin redteam \
+    && mkdir -p /home/redteam \
     && mkdir /workspace \
-    && chown redteam:redteam /workspace
+    && chown redteam:redteam /home/redteam /workspace
 
 COPY --from=builder /wheels /tmp/wheels
 RUN python -m pip install --no-cache-dir /tmp/wheels/*.whl \
