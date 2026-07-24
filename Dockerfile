@@ -1,4 +1,4 @@
-FROM python:3.12-alpine3.23@sha256:601d3d3797e90e2534782e69c85fafb7971b43f24c7b1b079b7e48dd435e458d AS builder
+FROM python:3.14-alpine3.23@sha256:b165067c5afc37fa5608a3c05609cc3d51aafd808a30fbfd822ee594fef55ad4 AS builder
 
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
     PIP_NO_CACHE_DIR=1
@@ -8,7 +8,7 @@ COPY . .
 RUN python -m pip wheel --no-deps --wheel-dir /wheels .
 
 
-FROM python:3.12-alpine3.23@sha256:601d3d3797e90e2534782e69c85fafb7971b43f24c7b1b079b7e48dd435e458d AS runtime-base
+FROM python:3.14-alpine3.23@sha256:b165067c5afc37fa5608a3c05609cc3d51aafd808a30fbfd822ee594fef55ad4 AS runtime-base
 
 ARG VCS_REF
 LABEL org.opencontainers.image.title="ko-redteam" \
@@ -48,5 +48,23 @@ CMD ["python", "-m", "pytest", "tests", "-q"]
 
 FROM runtime-base AS runtime
 
+USER root
+COPY container/harden_python_runtime.py /opt/ko-redteam/harden_python_runtime.py
+RUN python -m pip uninstall --yes pip setuptools wheel \
+    && python /opt/ko-redteam/harden_python_runtime.py \
+       --stdlib-root /usr/local/lib/python3.14 \
+       --output /usr/local/share/ko-guard/runtime-hardening.json \
+    && rm /opt/ko-redteam/harden_python_runtime.py
+RUN apk add --no-cache --virtual .guard-scan-deps findutils pax-utils \
+    && runtime_deps="$(find /usr/local -type f -executable \
+         -not \( -name '*tkinter*' \) \
+         -exec scanelf --needed --nobanner --format '%n#p' '{}' ';' \
+         | tr ',' '\n' \
+         | sort -u \
+         | awk 'system("[ -e /usr/local/lib/" $1 " ]") == 0 \
+             { next } { print "so:" $1 }')" \
+    && apk add --no-cache --virtual .guard-python-rundeps ${runtime_deps} \
+    && apk del .python-rundeps .guard-scan-deps
+USER 10001:10001
 RUN ko-redteam-self-check
 CMD ["ko-redteam-self-check"]
