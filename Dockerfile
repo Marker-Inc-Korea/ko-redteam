@@ -10,8 +10,10 @@ RUN python -m pip wheel --no-deps --wheel-dir /wheels .
 
 FROM python:3.12-slim@sha256:c3d81d25b3154142b0b42eb1e61300024426268edeb5b5a26dd7ddf64d9daf28 AS runtime-base
 
+ARG VCS_REF
 LABEL org.opencontainers.image.title="ko-redteam" \
-      org.opencontainers.image.description="Korean LLM redteam and forensics evaluator"
+      org.opencontainers.image.description="Korean LLM redteam and forensics evaluator" \
+      org.opencontainers.image.revision="${VCS_REF}"
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \

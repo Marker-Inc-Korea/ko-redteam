@@ -24,11 +24,15 @@ def test_public_hygiene_detects_internal_and_secret_shapes_without_echo(tmp_path
     private_path = "/" + "data1" + "/" + "mk04" + "/eval_external"
     private_ip = "192" + ".168.0.10"
     fake_secret = "sk-" + "exampleSECRET0000"
+    fake_github = "ghp" + "_0123456789abcdefghijklmnop"
+    fake_private_key = "-----BEGIN RSA " + "PRIVATE KEY-----"
     bad.write_text(
         "\n".join([
             f"private path {private_path}",
             f"private ip {private_ip}",
             f"token {fake_secret}",
+            f"github {fake_github}",
+            fake_private_key,
         ]),
         "utf-8",
     )
@@ -44,9 +48,13 @@ def test_public_hygiene_detects_internal_and_secret_shapes_without_echo(tmp_path
         "internal_abs_path",
         "internal_rfc1918_ip",
         "vendor_token_shape",
+        "github_token_shape",
+        "private_key_material",
         "sensitive_artifact_path",
     } <= codes
     assert fake_secret not in rendered
+    assert fake_github not in rendered
+    assert fake_private_key not in rendered
     assert private_path not in rendered
 
 

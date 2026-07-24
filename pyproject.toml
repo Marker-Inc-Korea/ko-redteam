@@ -94,6 +94,7 @@ ko-redteam-validate-mfds-deployment = "probes.validate_mfds_deployment:main"
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["analysis*", "benchmarks*", "detectors*", "gap_analysis*", "governance*", "probes*"]
+namespaces = false
 
 [tool.setuptools]
 include-package-data = false

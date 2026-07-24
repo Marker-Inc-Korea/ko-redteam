@@ -49,6 +49,16 @@ CONTENT_RULES: tuple[tuple[str, re.Pattern[str]], ...] = (
             r"hf_[A-Za-z0-9]{16,}|glpat-[A-Za-z0-9_-]{16,})"
         ),
     ),
+    (
+        "github_token_shape",
+        re.compile("ghp" + r"_[A-Za-z0-9]{20,}"),
+    ),
+    (
+        "private_key_material",
+        re.compile(
+            "-----BEGIN " + r"(?:RSA |EC |OPENSSH )?PRIVATE KEY-----"
+        ),
+    ),
 )
 _SENSITIVE_ARTIFACT_PATTERNS = (
     "real_" + "harmful[^/]*",

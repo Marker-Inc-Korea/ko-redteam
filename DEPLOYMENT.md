@@ -4,6 +4,10 @@
 재현성, 산출물 무결성, endpoint 오류 처리를 검증합니다. 특정 모델의 안전 인증이나 공식 순위 공개를
 의미하지 않습니다.
 
+세 inline guard와 함께 승격하는 suite-wide image digest·SBOM·preflight 계약은
+[`../deployment/README.md`](../deployment/README.md)와
+[`../DEPLOYMENT_READINESS_RC13.md`](../DEPLOYMENT_READINESS_RC13.md)를 따릅니다.
+
 ## Deployment Boundary
 
 | 구성 요소 | 역할 | GPU 사용 |
