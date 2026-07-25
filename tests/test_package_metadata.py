@@ -66,6 +66,7 @@ def test_console_script_targets_are_importable():
         "ko-redteam-runtime-lock",
         "ko-redteam-analyze-deployment-matrix",
         "ko-redteam-validate-mfds-deployment",
+        "ko-redteam-validate-inline-services",
     } <= set(scripts)
 
     for target in scripts.values():

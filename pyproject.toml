@@ -90,6 +90,7 @@ ko-redteam-validate-model-selection = "probes.validate_model_selection:main"
 ko-redteam-runtime-lock = "probes.runtime_lock:main"
 ko-redteam-analyze-deployment-matrix = "probes.analyze_deployment_matrix:main"
 ko-redteam-validate-mfds-deployment = "probes.validate_mfds_deployment:main"
+ko-redteam-validate-inline-services = "probes.validate_inline_services:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
