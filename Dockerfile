@@ -39,7 +39,8 @@ USER 10001:10001
 FROM runtime-base AS test
 
 USER root
-RUN python -m pip install --no-cache-dir "pytest>=8,<9"
+RUN apk add --no-cache git openssh-keygen \
+    && python -m pip install --no-cache-dir "pytest>=8,<9"
 COPY --chown=10001:10001 . /opt/ko-redteam
 WORKDIR /opt/ko-redteam
 USER 10001:10001
