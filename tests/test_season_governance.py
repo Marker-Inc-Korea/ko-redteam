@@ -4,18 +4,17 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-REPO = ROOT.parent
 sys.path.insert(0, str(ROOT / "analysis"))
 
 import ko_benchmark_identity as I  # noqa: E402
 import ko_model_ranking as R  # noqa: E402
 import ko_power_pilot as P  # noqa: E402
+import ko_source_history as H  # noqa: E402
 
 
 S1_PATH = ROOT / "governance" / "SEASON_2026Q3_PREREGISTRATION.json"
@@ -72,12 +71,7 @@ def _load(path: Path) -> dict:
 
 
 def _git_blob(commit: str, relative_path: str) -> bytes:
-    result = subprocess.run(
-        ["git", "-C", str(REPO), "show", f"{commit}:ko-redteam/{relative_path}"],
-        capture_output=True,
-        check=True,
-    )
-    return result.stdout
+    return H.read_source_blob(ROOT, commit, relative_path)
 
 
 def test_practice_pairwise_inference_notice_binds_preserved_research_record():

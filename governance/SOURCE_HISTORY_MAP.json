@@ -1,0 +1,23 @@
+{
+  "schema": "ko-redteam.source-history-map.v1",
+  "source": {
+    "repository": "https://github.com/Marker-Inc-Korea/modak_experiments",
+    "path": "ko-redteam"
+  },
+  "destination": {
+    "repository": "https://github.com/Marker-Inc-Korea/ko-redteam",
+    "path": "."
+  },
+  "purpose": "Preserve frozen-evidence verification after path-filtered repository extraction.",
+  "commit_map": {
+    "0742bdd37b16fde426cb35b9d6053d1996a39be2": "b3209ccaf540fcba55dd6b8337bfdcbdbe1983a8",
+    "08d7605830fb25c12e0e3c25d44acc5f69f92236": "176094e25cff84cb712df56bdd709224716a19cd",
+    "24636d57f93ba3d1385a1095696d3e6134c7920e": "275bde82afb651ca9673092077257566d833df36",
+    "46ecc81d88e7437f22ef23a128d05894905d737f": "dca465b05b52235091c3af8c1745dc6f46411f29",
+    "6de04e588d29fddb2cae5db1d4f481c68883f6f8": "4a1f6e9f6a3429bb51578e98bf9640d841defa0e",
+    "7d2eef959b8b039162d9bc89e1c77218d33000df": "f37404eba17b2d60125e673e085eaa430edf2495",
+    "b7e7a757acb8f5a8d2413f851f9155a0ed428b5b": "65cfbeff030d957f92edefedd89e7524e62f2c52",
+    "d0c344d2f18a6071c6a53aca143e7849d10cd8c3": "4277e5ca94ad7eeb4302d12174b48b2b4487a478",
+    "dfef7c5455b28fd41f8bf2f5e9750711f2964fd0": "6b2d16b351fb305228c6cdcf4fe01ed6ea9bfaf6"
+  }
+}

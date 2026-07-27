@@ -10,6 +10,7 @@ sys.path.insert(0, str(ROOT / "analysis"))
 
 import ko_benchmark_coverage as C  # noqa: E402
 import ko_benchmark_identity as I  # noqa: E402
+import ko_source_history as H  # noqa: E402
 
 
 def _case(case_id, domain, expected, *, category="unit", source="source"):
@@ -84,11 +85,7 @@ def test_frozen_power_pilot_practice_strata_and_fingerprints_match():
     }
     seen_groups = set()
     for suite, relative_path in paths.items():
-        value = subprocess.run(
-            ["git", "-C", str(ROOT.parent), "show", f"{commit}:ko-redteam/{relative_path}"],
-            capture_output=True,
-            check=True,
-        ).stdout
+        value = H.read_source_blob(ROOT, commit, relative_path)
         benchmark = json.loads(value.decode("utf-8"))
         assert I.benchmark_content_sha256(benchmark) == design[
             "practice_benchmark_fingerprints"
@@ -119,11 +116,7 @@ def test_frozen_season_analysis_code_commitments_match_registered_commit():
     commit = preregistration["season"]["protocol_git_commit"]
 
     def committed_sha256(relative_path: str) -> str:
-        value = subprocess.run(
-            ["git", "-C", str(ROOT.parent), "show", f"{commit}:ko-redteam/{relative_path}"],
-            capture_output=True,
-            check=True,
-        ).stdout
+        value = H.read_source_blob(ROOT, commit, relative_path)
         return hashlib.sha256(value).hexdigest()
 
     assert statistics["ranking_analysis_code_sha256"] == committed_sha256(
@@ -159,18 +152,7 @@ def test_frozen_season_commit_contains_committed_code_and_benchmarks():
     commit = preregistration["season"]["protocol_git_commit"]
 
     def git_blob(relative_path: str) -> bytes:
-        result = subprocess.run(
-            [
-                "git",
-                "-C",
-                str(ROOT.parent),
-                "show",
-                f"{commit}:ko-redteam/{relative_path}",
-            ],
-            capture_output=True,
-        )
-        assert result.returncode == 0, result.stderr.decode("utf-8", errors="replace")
-        return result.stdout
+        return H.read_source_blob(ROOT, commit, relative_path)
 
     statistics = preregistration["statistics"]
     semantic = preregistration["semantic_overlap"]
