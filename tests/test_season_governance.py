@@ -8,6 +8,8 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
+import pytest
+
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "analysis"))
 
@@ -100,6 +102,7 @@ def test_practice_pairwise_inference_notice_binds_preserved_research_record():
     assert "192" + ".168." not in public_text
 
 
+@pytest.mark.requires_git_history
 def test_frozen_seasons_are_preserved_and_s4_supersedes_stopped_s3():
     s1 = _load(S1_PATH)
     s2 = _load(S2_PATH)
@@ -326,6 +329,7 @@ def test_s4_power_evidence_uses_the_frozen_v3_execution_contract():
     assert "192" + ".168." not in public_text
 
 
+@pytest.mark.requires_git_history
 def test_s4_multiplicity_audit_stops_the_official_design_before_data():
     s4 = _load(S4_PATH)
     audit = _load(S4_FAMILYWISE_PATH)
@@ -387,6 +391,7 @@ def test_s4_multiplicity_audit_stops_the_official_design_before_data():
     assert "192" + ".168." not in public_text
 
 
+@pytest.mark.requires_git_history
 def test_successor_pilot_precision_audit_is_hash_bound_and_blocks_preregistration():
     audit = _load(SUCCESSOR_PRECISION_PATH)
 
@@ -544,6 +549,7 @@ def test_s1_incident_counts_and_commitments_are_internally_consistent():
     assert incident["raw_prompt_or_response_included"] is False
 
 
+@pytest.mark.requires_git_history
 def test_s3_code_and_practice_commitments_match_registered_protocol_commit():
     s2 = _load(S2_PATH)
     s3 = _load(S3_PATH)
@@ -588,6 +594,7 @@ def test_s3_code_and_practice_commitments_match_registered_protocol_commit():
     )
 
 
+@pytest.mark.requires_git_history
 def test_s4_code_and_practice_commitments_match_registered_protocol_commit():
     s4 = _load(S4_PATH)
     commit = s4["season"]["protocol_git_commit"]

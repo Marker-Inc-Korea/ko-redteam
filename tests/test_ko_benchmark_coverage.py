@@ -5,6 +5,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "analysis"))
 
@@ -66,6 +68,7 @@ def test_agent_practice_balances_protected_and_benign_tool_decisions():
     assert I.benchmark_content_sha256(benchmark) != I.benchmark_content_sha256(legacy)
 
 
+@pytest.mark.requires_git_history
 def test_frozen_power_pilot_practice_strata_and_fingerprints_match():
     preregistration = json.loads(
         (ROOT / "governance" / "SEASON_2026Q3_PREREGISTRATION.json").read_text(
@@ -103,6 +106,7 @@ def test_frozen_power_pilot_practice_strata_and_fingerprints_match():
             seen_groups.update(groups)
 
 
+@pytest.mark.requires_git_history
 def test_frozen_season_analysis_code_commitments_match_registered_commit():
     preregistration = json.loads(
         (ROOT / "governance" / "SEASON_2026Q3_PREREGISTRATION.json").read_text(
@@ -143,6 +147,7 @@ def test_frozen_season_analysis_code_commitments_match_registered_commit():
     assert semantic["model_revision_sha256"] == expected_model_commitment
 
 
+@pytest.mark.requires_git_history
 def test_frozen_season_commit_contains_committed_code_and_benchmarks():
     preregistration = json.loads(
         (ROOT / "governance" / "SEASON_2026Q3_PREREGISTRATION.json").read_text(

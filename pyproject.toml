@@ -124,3 +124,6 @@ probes = [".gitignore"]
 [tool.pytest.ini_options]
 pythonpath = ["analysis", "probes", "detectors"]
 testpaths = ["tests"]
+markers = [
+    "requires_git_history: validates frozen evidence against repository history",
+]

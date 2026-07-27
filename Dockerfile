@@ -43,7 +43,7 @@ RUN python -m pip install --no-cache-dir "pytest>=8,<9"
 COPY --chown=10001:10001 . /opt/ko-redteam
 WORKDIR /opt/ko-redteam
 USER 10001:10001
-CMD ["python", "-m", "pytest", "tests", "-q"]
+CMD ["python", "-m", "pytest", "tests", "-q", "-m", "not requires_git_history"]
 
 
 FROM runtime-base AS runtime
