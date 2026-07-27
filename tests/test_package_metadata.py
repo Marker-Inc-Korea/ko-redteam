@@ -5,8 +5,12 @@ import importlib
 import os
 import subprocess
 import sys
-import tomllib
 from pathlib import Path
+
+try:
+    import tomllib
+except ModuleNotFoundError:  # Python 3.10
+    import tomli as tomllib
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
@@ -91,7 +95,10 @@ def test_distribution_metadata_has_release_basics():
     assert data["project"]["license"] == "MIT"
     assert data["project"]["license-files"] == ["LICENSE"]
     assert data["project"]["version"] == "0.2.0"
-    assert "Development Status :: 5 - Production/Stable" in data["project"]["classifiers"]
+    assert "Development Status :: 4 - Beta" in data["project"]["classifiers"]
+    assert data["project"]["urls"]["Repository"] == (
+        "https://github.com/Marker-Inc-Korea/ko-redteam"
+    )
     assert "korean" in data["project"]["keywords"]
     assert "Natural Language :: Korean" in data["project"]["classifiers"]
     assert any(dep.startswith("build") for dep in data["project"]["optional-dependencies"]["dev"])
@@ -275,9 +282,8 @@ def test_analysis_package_imports_without_flat_pythonpath():
 
 
 def test_ci_runs_redteam_suite_multiturn_agent_hard_fail_check():
-    workflow_path = ROOT.parent / ".github" / "workflows" / "tests.yml"
-    if not workflow_path.exists():
-        return
+    workflow_path = ROOT / ".github" / "workflows" / "tests.yml"
+    assert workflow_path.exists()
     workflow = workflow_path.read_text("utf-8")
     assert "ko-redteam-suite" in workflow
     assert "--multiturn" in workflow
@@ -305,12 +311,12 @@ def test_container_uses_minimal_non_root_runtime_and_separate_test_stage():
     assert "harden_python_runtime.py" in dockerfile
     assert "python -m pip uninstall --yes pip setuptools wheel" in dockerfile
     assert 'python -m pip install --no-cache-dir ".[dev]"' not in dockerfile
-    workflow_path = ROOT.parent / ".github" / "workflows" / "tests.yml"
-    if workflow_path.exists():
-        workflow = workflow_path.read_text("utf-8")
-        assert "--read-only" in workflow
-        assert "--cap-drop ALL" in workflow
-        assert "--target test" in workflow
+    workflow_path = ROOT / ".github" / "workflows" / "tests.yml"
+    assert workflow_path.exists()
+    workflow = workflow_path.read_text("utf-8")
+    assert "--read-only" in workflow
+    assert "--cap-drop ALL" in workflow
+    assert "--target test" in workflow
 
 
 def test_user_facing_docs_keep_external_scanner_references_neutral():

@@ -13,7 +13,7 @@ license-files = ["LICENSE"]
 authors = [{ name = "Marker Inc Korea" }]
 keywords = ["korean", "llm", "redteam", "forensics", "safety", "privacy", "agent", "security"]
 classifiers = [
-    "Development Status :: 5 - Production/Stable",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "Natural Language :: Korean",
     "Programming Language :: Python :: 3",
@@ -22,8 +22,19 @@ classifiers = [
 ]
 dependencies = []
 
+[project.urls]
+Homepage = "https://github.com/Marker-Inc-Korea/ko-redteam"
+Repository = "https://github.com/Marker-Inc-Korea/ko-redteam"
+Issues = "https://github.com/Marker-Inc-Korea/ko-redteam/issues"
+Changelog = "https://github.com/Marker-Inc-Korea/ko-redteam/blob/main/CHANGELOG.md"
+
 [project.optional-dependencies]
-dev = ["pytest>=8,<9", "build>=1,<2"]
+dev = [
+    "pytest>=8,<9",
+    "build>=1,<2",
+    "tomli>=2,<3; python_version < '3.11'",
+]
+prompt-guard = ["ko-prompt-guard>=0.2,<1"]
 semantic = [
     "torch>=2.6,<3",
     "transformers>=4.48,<6",

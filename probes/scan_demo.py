@@ -8,6 +8,7 @@ ko-prompt-guard 미설치 시 대상 B 는 자동 skip.
 """
 import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from ko_obfuscation import TECHNIQUES, variants
 
@@ -29,15 +30,12 @@ def naive_filter_blocks(text: str) -> bool:
 
 def load_guard():
     try:
-        # 같은 레포의 형제 패키지: ko-redteam/../ko-prompt-guard/src
-        guard_src = Path(__file__).resolve().parents[2] / "ko-prompt-guard" / "src"
-        sys.path.insert(0, str(guard_src))
         from ko_prompt_guard import check, Verdict
 
         def blocks(text: str) -> bool:
             return check(text).verdict is not Verdict.ALLOW
         return blocks
-    except Exception:
+    except ImportError:
         return None
 
 

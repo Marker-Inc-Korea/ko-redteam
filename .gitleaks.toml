@@ -1,0 +1,10 @@
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Synthetic provenance and secret-leakage fixtures"
+paths = [
+    '''^tests/test_ko_revalidation\.py$''',
+    '''^tests/test_ko_run_context\.py$''',
+    '''^benchmarks/ko_llm_mini_v1\.json$''',
+]

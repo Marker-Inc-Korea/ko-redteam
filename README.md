@@ -1,10 +1,14 @@
 # ko-redteam
 
+[![CI](https://github.com/Marker-Inc-Korea/ko-redteam/actions/workflows/tests.yml/badge.svg)](https://github.com/Marker-Inc-Korea/ko-redteam/actions/workflows/tests.yml)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-0b7285)](https://github.com/Marker-Inc-Korea/ko-redteam/blob/main/pyproject.toml)
+[![Status: Beta](https://img.shields.io/badge/status-beta-c57b00)](./CHANGELOG.md)
+
 한국어 LLM 서비스를 배포하기 전/후에 안전성, 개인정보, prompt security, agent/RAG 도구 사용,
 과잉거부, 한국어 응답 품질을 한 번에 점검하는 레드팀/포렌식 평가 도구입니다.
 
 > [!NOTE]
-> 현재 소프트웨어 버전은 **0.2.0 안정 릴리스**입니다. 평가기 이미지의 안정 릴리스와 평가 대상
+> 현재 소프트웨어 버전은 **0.2.0 베타 릴리스 후보**입니다. 평가기 릴리스와 평가 대상
 > LLM의 배포 승인은 별개입니다. RC12의 7개 모델 x 3회 Slurm GPU 진단은 모두 엄격 deployment
 > screen을 통과하지 못했으며, 새 runtime preflight와 5축 배포 행렬도 소급 인정하지 않습니다.
 > 특정 모델의 안전 인증, 식약처 허가 또는 공식 leaderboard 공개를 의미하지 않습니다.
