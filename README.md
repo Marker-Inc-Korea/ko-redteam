@@ -2,14 +2,14 @@
 
 [![CI](https://github.com/Marker-Inc-Korea/ko-redteam/actions/workflows/tests.yml/badge.svg)](https://github.com/Marker-Inc-Korea/ko-redteam/actions/workflows/tests.yml)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-0b7285)](https://github.com/Marker-Inc-Korea/ko-redteam/blob/main/pyproject.toml)
-[![Status: Beta](https://img.shields.io/badge/status-beta-c57b00)](./CHANGELOG.md)
+[![Status: Production/Stable](https://img.shields.io/badge/status-production%2Fstable-1f6f43)](./CHANGELOG.md)
 
 한국어 LLM 서비스를 배포하기 전/후에 안전성, 개인정보, prompt security, agent/RAG 도구 사용,
 과잉거부, 한국어 응답 품질을 한 번에 점검하는 레드팀/포렌식 평가 도구입니다.
 
 > [!NOTE]
-> 현재 소프트웨어 버전은 **0.2.0 베타 릴리스 후보**입니다. 평가기 릴리스와 평가 대상
-> LLM의 배포 승인은 별개입니다. RC12의 7개 모델 x 3회 Slurm GPU 진단은 모두 엄격 deployment
+> 평가기 소프트웨어 버전은 **1.0.0 Production/Stable**입니다. 이는 CLI·실패 처리·배포
+> 패키징의 운영 계약을 뜻하며 평가 대상 LLM의 배포 승인과는 별개입니다. RC12의 7개 모델 x 3회 Slurm GPU 진단은 모두 엄격 deployment
 > screen을 통과하지 못했으며, 새 runtime preflight와 5축 배포 행렬도 소급 인정하지 않습니다.
 > 특정 모델의 안전 인증, 식약처 허가 또는 공식 leaderboard 공개를 의미하지 않습니다.
 
@@ -153,6 +153,13 @@ ko-redteam-suite \
 통합 suite의 endpoint smoke는 기본적으로 API 성공, 비어 있지 않은 응답, 한글 비율과 문자 깨짐 여부를
 검사합니다. 특정 표면형을 재현하지 않았다는 이유로 정상적인 한국어 응답을 측정 오류로 처리하지 않습니다.
 정확 문구 준수가 필요한 별도 진단에서는 `--endpoint-smoke-required-phrase "문구"`를 명시합니다.
+
+운영 endpoint는 HTTPS가 필수이며 평문 HTTP는 loopback에서만 허용됩니다. 인증이 필요하면 secret
+값이 아니라 환경변수 이름을 `--api-key-env KO_REDTEAM_API_TOKEN`으로 전달합니다. 지정한 환경변수가
+없으면 익명 재시도 없이 즉시 실패합니다. `--deadline`, `--max-response-bytes`, `--retries`,
+`--retry-backoff`는 모든 단일턴·멀티턴·agent·smoke 호출에 동일하게 적용되고 suite manifest에
+기록됩니다. 리다이렉트와 크기 초과 응답은 측정 오류로 처리하며 raw 응답은 transport 진단에 남기지
+않습니다.
 
 소스 checkout에서는 `python3 probes/...` 경로도 그대로 사용할 수 있습니다.
 

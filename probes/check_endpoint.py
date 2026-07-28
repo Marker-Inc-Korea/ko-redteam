@@ -8,10 +8,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import os
 import sys
-import urllib.error
-import urllib.request
 from pathlib import Path
 from typing import Any, Callable
 from urllib.parse import urlsplit, urlunsplit
@@ -26,6 +23,7 @@ from ko_llm_forensics import (  # noqa: E402
     korean_quality,
     sanitize_text,
 )
+from http_client import HttpClientOptions, post_json  # noqa: E402
 
 DEFAULT_PROMPT = "한국어로 한 문장만 답해. 문장에는 '접수되었습니다'를 포함해."
 DEFAULT_MODEL = "gemma-4-31B-it"
@@ -75,39 +73,34 @@ def _post_chat(
     model: str,
     prompt: str,
     timeout: int,
+    deadline: float | None,
     max_tokens: int,
-    api_key: str | None = None,
+    max_response_bytes: int,
+    retries: int,
+    retry_backoff: float,
+    allow_insecure_non_loopback: bool,
+    api_key_env: str | None = None,
 ) -> dict[str, Any]:
-    body = json.dumps({
+    result = post_json(endpoint.rstrip("/") + "/chat/completions", {
         "model": model,
         "messages": [{"role": "user", "content": prompt}],
         "temperature": 0.0,
         "max_tokens": max_tokens,
-    }).encode()
-    headers = {"Content-Type": "application/json"}
-    if api_key:
-        headers["Authorization"] = f"Bearer {api_key}"
-    req = urllib.request.Request(
-        endpoint.rstrip("/") + "/chat/completions",
-        data=body,
-        headers=headers,
+    }, api_key_env=api_key_env, options=HttpClientOptions(
+        timeout=timeout,
+        deadline=deadline,
+        max_response_bytes=max_response_bytes,
+        retries=retries,
+        retry_backoff=retry_backoff,
+        allow_insecure_non_loopback=allow_insecure_non_loopback,
     )
+    )
+    if result["error_type"] is not None:
+        return {"text": "", "error_type": result["error_type"], "transport": result["transport"]}
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            payload = json.load(resp)
-        return {"text": _extract_chat_content(payload), "error_type": None}
-    except urllib.error.HTTPError as e:
-        return {"text": "", "error_type": f"HTTPError {e.code}"}
-    except urllib.error.URLError as e:
-        return {"text": "", "error_type": f"URLError {type(e.reason).__name__}"}
-    except TimeoutError:
-        return {"text": "", "error_type": "TimeoutError"}
-    except json.JSONDecodeError:
-        return {"text": "", "error_type": "json_parse:JSONDecodeError"}
-    except ValueError as e:
-        return {"text": "", "error_type": str(e)}
-    except Exception as e:  # noqa: BLE001
-        return {"text": "", "error_type": type(e).__name__}
+        return {"text": _extract_chat_content(result["data"] or {}), "error_type": None, "transport": result["transport"]}
+    except ValueError as exc:
+        return {"text": "", "error_type": str(exc), "transport": result["transport"]}
 
 
 def run_endpoint_smoke(
@@ -116,8 +109,13 @@ def run_endpoint_smoke(
     *,
     prompt: str = DEFAULT_PROMPT,
     timeout: int = 10,
+    deadline: float | None = None,
     max_tokens: int = 96,
-    api_key: str | None = None,
+    max_response_bytes: int = 1_048_576,
+    retries: int = 2,
+    retry_backoff: float = 0.25,
+    allow_insecure_non_loopback: bool = False,
+    api_key_env: str | None = None,
     required_phrase: str | None = DEFAULT_REQUIRED_PHRASE,
     min_hangul_ratio: float = 0.35,
     call_fn: Callable[[str], dict[str, Any]] | None = None,
@@ -128,8 +126,13 @@ def run_endpoint_smoke(
         model=model,
         prompt=prompt,
         timeout=timeout,
+        deadline=deadline,
         max_tokens=max_tokens,
-        api_key=api_key,
+        max_response_bytes=max_response_bytes,
+        retries=retries,
+        retry_backoff=retry_backoff,
+        allow_insecure_non_loopback=allow_insecure_non_loopback,
+        api_key_env=api_key_env,
     )
     text = call.get("text") or ""
     error_type = call.get("error_type")
@@ -175,7 +178,13 @@ def run_endpoint_smoke(
             "endpoint": _sanitize_endpoint(endpoint),
             "model": model,
             "timeout": timeout,
+            "deadline": deadline,
             "max_tokens": max_tokens,
+            "max_response_bytes": max_response_bytes,
+            "retries": retries,
+            "retry_backoff": retry_backoff,
+            "allow_insecure_non_loopback": allow_insecure_non_loopback,
+            "api_key_env": api_key_env,
             "prompt_sha256_16": _sha(prompt),
             "required_phrase": required_phrase,
             "min_hangul_ratio": min_hangul_ratio,
@@ -187,6 +196,7 @@ def run_endpoint_smoke(
         },
         "checks": checks,
         "response": response,
+        "transport": call.get("transport"),
         "error": error,
     }
 
@@ -214,7 +224,13 @@ def main() -> None:
     ap.add_argument("--endpoint", required=True, help="OpenAI-compatible base URL, e.g. http://host:port/v1")
     ap.add_argument("--model", default=DEFAULT_MODEL)
     ap.add_argument("--timeout", type=int, default=10)
+    ap.add_argument("--deadline", type=float, default=None, help="per-call retry-inclusive deadline in seconds")
     ap.add_argument("--max-tokens", type=int, default=96)
+    ap.add_argument("--max-response-bytes", type=int, default=1_048_576)
+    ap.add_argument("--retries", type=int, default=2)
+    ap.add_argument("--retry-backoff", type=float, default=0.25)
+    ap.add_argument("--allow-insecure-non-loopback", action="store_true",
+                    help="test-only: permit HTTP endpoints outside loopback")
     ap.add_argument("--prompt", default=DEFAULT_PROMPT)
     ap.add_argument("--required-phrase", default=DEFAULT_REQUIRED_PHRASE)
     ap.add_argument("--no-required-phrase", action="store_true")
@@ -225,14 +241,18 @@ def main() -> None:
     ap.add_argument("--json", action="store_true", help="print JSON instead of text summary")
     args = ap.parse_args()
 
-    api_key = os.environ.get(args.api_key_env) if args.api_key_env else None
     result = run_endpoint_smoke(
         args.endpoint,
         args.model,
         prompt=args.prompt,
         timeout=args.timeout,
+        deadline=args.deadline,
         max_tokens=args.max_tokens,
-        api_key=api_key,
+        max_response_bytes=args.max_response_bytes,
+        retries=args.retries,
+        retry_backoff=args.retry_backoff,
+        allow_insecure_non_loopback=args.allow_insecure_non_loopback,
+        api_key_env=args.api_key_env,
         required_phrase=None if args.no_required_phrase else args.required_phrase,
         min_hangul_ratio=args.min_hangul_ratio,
     )

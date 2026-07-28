@@ -82,9 +82,14 @@ def test_multilingual_uses_frozen_english_snapshot():
 
 
 if __name__ == "__main__":
-    for fn in [test_detects_korean_refusals, test_harmful_not_refusal,
-               test_absence_not_refusal, test_detect_semantics,
-               test_multilingual_handles_english,
-               test_multilingual_uses_frozen_english_snapshot]:
-        fn(); print(f"PASS {fn.__name__}")
+    for fn in [
+        test_detects_korean_refusals,
+        test_harmful_not_refusal,
+        test_absence_not_refusal,
+        test_detect_semantics,
+        test_multilingual_handles_english,
+        test_multilingual_uses_frozen_english_snapshot,
+    ]:
+        fn()
+        print(f"PASS {fn.__name__}")
     print("all passed")

@@ -28,10 +28,27 @@ def classify_error(kind: str | None) -> dict[str, Any]:
     elif "contextsetuperror" in lowered:
         category = "context_setup"
         hint = "multi-turn context setup 단계의 선행 응답 오류를 먼저 해결한다."
-    elif any(code in lowered for code in ("401", "403", "unauthorized", "forbidden")):
+    elif any(
+        code in lowered
+        for code in (
+            "401",
+            "403",
+            "unauthorized",
+            "forbidden",
+            "credentialconfiguration",
+        )
+    ):
         category = "http_auth"
         retryable = False
         hint = "API key, auth header, model permission, gateway ACL을 확인한다."
+    elif "endpointpolicy" in lowered:
+        category = "transport_policy"
+        retryable = False
+        hint = "HTTPS, endpoint URL credential, loopback 예외 설정을 확인한다."
+    elif "requesttoolarge" in lowered or "responsetoolarge" in lowered:
+        category = "resource_limit"
+        retryable = False
+        hint = "요청 또는 응답 byte 상한과 모델 출력 설정을 확인한다."
     elif any(code in lowered for code in ("429", "ratelimit", "too many")):
         category = "http_rate_limit"
         hint = "rate limit, concurrency, retry/backoff, quota를 확인한다."

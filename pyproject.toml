@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ko-redteam"
-version = "0.2.0"
+version = "1.0.0"
 description = "Korean LLM redteam and forensics toolkit"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -13,7 +13,7 @@ license-files = ["LICENSE"]
 authors = [{ name = "Marker Inc Korea" }]
 keywords = ["korean", "llm", "redteam", "forensics", "safety", "privacy", "agent", "security"]
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
     "Natural Language :: Korean",
     "Programming Language :: Python :: 3",
@@ -32,9 +32,10 @@ Changelog = "https://github.com/Marker-Inc-Korea/ko-redteam/blob/main/CHANGELOG.
 dev = [
     "pytest>=8,<9",
     "build>=1,<2",
+    "ruff>=0.12,<1",
     "tomli>=2,<3; python_version < '3.11'",
 ]
-prompt-guard = ["ko-prompt-guard>=0.2,<1"]
+prompt-guard = ["ko-prompt-guard>=1,<2"]
 semantic = [
     "torch>=2.6,<3",
     "transformers>=4.48,<6",

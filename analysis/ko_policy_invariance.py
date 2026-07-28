@@ -3,7 +3,6 @@ from __future__ import annotations
 
 from collections import Counter
 import hashlib
-import json
 import math
 from pathlib import Path
 import re

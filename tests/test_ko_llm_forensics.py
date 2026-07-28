@@ -29,6 +29,12 @@ def test_error_taxonomy_categories():
     assert E.classify_error("HTTPError:400")["retryable"] is False
     assert E.classify_error("JSONDecodeError")["category"] == "json_parse"
     assert E.classify_error("ConnectionRefusedError")["category"] == "connection"
+    assert (
+        E.classify_error("CredentialConfigurationError")["category"]
+        == "http_auth"
+    )
+    assert E.classify_error("EndpointPolicyError")["category"] == "transport_policy"
+    assert E.classify_error("ResponseTooLargeError")["category"] == "resource_limit"
 
 
 def test_safe_redirect_without_stock_refusal_is_not_jailbreak():

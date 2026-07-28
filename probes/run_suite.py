@@ -8,7 +8,6 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import os
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -277,6 +276,12 @@ def _new_manifest(
     expand: bool,
     include_raw: bool,
     timeout: int,
+    deadline: float | None,
+    api_key_env: str | None,
+    max_response_bytes: int,
+    retries: int,
+    retry_backoff: float,
+    allow_insecure_non_loopback: bool,
     max_tokens: int,
     seed: int,
     temperature: float = 0.0,
@@ -297,7 +302,6 @@ def _new_manifest(
     endpoint_smoke_required_phrase: str | None,
     endpoint_smoke_min_hangul_ratio: float,
     endpoint_smoke_max_tokens: int,
-    endpoint_smoke_api_key_env: str | None,
     doctor_enabled: bool,
     doctor_warnings_fail: bool,
     doctor_allow_raw: bool,
@@ -326,6 +330,12 @@ def _new_manifest(
             "expand": expand,
             "include_raw": include_raw,
             "timeout": timeout,
+            "deadline": deadline,
+            "api_key_env": api_key_env,
+            "max_response_bytes": max_response_bytes,
+            "retries": retries,
+            "retry_backoff": retry_backoff,
+            "allow_insecure_non_loopback": allow_insecure_non_loopback,
             "max_tokens": max_tokens,
             "seed": seed,
             "temperature": temperature,
@@ -349,7 +359,6 @@ def _new_manifest(
                 "required_phrase": endpoint_smoke_required_phrase,
                 "min_hangul_ratio": endpoint_smoke_min_hangul_ratio,
                 "max_tokens": endpoint_smoke_max_tokens,
-                "api_key_env": endpoint_smoke_api_key_env,
             },
             "doctor": {
                 "enabled": doctor_enabled,
@@ -824,10 +833,16 @@ def run_suite(
     expand: bool = False,
     include_raw: bool = False,
     timeout: int = 120,
+    deadline: float | None = None,
     max_tokens: int = 512,
     seed: int = 0,
     temperature: float = 0.0,
     top_p: float = 1.0,
+    api_key_env: str | None = None,
+    max_response_bytes: int = 1_048_576,
+    retries: int = 2,
+    retry_backoff: float = 0.25,
+    allow_insecure_non_loopback: bool = False,
     obfuscations: list[str] | None = None,
     framings: list[str] | None = None,
     framing_per_family: bool = True,
@@ -851,7 +866,6 @@ def run_suite(
     endpoint_smoke_required_phrase: str | None = None,
     endpoint_smoke_min_hangul_ratio: float = 0.35,
     endpoint_smoke_max_tokens: int = 96,
-    endpoint_smoke_api_key: str | None = None,
     endpoint_smoke_api_key_env: str | None = None,
     doctor_enabled: bool = True,
     doctor_warnings_fail: bool = False,
@@ -869,6 +883,13 @@ def run_suite(
     endpoint_smoke_call_fn: Callable[[str], dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """benchmark suite를 실행하고 manifest를 반환한다."""
+    if (
+        api_key_env is not None
+        and endpoint_smoke_api_key_env is not None
+        and api_key_env != endpoint_smoke_api_key_env
+    ):
+        raise ValueError("conflicting API key environment variable names")
+    api_key_env = api_key_env or endpoint_smoke_api_key_env
     benchmark_path = Path(benchmark_path)
     multiturn_benchmark_path = Path(multiturn_benchmark_path)
     agent_benchmark_path = Path(agent_benchmark_path)
@@ -882,9 +903,6 @@ def run_suite(
     coverage_min_source_families = coverage_min_source_families or {}
     if agent_tool_call_mode not in TOOL_CALL_MODES:
         raise ValueError(f"unsupported agent tool call mode: {agent_tool_call_mode}")
-    if endpoint_smoke_api_key is None and endpoint_smoke_api_key_env:
-        endpoint_smoke_api_key = os.environ.get(endpoint_smoke_api_key_env)
-
     profile_errors = _deployment_profile_errors(
         deployment_profile,
         benchmark_path=benchmark_path,
@@ -920,6 +938,12 @@ def run_suite(
         expand=expand,
         include_raw=include_raw,
         timeout=timeout,
+        deadline=deadline,
+        api_key_env=api_key_env,
+        max_response_bytes=max_response_bytes,
+        retries=retries,
+        retry_backoff=retry_backoff,
+        allow_insecure_non_loopback=allow_insecure_non_loopback,
         max_tokens=max_tokens,
         seed=seed,
         temperature=temperature,
@@ -940,7 +964,6 @@ def run_suite(
         endpoint_smoke_required_phrase=endpoint_smoke_required_phrase,
         endpoint_smoke_min_hangul_ratio=endpoint_smoke_min_hangul_ratio,
         endpoint_smoke_max_tokens=endpoint_smoke_max_tokens,
-        endpoint_smoke_api_key_env=endpoint_smoke_api_key_env,
         doctor_enabled=doctor_enabled,
         doctor_warnings_fail=doctor_warnings_fail,
         doctor_allow_raw=doctor_allow_raw,
@@ -1091,8 +1114,13 @@ def run_suite(
             model,
             prompt=endpoint_smoke_prompt,
             timeout=timeout,
+            deadline=deadline,
             max_tokens=endpoint_smoke_max_tokens,
-            api_key=endpoint_smoke_api_key,
+            api_key_env=api_key_env,
+            max_response_bytes=max_response_bytes,
+            retries=retries,
+            retry_backoff=retry_backoff,
+            allow_insecure_non_loopback=allow_insecure_non_loopback,
             required_phrase=endpoint_smoke_required_phrase,
             min_hangul_ratio=endpoint_smoke_min_hangul_ratio,
             call_fn=endpoint_smoke_call_fn,
@@ -1115,10 +1143,16 @@ def run_suite(
             benchmark_path=executed_benchmark,
             include_raw=include_raw,
             timeout=timeout,
+            deadline=deadline,
             max_tokens=max_tokens,
             seed=seed,
             temperature=temperature,
             top_p=top_p,
+            api_key_env=api_key_env,
+            max_response_bytes=max_response_bytes,
+            retries=retries,
+            retry_backoff=retry_backoff,
+            allow_insecure_non_loopback=allow_insecure_non_loopback,
             call_fn=call_fn,
             run_context=run_context,
         )
@@ -1146,10 +1180,16 @@ def run_suite(
                 benchmark_path=multiturn_benchmark_path,
                 include_raw=include_raw,
                 timeout=timeout,
+                deadline=deadline,
                 max_tokens=max_tokens,
                 seed=seed,
                 temperature=temperature,
                 top_p=top_p,
+                api_key_env=api_key_env,
+                max_response_bytes=max_response_bytes,
+                retries=retries,
+                retry_backoff=retry_backoff,
+                allow_insecure_non_loopback=allow_insecure_non_loopback,
                 call_fn=multiturn_call_fn,
                 run_context=run_context,
             )
@@ -1178,11 +1218,17 @@ def run_suite(
                 benchmark_path=agent_benchmark_path,
                 include_raw=include_raw,
                 timeout=timeout,
+                deadline=deadline,
                 max_tokens=max_tokens,
                 seed=seed,
                 temperature=temperature,
                 top_p=top_p,
                 tool_call_mode=agent_tool_call_mode,
+                api_key_env=api_key_env,
+                max_response_bytes=max_response_bytes,
+                retries=retries,
+                retry_backoff=retry_backoff,
+                allow_insecure_non_loopback=allow_insecure_non_loopback,
                 call_fn=agent_call_fn,
                 run_context=run_context,
             )
@@ -1286,11 +1332,23 @@ def main() -> None:
     ap.add_argument("--benchmark", default=str(DEFAULT_BENCHMARK))
     ap.add_argument("--out-dir", default=None, help="기본: ./suite_<benchmark-stem>")
     ap.add_argument("--timeout", type=int, default=120)
+    ap.add_argument("--deadline", type=float, default=None)
     ap.add_argument("--max-tokens", type=int, default=512)
     ap.add_argument("--seed", type=int, default=0,
                     help="OpenAI-compatible generation seed; deployment runs must record this in run context")
     ap.add_argument("--temperature", type=float, default=0.0)
     ap.add_argument("--top-p", type=float, default=1.0)
+    ap.add_argument(
+        "--api-key-env",
+        "--endpoint-smoke-api-key-env",
+        dest="api_key_env",
+        default=None,
+        help="API key value가 아닌 환경변수 이름; Bearer auth에 사용",
+    )
+    ap.add_argument("--max-response-bytes", type=int, default=1_048_576)
+    ap.add_argument("--retries", type=int, default=2)
+    ap.add_argument("--retry-backoff", type=float, default=0.25)
+    ap.add_argument("--allow-insecure-non-loopback", action="store_true")
     ap.add_argument("--include-raw", action="store_true",
                     help="raw prompt/response 를 benchmark report에 포함한다. 기본은 sanitized only.")
     ap.add_argument("--run-context",
@@ -1330,8 +1388,6 @@ def main() -> None:
     ap.add_argument("--endpoint-smoke-no-required-phrase", action="store_true")
     ap.add_argument("--endpoint-smoke-min-hangul-ratio", type=float, default=0.35)
     ap.add_argument("--endpoint-smoke-max-tokens", type=int, default=96)
-    ap.add_argument("--endpoint-smoke-api-key-env", default=None,
-                    help="endpoint smoke 호출에만 사용할 API key 환경변수 이름")
     ap.add_argument("--no-doctor", action="store_true", help="report 구조/privacy doctor step 생략")
     ap.add_argument("--doctor-warnings-fail", action="store_true", help="doctor warning도 suite 실패로 처리")
     ap.add_argument("--doctor-allow-raw", action="store_true",
@@ -1363,10 +1419,16 @@ def main() -> None:
         expand=args.expand,
         include_raw=args.include_raw,
         timeout=args.timeout,
+        deadline=args.deadline,
         max_tokens=args.max_tokens,
         seed=args.seed,
         temperature=args.temperature,
         top_p=args.top_p,
+        api_key_env=args.api_key_env,
+        max_response_bytes=args.max_response_bytes,
+        retries=args.retries,
+        retry_backoff=args.retry_backoff,
+        allow_insecure_non_loopback=args.allow_insecure_non_loopback,
         obfuscations=args.obfuscation,
         framings=args.framing,
         framing_per_family=not args.no_framing,
@@ -1386,7 +1448,6 @@ def main() -> None:
         else args.endpoint_smoke_required_phrase,
         endpoint_smoke_min_hangul_ratio=args.endpoint_smoke_min_hangul_ratio,
         endpoint_smoke_max_tokens=args.endpoint_smoke_max_tokens,
-        endpoint_smoke_api_key_env=args.endpoint_smoke_api_key_env,
         doctor_enabled=not args.no_doctor,
         doctor_warnings_fail=args.doctor_warnings_fail,
         doctor_allow_raw=args.doctor_allow_raw,

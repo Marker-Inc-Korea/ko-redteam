@@ -41,5 +41,6 @@ if __name__ == "__main__":
     for f in ["refusal_valset1.json", "refusal_valset2.json"]:
         recall, fpr, n_ref, n_neg = _measure(FIX / f)
         print(f"{f:22} recall {recall:5.1%} (n={n_ref})  FPR {fpr:5.1%} (n={n_neg})")
-    test_valset1_development_regression(); test_valset2_development_regression()
+    test_valset1_development_regression()
+    test_valset2_development_regression()
     print("PASS 개발 회귀 게이트 (recall≥0.95, FPR≤0.05)")

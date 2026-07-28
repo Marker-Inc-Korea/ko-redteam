@@ -48,8 +48,13 @@ def test_guard_normalize_roundtrip():
 
 
 if __name__ == "__main__":
-    for fn in [test_all_techniques_change_korean, test_jamo_split_produces_jamo,
-               test_zero_width_inserts_invisible, test_separators_removable,
-               test_guard_normalize_roundtrip]:
-        fn(); print(f"PASS {fn.__name__}")
+    for fn in [
+        test_all_techniques_change_korean,
+        test_jamo_split_produces_jamo,
+        test_zero_width_inserts_invisible,
+        test_separators_removable,
+        test_guard_normalize_roundtrip,
+    ]:
+        fn()
+        print(f"PASS {fn.__name__}")
     print("all passed")

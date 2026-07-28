@@ -20,18 +20,12 @@ from typing import Any
 try:
     import ko_calibration as calibration
     import ko_calibration_evidence as evidence
-    from ko_practice_review import (
-        ssh_ed25519_public_key,
-        ssh_signature_bytes,
-    )
+    from ko_practice_review import ssh_ed25519_public_key
     from ko_run_context import canonical_sha256
 except ModuleNotFoundError:  # package import path
     from . import ko_calibration as calibration
     from . import ko_calibration_evidence as evidence
-    from .ko_practice_review import (
-        ssh_ed25519_public_key,
-        ssh_signature_bytes,
-    )
+    from .ko_practice_review import ssh_ed25519_public_key
     from .ko_run_context import canonical_sha256
 
 

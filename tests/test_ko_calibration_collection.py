@@ -1,7 +1,6 @@
 """End-to-end regression tests for isolated human calibration collection."""
 from __future__ import annotations
 
-import copy
 import json
 from pathlib import Path
 import shutil

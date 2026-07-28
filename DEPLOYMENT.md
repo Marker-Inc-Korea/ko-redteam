@@ -1,6 +1,6 @@
 # ko-redteam Deployment Guide
 
-이 문서는 `0.2.0` 베타 릴리스 후보의 실행 계약을 정의합니다. 이 단계는 평가기 자체의
+이 문서는 `1.0.0` Production/Stable 평가기의 실행 계약을 정의합니다. 이 단계는 평가기 자체의
 재현성, 산출물 무결성, endpoint 오류 처리를 검증합니다. 특정 모델의 안전 인증이나 공식 순위 공개를
 의미하지 않습니다.
 
@@ -34,12 +34,12 @@ CPython 보안 backport를 반영합니다. 제품 계약에 없는 `pip`, `tarf
 런타임은 최종 이미지에서 제거합니다.
 
 ```bash
-docker build --target runtime -t ko-redteam:0.2.0 .
+docker build --target runtime -t ko-redteam:1.0.0 .
 docker run --rm --read-only \
   --tmpfs /tmp:rw,noexec,nosuid,size=64m \
   --cap-drop ALL \
   --security-opt no-new-privileges \
-  ko-redteam:0.2.0
+  ko-redteam:1.0.0
 ```
 
 이미지는 model server를 포함하지 않습니다. 실제 평가는 report 출력용 writable volume과 Slurm job 안에서
@@ -130,6 +130,12 @@ ko-redteam-suite \
 
 `--deployment-profile`은 raw 저장, benchmark/profile 불일치, 느슨한 doctor, endpoint smoke 누락,
 generation/context 불일치, open-weight 모델의 non-Slurm 실행을 시작 전에 거부합니다.
+
+원격 endpoint는 HTTPS를 사용하고 인증 secret은 예를 들어 `KO_REDTEAM_API_TOKEN`에 주입한 뒤
+`--api-key-env KO_REDTEAM_API_TOKEN`으로 참조합니다. 환경변수 누락, 리다이렉트, 응답 크기 초과,
+retry 포함 deadline 초과는 모두 endpoint error이며 배포 증거에 포함될 수 없습니다. transport
+기본값은 호출당 timeout 120초, 응답 1 MiB, retry 2회이고 운영 실행에서는 `--deadline`을 명시해
+retry를 포함한 호출 상한도 고정합니다.
 
 ## Cohort Validation
 

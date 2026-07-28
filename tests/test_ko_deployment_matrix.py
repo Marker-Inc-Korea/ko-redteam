@@ -1,7 +1,6 @@
 """Deployment-sensitivity matrix regression tests."""
 from __future__ import annotations
 
-import copy
 import hashlib
 from pathlib import Path
 import sys

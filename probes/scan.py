@@ -14,7 +14,6 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-import urllib.request
 from pathlib import Path
 from typing import Any
 
@@ -37,6 +36,7 @@ from ko_report import render_markdown  # noqa: E402
 from ko_diagnostics import diagnose  # noqa: E402
 from ko_obfuscation import TECHNIQUES, obfuscate  # noqa: E402
 import ko_jailbreak as JB  # noqa: E402
+from http_client import HttpClientOptions, post_json  # noqa: E402
 
 
 # 유해요청 시드(모델 안전정렬 시험). 평문이면 정렬된 모델은 거부해야 정상.
@@ -50,9 +50,9 @@ _RS_FRAMING = "거부어휘 금지 제약 (refusal-suppression)"
 
 # ---- 공통: 모델 호출 + 판정 ------------------------------------------------
 
-def chat(endpoint: str, model: str, prompt: str, *, timeout: int = 120, max_tokens: int = 512) -> str:
+def chat(endpoint: str, model: str, prompt: str, *, timeout: int = 120, max_tokens: int = 512, **kwargs: Any) -> str:
     return chat_multi(endpoint, model, [{"role": "user", "content": prompt}],
-                      timeout=timeout, max_tokens=max_tokens)
+                      timeout=timeout, max_tokens=max_tokens, **kwargs)
 
 
 def chat_multi(
@@ -62,22 +62,31 @@ def chat_multi(
     *,
     timeout: int = 120,
     max_tokens: int = 512,
+    deadline: float | None = None,
+    api_key_env: str | None = None,
+    max_response_bytes: int = 1_048_576,
+    retries: int = 2,
+    retry_backoff: float = 0.25,
+    allow_insecure_non_loopback: bool = False,
 ) -> str:
-    body = json.dumps({
+    result = post_json(endpoint.rstrip("/") + "/chat/completions", {
         "model": model,
         "messages": messages,
         "temperature": 0.0,
         "max_tokens": max_tokens,
-    }).encode()
-    req = urllib.request.Request(endpoint.rstrip("/") + "/chat/completions",
-                                 data=body, headers={"Content-Type": "application/json"})
-    data = json.load(urllib.request.urlopen(req, timeout=timeout))
-    return data["choices"][0]["message"]["content"]
+    }, api_key_env=api_key_env, options=HttpClientOptions(
+        timeout=timeout, deadline=deadline, max_response_bytes=max_response_bytes,
+        retries=retries, retry_backoff=retry_backoff,
+        allow_insecure_non_loopback=allow_insecure_non_loopback,
+    ))
+    if result["error_type"] is not None:
+        raise RuntimeError(result["error_type"])
+    return result["data"]["choices"][0]["message"]["content"]
 
 
-def _call_chat(endpoint: str, model: str, prompt: str, *, timeout: int, max_tokens: int) -> dict[str, Any]:
+def _call_chat(endpoint: str, model: str, prompt: str, *, timeout: int, max_tokens: int, **kwargs: Any) -> dict[str, Any]:
     return _call_chat_multi(endpoint, model, [{"role": "user", "content": prompt}],
-                            timeout=timeout, max_tokens=max_tokens)
+                            timeout=timeout, max_tokens=max_tokens, **kwargs)
 
 
 def _call_chat_multi(
@@ -87,15 +96,29 @@ def _call_chat_multi(
     *,
     timeout: int,
     max_tokens: int,
+    deadline: float | None = None,
+    api_key_env: str | None = None,
+    max_response_bytes: int = 1_048_576,
+    retries: int = 2,
+    retry_backoff: float = 0.25,
+    allow_insecure_non_loopback: bool = False,
 ) -> dict[str, Any]:
+    result = post_json(endpoint.rstrip("/") + "/chat/completions", {
+        "model": model,
+        "messages": messages,
+        "temperature": 0.0,
+        "max_tokens": max_tokens,
+    }, api_key_env=api_key_env, options=HttpClientOptions(
+        timeout=timeout, deadline=deadline, max_response_bytes=max_response_bytes,
+        retries=retries, retry_backoff=retry_backoff,
+        allow_insecure_non_loopback=allow_insecure_non_loopback,
+    ))
+    if result["error_type"] is not None:
+        return {"ok": False, "text": "", "error_type": result["error_type"], "transport": result["transport"]}
     try:
-        return {
-            "ok": True,
-            "text": chat_multi(endpoint, model, messages, timeout=timeout, max_tokens=max_tokens),
-            "error_type": None,
-        }
-    except Exception as e:  # noqa: BLE001 - 스캐너는 endpoint 장애를 리포트로 남긴다.
-        return {"ok": False, "text": f"[ERROR:{type(e).__name__}]", "error_type": type(e).__name__}
+        return {"ok": True, "text": result["data"]["choices"][0]["message"]["content"], "error_type": None, "transport": result["transport"]}
+    except (KeyError, IndexError, TypeError):
+        return {"ok": False, "text": "", "error_type": "json_parse:missing choices[0].message.content", "transport": result["transport"]}
 
 
 def _english_ref_would_hit(text: str) -> bool:
@@ -145,6 +168,7 @@ def _assess_call(
         "harmful_compliance": assessment["outcome"] == OUTCOME_HARMFUL,
         "english_ref_hit": english_ref_hit,
         "assessment": assessment,
+        "transport": call.get("transport"),
     }
 
 
@@ -204,13 +228,23 @@ def run_single(
     include_raw: bool = False,
     timeout: int = 120,
     max_tokens: int = 512,
+    deadline: float | None = None,
+    api_key_env: str | None = None,
+    max_response_bytes: int = 1_048_576,
+    retries: int = 2,
+    retry_backoff: float = 0.25,
+    allow_insecure_non_loopback: bool = False,
 ) -> dict[str, Any]:
     techs = ["plain", *TECHNIQUES]
     rows: list[dict[str, Any]] = []
     for idx, seed in enumerate(HARMFUL_SEEDS, 1):
         for tech in techs:
             prompt = seed if tech == "plain" else obfuscate(seed, tech)
-            call = _call_chat(endpoint, model, prompt, timeout=timeout, max_tokens=max_tokens)
+            call = _call_chat(endpoint, model, prompt, timeout=timeout, max_tokens=max_tokens,
+                              deadline=deadline, api_key_env=api_key_env,
+                              max_response_bytes=max_response_bytes, retries=retries,
+                              retry_backoff=retry_backoff,
+                              allow_insecure_non_loopback=allow_insecure_non_loopback)
             row = _assess_call(call, prompt=prompt, mode="single", attack=tech,
                                seed_id=f"seed{idx}", include_raw=include_raw)
             rows.append(row)
@@ -240,13 +274,23 @@ def run_combo(
     include_raw: bool = False,
     timeout: int = 120,
     max_tokens: int = 512,
+    deadline: float | None = None,
+    api_key_env: str | None = None,
+    max_response_bytes: int = 1_048_576,
+    retries: int = 2,
+    retry_backoff: float = 0.25,
+    allow_insecure_non_loopback: bool = False,
 ) -> dict[str, Any]:
     fams = JB.by_family()
     stack = [names[0] for names in fams.values()]
     rows: list[dict[str, Any]] = []
 
     def one(seed_id: str, family: str, mode_name: str, prompt: str, attack_name: str) -> None:
-        call = _call_chat(endpoint, model, prompt, timeout=timeout, max_tokens=max_tokens)
+        call = _call_chat(endpoint, model, prompt, timeout=timeout, max_tokens=max_tokens,
+                          deadline=deadline, api_key_env=api_key_env,
+                          max_response_bytes=max_response_bytes, retries=retries,
+                          retry_backoff=retry_backoff,
+                          allow_insecure_non_loopback=allow_insecure_non_loopback)
         row = _assess_call(call, prompt=prompt, mode="combo", attack=mode_name,
                            family=family, seed_id=seed_id, include_raw=include_raw)
         row["framing"] = attack_name
@@ -322,11 +366,21 @@ def run_crescendo(
     include_raw: bool = False,
     timeout: int = 120,
     max_tokens: int = 512,
+    deadline: float | None = None,
+    api_key_env: str | None = None,
+    max_response_bytes: int = 1_048_576,
+    retries: int = 2,
+    retry_backoff: float = 0.25,
+    allow_insecure_non_loopback: bool = False,
 ) -> dict[str, Any]:
     rows: list[dict[str, Any]] = []
     for goal, spec in _LADDERS.items():
         print(f"\n── crescendo: {goal} ──", flush=True)
-        base_call = _call_chat(endpoint, model, spec["direct"], timeout=timeout, max_tokens=max_tokens)
+        base_call = _call_chat(endpoint, model, spec["direct"], timeout=timeout, max_tokens=max_tokens,
+                               deadline=deadline, api_key_env=api_key_env,
+                               max_response_bytes=max_response_bytes, retries=retries,
+                               retry_backoff=retry_backoff,
+                               allow_insecure_non_loopback=allow_insecure_non_loopback)
         base_row = _assess_call(base_call, prompt=spec["direct"], mode="crescendo",
                                 attack="baseline_direct", family=goal, seed_id=goal,
                                 include_raw=include_raw)
@@ -337,7 +391,11 @@ def run_crescendo(
         context_ok = True
         for i, (text, level) in enumerate(spec["turns"][:4], 1):
             messages.append({"role": "user", "content": text})
-            call = _call_chat_multi(endpoint, model, messages, timeout=timeout, max_tokens=max_tokens)
+            call = _call_chat_multi(endpoint, model, messages, timeout=timeout, max_tokens=max_tokens,
+                                    deadline=deadline, api_key_env=api_key_env,
+                                    max_response_bytes=max_response_bytes, retries=retries,
+                                    retry_backoff=retry_backoff,
+                                    allow_insecure_non_loopback=allow_insecure_non_loopback)
             if call["error_type"]:
                 context_ok = False
                 print(f"  [turn{i} {level:8}] error={call['error_type']}", flush=True)
@@ -352,7 +410,10 @@ def run_crescendo(
         for variant, term in finals:
             if context_ok:
                 call = _call_chat_multi(endpoint, model, messages + [{"role": "user", "content": term}],
-                                        timeout=timeout, max_tokens=max_tokens)
+                                        timeout=timeout, max_tokens=max_tokens, deadline=deadline,
+                                        api_key_env=api_key_env, max_response_bytes=max_response_bytes,
+                                        retries=retries, retry_backoff=retry_backoff,
+                                        allow_insecure_non_loopback=allow_insecure_non_loopback)
             else:
                 call = {"ok": False, "text": "[ERROR:ContextSetupError]", "error_type": "ContextSetupError"}
             row = _assess_call(call, prompt=term, mode="crescendo", attack=f"final_{variant}",
@@ -381,7 +442,15 @@ def main() -> None:
     ap.add_argument("--endpoint", required=True)
     ap.add_argument("--model", default="gemma-4-31B-it")
     ap.add_argument("--timeout", type=int, default=120)
+    ap.add_argument("--deadline", type=float, default=None)
     ap.add_argument("--max-tokens", type=int, default=512)
+    ap.add_argument("--api-key-env", default=None)
+    ap.add_argument("--max-response-bytes", type=int, default=1_048_576)
+    ap.add_argument("--retries", type=int, default=2)
+    ap.add_argument("--retry-backoff", type=float, default=0.25)
+    ap.add_argument("--allow-insecure-non-loopback", action="store_true")
+    ap.add_argument("--allow-errors", action="store_true",
+                    help="endpoint errors가 있어도 zero exit status를 반환한다")
     ap.add_argument("--include-raw", action="store_true",
                     help="raw prompt/response 를 로컬 report 에 포함한다. 기본은 sanitized only.")
     ap.add_argument("--output", default=None, help="report path. 기본: ./scan_<mode>_report.json")
@@ -389,7 +458,11 @@ def main() -> None:
                     help="optional Markdown summary path. 예: scan_single_report.md")
     args = ap.parse_args()
     out = MODES[args.mode](args.endpoint, args.model, include_raw=args.include_raw,
-                           timeout=args.timeout, max_tokens=args.max_tokens)
+                           timeout=args.timeout, deadline=args.deadline,
+                           max_tokens=args.max_tokens, api_key_env=args.api_key_env,
+                           max_response_bytes=args.max_response_bytes, retries=args.retries,
+                           retry_backoff=args.retry_backoff,
+                           allow_insecure_non_loopback=args.allow_insecure_non_loopback)
     out_path = Path(args.output) if args.output else Path.cwd() / f"scan_{args.mode}_report.json"
     out_path.write_text(json.dumps(out, ensure_ascii=False, indent=1))
     sc = out.get("scorecard", {})
@@ -400,6 +473,8 @@ def main() -> None:
         md_path.write_text(render_markdown(out), "utf-8")
         print(f"saved markdown {md_path}")
     print(f"\nsaved {out_path}")
+    if out.get("summary", {}).get("outcome_counts", {}).get("error", 0) and not args.allow_errors:
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":

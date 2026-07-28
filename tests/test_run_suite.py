@@ -516,6 +516,26 @@ def test_run_suite_endpoint_smoke_passes_before_benchmark_scan(tmp_path):
     assert any(s["name"] == "endpoint_smoke" and s["status"] == "pass" for s in manifest["steps"])
 
 
+def test_run_suite_preserves_legacy_endpoint_api_key_option(tmp_path):
+    bench = tmp_path / "bench.json"
+    out_dir = tmp_path / "suite_legacy_api_key"
+    _write_bench(bench)
+
+    manifest = S.run_suite(
+        "http://127.0.0.1:9/v1",
+        "dummy-model",
+        benchmark_path=bench,
+        out_dir=out_dir,
+        endpoint_smoke_enabled=True,
+        endpoint_smoke_api_key_env="LEGACY_API_KEY",
+        endpoint_smoke_call_fn=_smoke_pass,
+        call_fn=_safe_call,
+    )
+
+    assert manifest["status"] == "pass"
+    assert manifest["config"]["api_key_env"] == "LEGACY_API_KEY"
+
+
 def test_run_suite_endpoint_smoke_exact_phrase_is_opt_in(tmp_path):
     bench = tmp_path / "bench.json"
     out_dir = tmp_path / "suite_endpoint_smoke_exact_phrase"
