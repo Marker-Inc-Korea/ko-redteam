@@ -16,8 +16,10 @@ from http_client import EndpointPolicyError, HttpClientOptions, post_json, valid
 class _TransportHandler(BaseHTTPRequestHandler):
     authorization: str | None = None
     mode = "ok"
+    request_count = 0
 
     def do_POST(self):  # noqa: N802
+        type(self).request_count += 1
         type(self).authorization = self.headers.get("authorization")
         if type(self).mode == "redirect":
             self.send_response(302)
@@ -31,6 +33,10 @@ class _TransportHandler(BaseHTTPRequestHandler):
             self.end_headers()
             return
         if type(self).mode == "retry":
+            self.send_response(503)
+            self.end_headers()
+            return
+        if type(self).mode == "retry_once" and type(self).request_count == 1:
             self.send_response(503)
             self.end_headers()
             return
@@ -155,6 +161,24 @@ def test_post_json_enforces_response_limit_and_deadline():
     assert oversize["transport"]["attempts"] == 1
     assert deadline["error_type"] == "TimeoutError"
     assert deadline["transport"]["attempts"] <= 1
+
+
+def test_post_json_retries_transient_server_error():
+    _TransportHandler.mode = "retry_once"
+    _TransportHandler.request_count = 0
+    server, thread = _server()
+    try:
+        result = post_json(
+            f"http://127.0.0.1:{server.server_port}/v1/chat/completions",
+            {"model": "dummy"},
+            options=HttpClientOptions(retries=1, retry_backoff=0),
+        )
+    finally:
+        server.shutdown()
+        thread.join(timeout=5)
+
+    assert result["error_type"] is None
+    assert result["transport"]["attempts"] == 2
 
 
 def test_scan_cli_endpoint_errors_fail_unless_allowed(tmp_path):

@@ -200,42 +200,50 @@ def post_json(
             error = RequestTooLargeError(
                 "request exceeds configured limit"
             )
-        opener = urllib.request.build_opener(NoRedirectHandler())
-        for attempt in range(1, options.retries + 2):
-            if error is not None:
-                break
-            remaining = deadline - time.monotonic()
-            if remaining <= 0:
-                error = TimeoutError("overall request deadline exceeded")
-                break
-            attempts = attempt
-            request = urllib.request.Request(endpoint, data=body, headers=headers, method="POST")
-            try:
-                with opener.open(request, timeout=min(options.timeout, remaining)) as response:
-                    status = response.status
-                    request_id = _request_id(response.headers)
-                    raw = _read_bounded(response, options.max_response_bytes)
-                parsed = json.loads(raw.decode("utf-8"))
-                if not isinstance(parsed, dict):
-                    raise ValueError("json_parse:response must be an object")
-                data = parsed
-                error = None
-                break
-            except urllib.error.HTTPError as exc:
-                status = exc.code
-                request_id = _request_id(exc.headers)
-                error = exc
-                retryable = exc.code == 429 or 500 <= exc.code <= 599
-            except Exception as exc:  # noqa: BLE001 - returned as structured endpoint errors.
-                error = exc
-                retryable = _retryable_exception(exc)
-            if not retryable or attempt > options.retries:
-                break
-            wait = min(options.retry_backoff * (2 ** (attempt - 1)), max(0.0, deadline - time.monotonic()))
-            if wait <= 0:
-                error = TimeoutError("overall request deadline exceeded")
-                break
-            time.sleep(wait)
+        if error is None:
+            opener = urllib.request.build_opener(NoRedirectHandler())
+            for attempt in range(1, options.retries + 2):
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    error = TimeoutError("overall request deadline exceeded")
+                    break
+                attempts = attempt
+                request = urllib.request.Request(
+                    endpoint,
+                    data=body,
+                    headers=headers,
+                    method="POST",
+                )
+                try:
+                    with opener.open(
+                        request,
+                        timeout=min(options.timeout, remaining),
+                    ) as response:
+                        status = response.status
+                        request_id = _request_id(response.headers)
+                        raw = _read_bounded(response, options.max_response_bytes)
+                    parsed = json.loads(raw.decode("utf-8"))
+                    if not isinstance(parsed, dict):
+                        raise ValueError("json_parse:response must be an object")
+                    data = parsed
+                    error = None
+                    break
+                except urllib.error.HTTPError as exc:
+                    status = exc.code
+                    request_id = _request_id(exc.headers)
+                    error = exc
+                    retryable = exc.code == 429 or 500 <= exc.code <= 599
+                except Exception as exc:  # noqa: BLE001 - returned as structured endpoint errors.
+                    error = exc
+                    retryable = _retryable_exception(exc)
+                if not retryable or attempt > options.retries:
+                    break
+                wait = options.retry_backoff * (2 ** (attempt - 1))
+                remaining = deadline - time.monotonic()
+                if remaining <= 0 or wait >= remaining:
+                    error = TimeoutError("overall request deadline exceeded")
+                    break
+                time.sleep(wait)
     latency_ms = round((time.monotonic() - started) * 1000, 1)
     transport = {
         "request_id": request_id,
