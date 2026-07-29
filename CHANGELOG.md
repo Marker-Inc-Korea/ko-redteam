@@ -4,6 +4,11 @@
 
 ## Unreleased
 
+### Documentation
+
+- 본제품을 공식 모델 순위가 아닌 내부 승격·변경 회귀·사고 포렌식으로 고정하고,
+  machine evidence와 안전 인증의 경계를 제품 계약에 명시했습니다.
+
 ## 1.0.0 - 2026-07-28
 
 ### Changed
