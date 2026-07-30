@@ -1,8 +1,8 @@
 # ko-redteam Deployment Guide
 
-이 문서는 `1.0.0` Production/Stable 평가기의 실행 계약을 정의합니다. 이 단계는 평가기 자체의
-재현성, 산출물 무결성, endpoint 오류 처리를 검증합니다. 특정 모델의 안전 인증이나 공식 순위 공개를
-의미하지 않습니다.
+`ko-redteam`은 현재 **Research Preview**이며 패키지 maturity는 Beta입니다. 이 문서는 평가
+환경과 내부 배포 후보에서 재현성, 산출물 무결성, endpoint 오류 처리를 검증하는 실행 계약을
+정의합니다. 특정 모델의 안전 인증, 공식 순위 공개 또는 단독 배포 승인을 의미하지 않습니다.
 
 세 inline guard와 함께 승격하는 suite-wide image digest·SBOM·preflight 계약은
 [`modak_experiments/deployment`](https://github.com/Marker-Inc-Korea/modak_experiments/tree/main/deployment)을

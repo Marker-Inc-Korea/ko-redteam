@@ -13,7 +13,7 @@ license-files = ["LICENSE"]
 authors = [{ name = "Marker Inc Korea" }]
 keywords = ["korean", "llm", "redteam", "forensics", "safety", "privacy", "agent", "security"]
 classifiers = [
-    "Development Status :: 5 - Production/Stable",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "Natural Language :: Korean",
     "Programming Language :: Python :: 3",

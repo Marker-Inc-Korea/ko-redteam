@@ -2,26 +2,27 @@
 
 [![CI](https://github.com/Marker-Inc-Korea/ko-redteam/actions/workflows/tests.yml/badge.svg)](https://github.com/Marker-Inc-Korea/ko-redteam/actions/workflows/tests.yml)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-0b7285)](https://github.com/Marker-Inc-Korea/ko-redteam/blob/main/pyproject.toml)
-[![Software: Stable](https://img.shields.io/badge/software-stable-1f6f43)](./CHANGELOG.md)
+[![Status: Research Preview](https://img.shields.io/badge/status-research_preview-2563eb)](./CHANGELOG.md)
 
 한국어 LLM 서비스를 배포하기 전/후에 안전성, 개인정보, prompt security, agent/RAG 도구 사용,
 과잉거부, 한국어 응답 품질을 한 번에 점검하는 레드팀/포렌식 평가 도구입니다.
 
 > [!NOTE]
-> 평가기 소프트웨어 버전은 **1.0.0 Production/Stable**입니다. 이는 CLI·실패 처리·배포
-> 패키징의 운영 계약을 뜻하며 평가 대상 LLM의 배포 승인과는 별개입니다. RC12의 7개 모델 x 3회 Slurm GPU 진단은 모두 엄격 deployment
-> screen을 통과하지 못했으며, 새 runtime preflight와 5축 배포 행렬도 소급 인정하지 않습니다.
-> 특정 모델의 안전 인증, 식약처 허가 또는 공식 leaderboard 공개를 의미하지 않습니다.
+> **공개 단계: Research Preview.** 패키지 버전 `1.0.0`은 API 세대를 나타내며 성숙도
+> 분류는 Beta입니다. 내부 연구·모델 비교·회귀 분석·사고 포렌식에 사용할 수 있지만,
+> 결과를 특정 모델의 안전 인증, 식약처 허가, 공식 leaderboard 또는 단독 배포 승인으로
+> 해석해서는 안 됩니다.
 
 ## Product Contract
 
 | 항목 | 운영 정의 |
 |---|---|
-| 본제품 | 고객 시스템의 내부 모델 승격 gate, 변경 회귀, 사고 포렌식 |
+| 현재 용도 | 고객 시스템의 내부 모델 승격 후보 gate, 변경 회귀, 사고 포렌식 연구 |
 | 구매자 | AI 플랫폼 owner, 보안·품질 책임자, 모델 운영팀 |
 | 핵심 산출물 | 고정 모델·런타임·프롬프트·도구 맥락, 반복 실행, critical finding, evidence bundle |
 | 비보장 범위 | 모델 절대 안전 등급, 완전 순위, 규제기관 인증 |
 | 현재 증거 수준 | 사람 판정·외부 검토를 제외한 machine evidence 기반 내부 의사결정 |
+| 공개 단계 | 오픈소스 `Research Preview`; 공식 판정·인증 용도 불가 |
 | 별도 연구 트랙 | 공식 leaderboard protocol은 유지하되 Runtime/Assurance 출시의 선행조건으로 사용하지 않음 |
 
 제품의 성공 지표는 더 많은 모델을 줄 세우는 것이 아니라 **위험한 변경을 배포 전에
