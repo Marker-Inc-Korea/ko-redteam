@@ -2,8 +2,8 @@
 
 ## Supported Versions
 
-보안 수정은 `main`과 최신 태그에 우선 적용합니다. 현재 `0.2.0`은 Beta 릴리스 후보이며,
-stable 지원을 주장하지 않습니다.
+현재 지원 브랜치는 `main`입니다. 이 저장소는 Research Preview이며 공식 판정·인증이나
+Stable 지원을 주장하지 않습니다.
 
 ## Reporting
 
