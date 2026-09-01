@@ -32,7 +32,7 @@ Changelog = "https://github.com/Marker-Inc-Korea/ko-redteam/blob/main/CHANGELOG.
 dev = [
     "pytest>=8,<9",
     "build>=1,<2",
-    "ruff==0.16.0",
+    "ruff==0.16.5",
     "tomli>=2,<3; python_version < '3.11'",
 ]
 prompt-guard = ["ko-prompt-guard>=1,<2"]
