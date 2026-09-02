@@ -30,7 +30,7 @@ Changelog = "https://github.com/Marker-Inc-Korea/ko-redteam/blob/main/CHANGELOG.
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=8,<9",
+    "pytest>=8,<10",
     "build>=1,<2",
     "ruff==0.16.0",
     "tomli>=2,<3; python_version < '3.11'",
