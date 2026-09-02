@@ -94,7 +94,7 @@ def test_distribution_metadata_has_release_basics():
     assert data["build-system"]["requires"][0].startswith("setuptools>=77")
     assert data["project"]["license"] == "MIT"
     assert data["project"]["license-files"] == ["LICENSE"]
-    assert data["project"]["version"] == "1.0.0"
+    assert data["project"]["version"] == "1.1.0"
     assert "Development Status :: 4 - Beta" in data["project"]["classifiers"]
     assert data["project"]["urls"]["Repository"] == (
         "https://github.com/Marker-Inc-Korea/ko-redteam"

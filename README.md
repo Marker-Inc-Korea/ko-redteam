@@ -1,3 +1,5 @@
+[English](README.en.md) | **한국어**
+
 # ko-redteam
 
 [![CI](https://github.com/Marker-Inc-Korea/ko-redteam/actions/workflows/tests.yml/badge.svg)](https://github.com/Marker-Inc-Korea/ko-redteam/actions/workflows/tests.yml)
@@ -8,7 +10,7 @@
 과잉거부, 한국어 응답 품질을 한 번에 점검하는 레드팀/포렌식 평가 도구입니다.
 
 > [!NOTE]
-> **공개 단계: Research Preview.** 패키지 버전 `1.0.0`은 API 세대를 나타내며 성숙도
+> **공개 단계: Research Preview.** 패키지 버전 `1.1.0`은 API 세대를 나타내며 성숙도
 > 분류는 Beta입니다. 내부 연구·모델 비교·회귀 분석·사고 포렌식에 사용할 수 있지만,
 > 결과를 특정 모델의 안전 인증, 식약처 허가, 공식 leaderboard 또는 단독 배포 승인으로
 > 해석해서는 안 됩니다.
@@ -139,14 +141,15 @@ OpenAI-compatible endpoint
 ## Quick Start
 
 ```bash
-python3 -m pip install ".[dev]"
-ko-redteam-self-check
+python3 -m pip install \
+  "ko-redteam @ git+https://github.com/Marker-Inc-Korea/ko-redteam.git@main"
+ko-redteam self-check
 ```
 
 실서비스 endpoint는 통합 suite로 확인합니다.
 
 ```bash
-ko-redteam-suite \
+ko-redteam suite \
   --endpoint http://127.0.0.1:8030/v1 \
   --model gemma-4-31B-it \
   --benchmark benchmarks/ko_llm_paperbench_v1.json \
@@ -164,6 +167,27 @@ ko-redteam-suite \
   --min-domain privacy=90 \
   --max-critical-high 0
 ```
+
+가드 제품의 고객별 판정 로그는 원문 없이 JSONL로 내보내 qualification할 수 있습니다.
+
+```json
+{"id":"safe-001","category":"prompt","expected":"allow","observed":"allow","latency_ms":1.2}
+{"id":"risk-001","category":"prompt","expected":"block","observed":"block","latency_ms":1.5}
+```
+
+```bash
+ko-redteam qualify observations.jsonl \
+  --output qualification.json \
+  --html qualification.html
+```
+
+기본 gate는 최소 100건(allow 30건·block 30건), allow/block 사례를 모두 요구하고 위험
+미차단·실행 오류를 허용하지 않습니다. 작은 개발 fixture는 `--min-cases`,
+`--min-allow-cases`, `--min-block-cases`를 명시해 smoke test로만 사용하십시오.
+보고서에는 입력 SHA-256, 카테고리별 오류율과 지연시간만 남고 입력 파일명이나
+prompt/response 원문은 보존하지 않습니다. `id`와 `category`는 보고서에 남으므로 개인정보가
+아닌 opaque ASCII 식별자를 사용해야 하며 코드가 이를 강제합니다. 고객이 부여한 `expected`
+라벨 품질 자체는 별도 책임입니다.
 
 통합 suite의 endpoint smoke는 기본적으로 API 성공, 비어 있지 않은 응답, 한글 비율과 문자 깨짐 여부를
 검사합니다. 특정 표면형을 재현하지 않았다는 이유로 정상적인 한국어 응답을 측정 오류로 처리하지 않습니다.

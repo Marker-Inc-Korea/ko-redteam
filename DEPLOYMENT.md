@@ -34,12 +34,12 @@ CPython 보안 backport를 반영합니다. 제품 계약에 없는 `pip`, `tarf
 런타임은 최종 이미지에서 제거합니다.
 
 ```bash
-docker build --target runtime -t ko-redteam:1.0.0 .
+docker build --target runtime -t ko-redteam:1.1.0 .
 docker run --rm --read-only \
   --tmpfs /tmp:rw,noexec,nosuid,size=64m \
   --cap-drop ALL \
   --security-opt no-new-privileges \
-  ko-redteam:1.0.0
+  ko-redteam:1.1.0
 ```
 
 이미지는 model server를 포함하지 않습니다. 실제 평가는 report 출력용 writable volume과 Slurm job 안에서

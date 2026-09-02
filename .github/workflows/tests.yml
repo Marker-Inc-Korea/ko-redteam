@@ -78,7 +78,7 @@ jobs:
         run: |
           python -m venv /tmp/ko-redteam-wheel
           /tmp/ko-redteam-wheel/bin/python -m pip install --no-deps dist/*.whl
-          /tmp/ko-redteam-wheel/bin/python -c "import importlib.metadata as m; from analysis.ko_llm_forensics import analyze_response; assert m.version('ko-redteam') == '1.0.0'; assert callable(analyze_response)"
+          /tmp/ko-redteam-wheel/bin/python -c "import importlib.metadata as m; from analysis.ko_llm_forensics import analyze_response; assert m.version('ko-redteam') == '1.1.0'; assert callable(analyze_response)"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always()
         with:

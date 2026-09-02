@@ -4,6 +4,21 @@
 
 ## Unreleased
 
+## 1.1.0 - 2026-09-02
+
+### Added
+
+- 자주 쓰는 self-check, suite, scan, report doctor, qualification 경로를 묶는 단일
+  `ko-redteam` 명령을 추가했습니다. 기존 세부 명령은 호환성을 위해 유지합니다.
+- 고객이 직접 기대 판정을 부여한 JSONL로 위험 미차단률, 정상 차단률, 오류율, 카테고리별
+  결과, 지연시간과 입력 SHA-256을 계산하는 `ko-redteam qualify`를 추가했습니다.
+- prompt/response 원문을 보고서에 남기지 않는 JSON 및 정적 HTML qualification 출력을
+  추가했습니다.
+- qualification 입력은 opaque ASCII case ID/category와 중복 없는 JSON을 요구하며,
+  공개 보고서에 입력 파일명이나 raw prompt/response를 남기지 않습니다.
+- 완벽한 2건 fixture가 운영 qualification을 통과하지 않도록 기본 최소 표본을 총 100건,
+  allow 30건, block 30건으로 강화하고 모든 기준을 보고서에 기록합니다.
+
 ### Documentation
 
 - 공개 단계를 `Research Preview`로 재분류하고 PyPI maturity를 Beta로 맞췄습니다.
